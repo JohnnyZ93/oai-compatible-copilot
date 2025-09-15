@@ -3,23 +3,23 @@ import { HuggingFaceChatModelProvider } from "./provider";
 
 export function activate(context: vscode.ExtensionContext) {
 	// Build a descriptive User-Agent to help quantify API usage
-	const ext = vscode.extensions.getExtension("HuggingFace.huggingface-vscode-chat");
+	const ext = vscode.extensions.getExtension("johnny-zhao.oai-compatible-copilot");
 	const extVersion = ext?.packageJSON?.version ?? "unknown";
 	const vscodeVersion = vscode.version;
 	// Keep UA minimal: only extension version and VS Code version
-	const ua = `huggingface-vscode-chat/${extVersion} VSCode/${vscodeVersion}`;
+	const ua = `oai-compatible-copilot/${extVersion} VSCode/${vscodeVersion}`;
 
 	const provider = new HuggingFaceChatModelProvider(context.secrets, ua);
 	// Register the Hugging Face provider under the vendor id used in package.json
-	vscode.lm.registerLanguageModelChatProvider("huggingface", provider);
+	vscode.lm.registerLanguageModelChatProvider("oaicopilot", provider);
 
 	// Management command to configure API key
 	context.subscriptions.push(
-		vscode.commands.registerCommand("huggingface.manage", async () => {
-			const existing = await context.secrets.get("huggingface.apiKey");
+		vscode.commands.registerCommand("oaicopilot.setApikey", async () => {
+			const existing = await context.secrets.get("oaicopilot.apiKey");
 			const apiKey = await vscode.window.showInputBox({
-				title: "Hugging Face API Key",
-				prompt: existing ? "Update your Hugging Face API key" : "Enter your Hugging Face API key",
+				title: "OAI Compatible Provider API Key",
+				prompt: existing ? "Update your OAI Compatible API key" : "Enter your OAI Compatible API key",
 				ignoreFocusOut: true,
 				password: true,
 				value: existing ?? "",
@@ -28,12 +28,12 @@ export function activate(context: vscode.ExtensionContext) {
 				return; // user canceled
 			}
 			if (!apiKey.trim()) {
-				await context.secrets.delete("huggingface.apiKey");
-				vscode.window.showInformationMessage("Hugging Face API key cleared.");
+				await context.secrets.delete("oaicopilot.apiKey");
+				vscode.window.showInformationMessage("OAI Compatible API key cleared.");
 				return;
 			}
-			await context.secrets.store("huggingface.apiKey", apiKey.trim());
-			vscode.window.showInformationMessage("Hugging Face API key saved.");
+			await context.secrets.store("oaicopilot.apiKey", apiKey.trim());
+			vscode.window.showInformationMessage("OAI Compatible API key saved.");
 		})
 	);
 }

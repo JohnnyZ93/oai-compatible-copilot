@@ -1,14 +1,14 @@
 {
-	"name": "huggingface-vscode-chat",
-	"publisher": "HuggingFace",
-	"displayName": "Hugging Face Provider for GitHub Copilot Chat",
-	"description": "An extension that integrates Hugging Face Inference Providers into GitHub Copilot Chat",
+	"name": "oai-compatible-copilot",
+	"publisher": "johnny-zhao",
+	"displayName": "OAI Compatible Provider for Copilot",
+	"description": "An extension that integrates Openai Compatible Inference Providers into GitHub Copilot Chat",
 	"icon": "assets/logo.png",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/huggingface/huggingface-vscode-chat"
+		"url": "https://github.com/JohnnyZ93/oai-compatible-copilot"
 	},
-	"version": "0.0.5",
+	"version": "0.0.1",
 	"engines": {
 		"vscode": "^1.104.0"
 	},
@@ -16,48 +16,87 @@
 		"AI",
 		"Chat"
 	],
-	"galleryBanner": {
-		"color": "#100f11",
-		"theme": "dark"
-	},
 	"badges": [
 		{
-		"url": "https://img.shields.io/github/stars/huggingface/huggingface-vscode-chat?style=social",
-		"description": "Star huggingface-vscode-chat on Github",
-		"href": "https://github.com/huggingface/huggingface-vscode-chat"
-		},
-		{
-		"url": "https://img.shields.io/twitter/follow/huggingface?style=social",
-		"description": "Follow Hugging Face on Twitter",
-		"href": "https://x.com/huggingface"
+		"url": "https://img.shields.io/github/stars/JohnnyZ93/oai-compatible-copilot?style=social",
+		"description": "Star oai-compatible-copilot on Github",
+		"href": "https://github.com/JohnnyZ93/oai-compatible-copilot"
 		}
 	],
-	"homepage": "https://huggingface.co/docs/inference-providers/en/index",
 	"bugs": {
-		"url": "https://github.com/huggingface/huggingface-vscode-chat/issues"
+		"url": "https://github.com/JohnnyZ93/oai-compatible-copilot/issues"
 	},
 	"license": "MIT",
 	"contributes": {
 		"languageModelChatProviders": [
 			{
-				"vendor": "huggingface",
-				"displayName": "Hugging Face",
-				"managementCommand": "huggingface.manage"
+				"vendor": "oaicopilot",
+				"displayName": "OAI Compatible",
+				"managementCommand": "oaicopilot.setApikey"
 			}
 		],
 		"commands": [
 			{
-				"command": "huggingface.manage",
-				"title": "Manage Hugging Face Provider"
+				"command": "oaicopilot.setApikey",
+				"title": "Set OAI Compatible Apikey"
 			}
-		]
+		],
+		"configuration": {
+			"title": "OAI Compatible Copilot",
+			"properties": {
+				"oaicopilot.temperature": {
+					"type": "number",
+					"default": 0,
+					"minimum": 0,
+					"maximum": 2,
+					"description": "Controls the randomness of the model's output. Lower values make output more deterministic, higher values make it more creative."
+				},
+				"oaicopilot.topP": {
+					"type": "number",
+					"default": 1,
+					"minimum": 0,
+					"maximum": 1,
+					"description": "Controls diversity via nucleus sampling. Values between 0 and 1. 1 means no nucleus sampling."
+				},
+				"oaicopilot.maxTokens": {
+					"type": "number",
+					"default": 4096,
+					"minimum": 1,
+					"maximum": 10240000,
+					"description": "Controls api limit maximum output tokens."
+				},
+				"oaicopilot.enableThinking": {
+					"type": "boolean",
+					"default": false,
+					"description": "Enable model thinking process output."
+				},
+				"oaicopilot.baseUrl": {
+					"type": "string",
+					"default": "https://router.huggingface.co/v1",
+					"description": "The base URL for the Openai Compatible Inference API. Default value is Hugging Face."
+				},
+				"oaicopilot.models": {
+					"type": "array",
+					"default": [],
+					"items": {
+						"type": "object",
+						"properties": {
+							"id": { "type": "string", "description": "Model ID" },
+							"owned_by": { "type": "string", "default": "Unknown", "description": "Model Provider" },
+							"context_length": { "type": "number", "default": 128000, "description": "Model Support Context Length" },
+							"vision": { "type": "boolean", "default": false, "description": "if Model Support Vision or not" }
+						},
+						"required": ["id", "owned_by"]
+					},
+					"description": "A list of preferred models to use. If provided, these models will be used directly instead of fetching from the API. Model Value is id, owned_by, context_length and vision."
+				}
+			}
+		}
 	},
 	"main": "./out/extension.js",
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
 		"download-api": "dts dev",
-		"postdownload-api": "dts main",
-		"postinstall": "npm run download-api",
 		"compile": "tsc -p ./",
 		"lint": "eslint",
 		"format": "prettier --write .",
@@ -71,13 +110,12 @@
 		"@types/node": "^22",
 		"@types/mocha": "^10.0.6",
 		"@vscode/dts": "^0.4.1",
-		"@types/vscode": "^1.103.0",
+		"@types/vscode": "^1.104.0",
 		"@vscode/test-cli": "^0.0.11",
 		"@vscode/test-electron": "^2.5.2",
 		"eslint": "^9.13.0",
 		"prettier": "^3.1.0",
 		"typescript": "^5.9.2",
 		"typescript-eslint": "^8.39.0"
-	},
-	"packageManager": "pnpm@8.15.4+sha512.0bd3a9be9eb0e9a692676deec00a303ba218ba279d99241475616b398dbaeedd11146f92c2843458f557b1d127e09d4c171e105bdcd6b61002b39685a8016b9e"
+	}
 }

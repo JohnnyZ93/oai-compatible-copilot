@@ -19976,7 +19976,7 @@ declare module 'vscode' {
 		 * @param content The content of the message.
 		 * @param name The optional name of a user for the message.
 		 */
-		static User(content: string | Array<LanguageModelTextPart | LanguageModelToolResultPart>, name?: string): LanguageModelChatMessage;
+		static User(content: string | Array<LanguageModelTextPart | LanguageModelToolResultPart | LanguageModelDataPart>, name?: string): LanguageModelChatMessage;
 
 		/**
 		 * Utility to create a new assistant message.
@@ -19984,7 +19984,7 @@ declare module 'vscode' {
 		 * @param content The content of the message.
 		 * @param name The optional name of a user for the message.
 		 */
-		static Assistant(content: string | Array<LanguageModelTextPart | LanguageModelToolCallPart>, name?: string): LanguageModelChatMessage;
+		static Assistant(content: string | Array<LanguageModelTextPart | LanguageModelToolCallPart | LanguageModelDataPart>, name?: string): LanguageModelChatMessage;
 
 		/**
 		 * The role of this message.
@@ -20501,7 +20501,7 @@ declare module 'vscode' {
 	/**
 	 * The various message types which can be sent via {@linkcode LanguageModelChat.sendRequest } and processed by a {@linkcode LanguageModelChatProvider}
 	 */
-	export type LanguageModelInputPart = LanguageModelTextPart | LanguageModelToolResultPart | LanguageModelToolCallPart;
+	export type LanguageModelInputPart = LanguageModelTextPart | LanguageModelToolResultPart | LanguageModelToolCallPart | LanguageModelDataPart;
 
 	/**
 	 * Represents a Language model chat provider. This provider provides multiple models in a 1 provider to many model relationship
@@ -20800,6 +20800,45 @@ declare module 'vscode' {
 		 */
 		constructor(value: string);
 	}
+
+	/**
+     * A language model response part containing arbitrary data, returned from a {@link LanguageModelChatResponse}.
+     */
+    export class LanguageModelDataPart {
+		 /**
+         * Factory function to create a `LanguageModelDataPart` for an image.
+         * @param data Binary image data
+         * @param mimeType The MIME type of the image
+         */
+        static image(data: Uint8Array, mimeType: ChatImageMimeType): LanguageModelDataPart;
+
+        /**
+         * The mime type which determines how the data property is interpreted.
+         */
+        mimeType: string;
+
+        /**
+         * The data of the part.
+         */
+        data: Uint8Array;
+
+        /**
+         * Construct a generic data part with the given content.
+         * @param value The data of the part.
+         */
+        constructor(data: Uint8Array, mimeType: string);
+    }
+
+    /**
+     * Enum for supported image MIME types.
+     */
+    export enum ChatImageMimeType {
+        PNG = 'image/png',
+        JPEG = 'image/jpeg',
+        GIF = 'image/gif',
+        WEBP = 'image/webp',
+        BMP = 'image/bmp'
+    }
 
 	/**
 	 * A language model response part containing a PromptElementJSON from `@vscode/prompt-tsx`.

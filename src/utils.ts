@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { OpenAIChatMessage, OpenAIChatRole, OpenAIFunctionToolDef, OpenAIToolCall } from "./types";
+import type { OpenAIChatMessage, OpenAIChatRole, OpenAIFunctionToolDef, OpenAIToolCall, ChatMessageContent } from "./types";
 
 // Tool calling sanitization helpers
 
@@ -145,12 +145,15 @@ export function convertMessages(messages: readonly vscode.LanguageModelChatReque
 	for (const m of messages) {
 		const role = mapRole(m);
 		const textParts: string[] = [];
+		const imageParts: vscode.LanguageModelDataPart[] = [];
 		const toolCalls: OpenAIToolCall[] = [];
 		const toolResults: { callId: string; content: string }[] = [];
 
 		for (const part of m.content ?? []) {
 			if (part instanceof vscode.LanguageModelTextPart) {
 				textParts.push(part.value);
+			} else if(part instanceof vscode.LanguageModelDataPart && isImageMimeType(part.mimeType)) {
+				imageParts.push(part);
 			} else if (part instanceof vscode.LanguageModelToolCallPart) {
 				const id = part.callId || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 				let args = "{}";
@@ -177,12 +180,53 @@ export function convertMessages(messages: readonly vscode.LanguageModelChatReque
 			out.push({ role: "tool", tool_call_id: tr.callId, content: tr.content || "" });
 		}
 
-		const text = textParts.join("");
-		if (text && (role === "system" || role === "user" || (role === "assistant" && !emittedAssistantToolCall))) {
-			out.push({ role, content: text });
+		if (textParts.length > 0) {
+			if (role === "user"){
+				// 多模态消息：包含图片、文本
+				const contentArray: ChatMessageContent[] = [];
+				contentArray.push({
+					type: 'text',
+					text: textParts.join('\n')
+				});
+
+				// 添加图片内容
+				if (imageParts.length > 0) {
+					// 模型支持图像输入，添加图片内容
+					for (const imagePart of imageParts) {
+						const dataUrl = createDataUrl(imagePart);
+						contentArray.push({
+							type: 'image_url',
+							image_url: {
+								url: dataUrl
+							}
+						});
+					}
+				}
+				out.push({ role, content: contentArray });
+			} else if ((role === "system" || (role === "assistant" && !emittedAssistantToolCall))) {
+				out.push({ role, content: textParts.join("\n") });
+			}
 		}
 	}
 	return out;
+}
+
+/**
+ * 检查是否为图片MIME类型
+*/
+function isImageMimeType(mimeType: string): boolean {
+	return (
+		mimeType.startsWith('image/') &&
+		['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(mimeType)
+	);
+}
+
+/**
+ * 创建图片的data URL
+ */
+function createDataUrl(dataPart: vscode.LanguageModelDataPart): string {
+	const base64Data = Buffer.from(dataPart.data).toString('base64');
+	return `data:${dataPart.mimeType};base64,${base64Data}`;
 }
 
 /**
@@ -217,7 +261,7 @@ export function convertTools(options: vscode.LanguageModelChatRequestHandleOptio
 	let tool_choice: "auto" | { type: "function"; function: { name: string } } = "auto";
 	if (options.toolMode === vscode.LanguageModelChatToolMode.Required) {
 		if (tools.length !== 1) {
-            console.error("[Hugging Face Model Provider] ToolMode.Required but multiple tools:", tools.length);
+            console.error("[OAI Compatible Model Provider] ToolMode.Required but multiple tools:", tools.length);
             throw new Error("LanguageModelChatToolMode.Required is not supported with more than one tool");
 		}
 		tool_choice = { type: "function", function: { name: sanitizeFunctionName(tools[0].name) } };
@@ -233,7 +277,7 @@ export function convertTools(options: vscode.LanguageModelChatRequestHandleOptio
 export function validateTools(tools: readonly vscode.LanguageModelChatTool[]): void {
 	for (const tool of tools) {
 		if (!tool.name.match(/^[\w-]+$/)) {
-            console.error("[Hugging Face Model Provider] Invalid tool name detected:", tool.name);
+            console.error("[OAI Compatible Model Provider] Invalid tool name detected:", tool.name);
             throw new Error(
                 `Invalid tool name "${tool.name}": only alphanumeric characters, hyphens, and underscores are allowed.`
             );
@@ -248,7 +292,7 @@ export function validateTools(tools: readonly vscode.LanguageModelChatTool[]): v
 export function validateRequest(messages: readonly vscode.LanguageModelChatRequestMessage[]): void {
 	const lastMessage = messages[messages.length - 1];
 	if (!lastMessage) {
-    console.error("[Hugging Face Model Provider] No messages in request");
+    console.error("[OAI Compatible Model Provider] No messages in request");
     throw new Error("Invalid request: no messages.");
 	}
 
@@ -269,7 +313,7 @@ export function validateRequest(messages: readonly vscode.LanguageModelChatReque
 			while (toolCallIds.size > 0) {
 				const nextMessage = messages[nextMessageIdx++];
 				if (!nextMessage || nextMessage.role !== vscode.LanguageModelChatMessageRole.User) {
-                    console.error("[Hugging Face Model Provider] Validation failed: missing tool result for call IDs:", Array.from(toolCallIds));
+                    console.error("[OAI Compatible Model Provider] Validation failed: missing tool result for call IDs:", Array.from(toolCallIds));
                     throw new Error(errMsg);
 				}
 
@@ -278,7 +322,7 @@ export function validateRequest(messages: readonly vscode.LanguageModelChatReque
 						const ctorName =
 							(Object.getPrototypeOf(part as object) as { constructor?: { name?: string } } | undefined)?.constructor
 								?.name ?? typeof part;
-                        console.error("[Hugging Face Model Provider] Validation failed: expected tool result part, got:", ctorName);
+                        console.error("[OAI Compatible Model Provider] Validation failed: expected tool result part, got:", ctorName);
                         throw new Error(errMsg);
 					}
 					const callId = (part as { callId: string }).callId;

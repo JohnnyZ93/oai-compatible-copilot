@@ -20,10 +20,21 @@ export interface OpenAIFunctionToolDef {
  */
 export interface OpenAIChatMessage {
 	role: OpenAIChatRole;
-	content?: string;
+	content?: string | ChatMessageContent[];
 	name?: string;
 	tool_calls?: OpenAIToolCall[];
 	tool_call_id?: string;
+}
+
+/**
+ * 聊天消息内容接口（支持多模态）
+ */
+export interface ChatMessageContent {
+    type: 'text' | 'image_url';
+    text?: string;
+    image_url?: {
+        url: string;
+    };
 }
 
 /**
@@ -47,11 +58,13 @@ export interface HFArchitecture {
 
 export interface HFModelItem {
     id: string;
-    object: string;
-    created: number;
+    object?: string;
+    created?: number;
     owned_by: string;
-    providers: HFProvider[];
+    providers?: HFProvider[];
     architecture?: HFArchitecture;
+	context_length?: number;
+	vision?:boolean;
 }
 
 /**

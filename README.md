@@ -1,56 +1,58 @@
-# 🤗 Hugging Face Provider for GitHub Copilot Chat
+# 🤗 OAI Compatible Provider for Copilot
 
-![Demo](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/inference-providers-guides/demo_vscode.gif)
+[![CI](https://github.com/JohnnyZ93/oai-compatible-copilot/actions/workflows/ci.yml/badge.svg)](https://github.com/JohnnyZ93/oai-compatible-copilot/actions)
+[![Version](https://img.shields.io/visual-studio-marketplace/v/johnny-zhao.oai-compatible-copilot?color=blue&label=Version)](https://marketplace.visualstudio.com/items?itemName=johnny-zhao.oai-compatible-copilot)
+[![Downloads](https://img.shields.io/visual-studio-marketplace/d/johnny-zhao.oai-compatible-copilot?color=green&label=Downloads)](https://marketplace.visualstudio.com/items?itemName=johnny-zhao.oai-compatible-copilot)
+[![License](https://img.shields.io/github/license/JohnnyZ93/oai-compatible-copilot?color=orange&label=License)](https://github.com/JohnnyZ93/oai-compatible-copilot/blob/main/LICENSE)
 
-Use frontier open LLMs like Kimi K2, DeepSeek V3.1, GLM 4.5 and more in VS Code with GitHub Copilot Chat powered by [Hugging Face Inference Providers](https://huggingface.co/docs/inference-providers/index) 🔥
+Use frontier open LLMs like Kimi K2, DeepSeek V3.1, GLM 4.5 and more in VS Code with GitHub Copilot Chat powered by any OpenAI-compatible provider 🔥
 
 ---
 
 ## ⚡ Quick Start
-1. Install the HF Copilot Chat extension [here](https://marketplace.visualstudio.com/items?itemName=HuggingFace.huggingface-vscode-chat).
-2. Open VS Code's chat interface.
-3. Click the model picker and click "Manage Models...".
-4. Select "Hugging Face" provider.
-5. Provide your Hugging Face Token, you can get one in your [settings page](https://huggingface.co/settings/tokens/new?ownUserPermissions=inference.serverless.write&tokenType=fineGrained). You only need to give it the inference.serverless permissions.
-6. Choose the models you want to add to the model picker. 🥳
+1. Install the OAI Compatible Provider for Copilot extension [here](https://marketplace.visualstudio.com/items?itemName=johnny-zhao.oai-compatible-copilot).
+2. Open VS Code Settings and configure `baseUrl` and `models`.
+3. Open VS Code's chat interface.
+4. Click the model picker and select "Manage Models...".
+5. Choose "OAI Compatible" provider.
+6. Enter your API key — it will be saved locally.
+7. Select the models you want to add to the model picker.
 
-## ✨ Why use the Hugging Face provider in Copilot
-* Access [SoTA open-source LLMs](https://huggingface.co/models?pipeline_tag=text-generation&inference_provider=cerebras,together,fireworks-ai,nebius,novita,sambanova,groq,hyperbolic,nscale,fal-ai,cohere,replicate,scaleway,black-forest-labs,ovhcloud&sort=trending) with tool calling capabilities.
-* Single API to switch between multiple providers: Cerebras, Cohere, Fireworks AI, Groq, HF Inference, Hyperbolic, Nebius, Novita, Nscale, SambaNova, Together AI, and more. See the full list of partners in the [Inference Providers docs](https://huggingface.co/docs/inference-providers/index#partners).
-* Built for high availability (across providers) and low latency.
-* Transparent pricing: what the provider charges is what you pay.
-
-💡 The free Hugging Face user tier gives you a small amount of monthly inference credits to experiment. Upgrade to [Hugging Face PRO](https://huggingface.co/pro) or [Enterprise](https://huggingface.co/enterprise) for $2 in monthly credits plus pay-as-you-go access across all providers!
+## ✨ Why Use the OAI Compatible Provider in Copilot
+- Supports almost all OpenAI-compatible providers, such as ModelScope, SiliconFlow, DeepSeek...
+- Supports vision models.
+- Offers additional configuration options for chat requests.
 
 ---
 
 ## Requirements
-* VS Code 1.104.0 or higher.
-* Hugging Face access token with `inference.serverless` permissions.
+- VS Code 1.104.0 or higher.
+- OpenAI-compatible provider API key.
 
 ## 🛠️ Development
 ```bash
-git clone https://github.com/huggingface/huggingface-vscode-chat
-cd huggingface-vscode-chat
+git clone https://github.com/JohnnyZ93/oai-compatible-copilot
+cd oai-compatible-copilot
 npm install
 npm run compile
 ```
 Press F5 to launch an Extension Development Host.
 
 Common scripts:
-* Build: `npm run compile`
-* Watch: `npm run watch`
-* Lint: `npm run lint`
-* Format: `npm run format`
+- Build: `npm run compile`
+- Watch: `npm run watch`
+- Lint: `npm run lint`
+- Format: `npm run format`
+- Publish: `npx @vscode/vsce package -o extension.vsix`
 
 ---
 
-## 📚 Learn more
-* Inference Providers documentation: https://huggingface.co/docs/inference-providers/index
-* VS Code Chat Provider API: https://code.visualstudio.com/api/extension-guides/ai/language-model-chat-provider
+## Thanks to
+- Hugging Face Chat Extension: https://github.com/huggingface/huggingface-vscode-chat
+- VS Code Chat Provider API: https://code.visualstudio.com/api/extension-guides/ai/language-model-chat-provider
 
 ---
 
 ## Support & License
-* Open issues: https://github.com/huggingface/huggingface-vscode-chat/issues
-* License: MIT License Copyright (c) 2025 Hugging Face
+- Open issues: https://github.com/JohnnyZ93/oai-compatible-copilot/issues
+- License: MIT License Copyright (c) 2025 Johnny Zhao

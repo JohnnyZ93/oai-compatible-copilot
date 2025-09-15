@@ -13,8 +13,6 @@ import type { HFModelItem, HFModelsResponse } from "./types";
 
 import { convertTools, convertMessages, tryParseJSONObject, validateRequest } from "./utils";
 
-const BASE_URL = "https://router.huggingface.co/v1";
-const DEFAULT_MAX_OUTPUT_TOKENS = 16000;
 const DEFAULT_CONTEXT_LENGTH = 128000;
 
 /**
@@ -95,58 +93,87 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			return [];
 		}
 
-		const { models } = await this.fetchModels(apiKey);
+		// Check for user-configured models first
+		const config = vscode.workspace.getConfiguration();
+		const userModels = config.get<HFModelItem[]>('oaicopilot.models', []);
+		const userMaxTokens = config.get<number>('oaicopilot.maxTokens', 4096);
 
-		const infos: LanguageModelChatInformation[] = models.flatMap((m) => {
-			const providers = m?.providers ?? [];
-			const modalities = m.architecture?.input_modalities ?? [];
-			const vision = Array.isArray(modalities) && modalities.includes("image");
-
-			// Build entries for all providers that support tool calling
-			const toolProviders = providers.filter((p) => p.supports_tools === true);
-			const entries: LanguageModelChatInformation[] = [];
-
-			for (const p of toolProviders) {
-				const contextLen = p?.context_length ?? DEFAULT_CONTEXT_LENGTH;
-				const maxOutput = DEFAULT_MAX_OUTPUT_TOKENS;
+		let infos: LanguageModelChatInformation[];
+		if (userModels && userModels.length > 0) {
+			// Return user-provided models directly
+			 infos = userModels.map((m) => {
+				const contextLen =  m?.context_length ?? DEFAULT_CONTEXT_LENGTH;
+				const maxOutput = userMaxTokens;
 				const maxInput = Math.max(1, contextLen - maxOutput);
-				entries.push({
-					id: `${m.id}:${p.provider}`,
-					name: `${m.id} via ${p.provider}`,
-					tooltip: `Hugging Face via ${p.provider}`,
-					family: "huggingface",
+				return {
+					id: `${m.id}`,
+					name: `${m.id} via ${m.owned_by}`,
+					tooltip: `OAI Compatible via ${m.owned_by}`,
+					family: "oai-compatible",
 					version: "1.0.0",
 					maxInputTokens: maxInput,
 					maxOutputTokens: maxOutput,
 					capabilities: {
 						toolCalling: true,
-						imageInput: vision,
+						imageInput: m?.vision ?? false,
 					},
-				} satisfies LanguageModelChatInformation);
-			}
+				} satisfies LanguageModelChatInformation;
+			});
+		} else {
+			// Fallback: Fetch models from Hugging Face API
+			const { models } = await this.fetchModels(apiKey);
 
-			if (entries.length === 0 && providers.length > 0) {
-				const base = providers[0];
-				const contextLen = base?.context_length ?? DEFAULT_CONTEXT_LENGTH;
-				const maxOutput = DEFAULT_MAX_OUTPUT_TOKENS;
-				const maxInput = Math.max(1, contextLen - maxOutput);
-				entries.push({
-					id: m.id,
-					name: m.id,
-					tooltip: "Hugging Face",
-					family: "huggingface",
-					version: "1.0.0",
-					maxInputTokens: maxInput,
-					maxOutputTokens: maxOutput,
-					capabilities: {
-						toolCalling: false,
-						imageInput: vision,
-					},
-				} satisfies LanguageModelChatInformation);
-			}
+		 	infos = models.flatMap((m) => {
+				const providers = m?.providers ?? [];
+				const modalities = m.architecture?.input_modalities ?? [];
+				const vision = Array.isArray(modalities) && modalities.includes("image");
 
-			return entries;
-		});
+				// Build entries for all providers that support tool calling
+				const toolProviders = providers.filter((p) => p.supports_tools === true);
+				const entries: LanguageModelChatInformation[] = [];
+
+				for (const p of toolProviders) {
+					const contextLen = p?.context_length ?? DEFAULT_CONTEXT_LENGTH;
+					const maxOutput = userMaxTokens;
+					const maxInput = Math.max(1, contextLen - maxOutput);
+					entries.push({
+						id: `${m.id}:${p.provider}`,
+						name: `${m.id} via ${p.provider}`,
+						tooltip: `OAI Compatible via ${p.provider}`,
+						family: "oai-compatible",
+						version: "1.0.0",
+						maxInputTokens: maxInput,
+						maxOutputTokens: maxOutput,
+						capabilities: {
+							toolCalling: true,
+							imageInput: vision,
+						},
+					} satisfies LanguageModelChatInformation);
+				}
+
+				if (entries.length === 0) {
+					const base = providers.length > 0 ? providers[0] : null;
+					const contextLen = base?.context_length ?? DEFAULT_CONTEXT_LENGTH;
+					const maxOutput = userMaxTokens;
+					const maxInput = Math.max(1, contextLen - maxOutput);
+					entries.push({
+						id: `${m.id}`,
+						name: `${m.id} via OAI Compatible`,
+						tooltip: "OAI Compatible",
+						family: "oai-compatible",
+						version: "1.0.0",
+						maxInputTokens: maxInput,
+						maxOutputTokens: maxOutput,
+						capabilities: {
+							toolCalling: true,
+							imageInput: true,
+						},
+					} satisfies LanguageModelChatInformation);
+				}
+
+				return entries;
+			});
+		}
 
 		this._chatEndpoints = infos.map((info) => ({
 			model: info.id,
@@ -170,6 +197,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	private async fetchModels(
 		apiKey: string
 	): Promise<{ models: HFModelItem[] }> {
+			const config = vscode.workspace.getConfiguration();
+			const BASE_URL = config.get<string>('oaicopilot.baseUrl', "");
 			const modelsList = (async () => {
 				const resp = await fetch(`${BASE_URL}/models`, {
 					method: "GET",
@@ -180,12 +209,12 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					try {
 						text = await resp.text();
 					} catch (error) {
-						console.error("[Hugging Face Model Provider] Failed to read response text", error);
+						console.error("[OAI Compatible Model Provider] Failed to read response text", error);
 					}
 					const err = new Error(
-						`Failed to fetch Hugging Face models: ${resp.status} ${resp.statusText}${text ? `\n${text}` : ""}`
+						`Failed to fetch OAI Compatible models: ${resp.status} ${resp.statusText}${text ? `\n${text}` : ""}`
 					);
-					console.error("[Hugging Face Model Provider] Failed to fetch Hugging Face models", err);
+					console.error("[OAI Compatible Model Provider] Failed to fetch OAI Compatible models", err);
 					throw err;
 				}
 				const parsed = (await resp.json()) as HFModelsResponse;
@@ -196,7 +225,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				const models = await modelsList;
 				return { models };
 			} catch (err) {
-				console.error("[Hugging Face Model Provider] Failed to fetch Hugging Face models", err);
+				console.error("[OAI Compatible Model Provider] Failed to fetch OAI Compatible models", err);
 				throw err;
 			}
 		}
@@ -235,7 +264,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				try {
 					progress.report(part);
 				} catch (e) {
-					console.error("[Hugging Face Model Provider] Progress.report failed", {
+					console.error("[OAI Compatible Model Provider] Progress.report failed", {
 						modelId: model.id,
 						error: e instanceof Error ? { name: e.name, message: e.message } : String(e),
 					});
@@ -245,7 +274,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		try {
 			const apiKey = await this.ensureApiKey(true);
 			if (!apiKey) {
-				throw new Error("Hugging Face API key not found");
+				throw new Error("OAI Compatible API key not found");
 			}
 
             const openaiMessages = convertMessages(messages);
@@ -262,18 +291,34 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
             const toolTokenCount = this.estimateToolTokens(toolConfig.tools);
             const tokenLimit = Math.max(1, model.maxInputTokens);
             if (inputTokenCount + toolTokenCount > tokenLimit) {
-                console.error("[Hugging Face Model Provider] Message exceeds token limit", { total: inputTokenCount + toolTokenCount, tokenLimit });
+                console.error("[OAI Compatible Model Provider] Message exceeds token limit", { total: inputTokenCount + toolTokenCount, tokenLimit });
                 throw new Error("Message exceeds token limit.");
             }
+
+            const config = vscode.workspace.getConfiguration();
+            const userTemperature = config.get<number>('oaicopilot.temperature', 0);
+            const topP = config.get<number>('oaicopilot.topP', 1);
+            const enableThinking = config.get<boolean>('oaicopilot.enableThinking', true);
+			const userMaxTokens = config.get<number>('oaicopilot.maxTokens', 4096);
+
+            const temperature = options.modelOptions?.temperature ?? userTemperature;
+            // 确保 temperature 在 0-2 范围内
+            const validatedTemperature = Math.min(Math.max(temperature, userTemperature), 2);
 
             requestBody = {
                 model: model.id,
                 messages: openaiMessages,
                 stream: true,
-                max_tokens: Math.min(options.modelOptions?.max_tokens || 4096, model.maxOutputTokens),
-                temperature: options.modelOptions?.temperature ?? 0.7,
+				stream_options: { include_usage: true },
+                max_tokens: Math.max(options.modelOptions?.max_tokens || 4096, userMaxTokens),
+                temperature: validatedTemperature,
+                top_p: topP,
             };
 
+            // 添加 enable_thinking 配置
+            if (enableThinking) {
+                (requestBody as Record<string, unknown>).enable_thinking = true;
+            }
 			// Allow-list model options
 			if (options.modelOptions) {
 				const mo = options.modelOptions as Record<string, unknown>;
@@ -294,6 +339,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			if (toolConfig.tool_choice) {
 				(requestBody as Record<string, unknown>).tool_choice = toolConfig.tool_choice;
 			}
+			// console.log(JSON.stringify(requestBody))
+
+			const BASE_URL = config.get<string>('oaicopilot.baseUrl', "");
 			const response = await fetch(`${BASE_URL}/chat/completions`, {
                 method: "POST",
                 headers: {
@@ -306,18 +354,18 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 			if (!response.ok) {
 				const errorText = await response.text();
-				console.error("[Hugging Face Model Provider] HF API error response", errorText);
+				console.error("[OAI Compatible Model Provider] HF API error response", errorText);
 				throw new Error(
-					`Hugging Face API error: ${response.status} ${response.statusText}${errorText ? `\n${errorText}` : ""}`
+					`OAI Compatible API error: ${response.status} ${response.statusText}${errorText ? `\n${errorText}` : ""}`
 				);
 			}
 
 			if (!response.body) {
-				throw new Error("No response body from Hugging Face API");
+				throw new Error("No response body from OAI Compatible API");
 			}
 			await this.processStreamingResponse(response.body, trackingProgress, token);
 		} catch (err) {
-			console.error("[Hugging Face Model Provider] Chat request failed", {
+			console.error("[OAI Compatible Model Provider] Chat request failed", {
 				modelId: model.id,
 				messageCount: messages.length,
 				error: err instanceof Error ? { name: err.name, message: err.message } : String(err),
@@ -356,17 +404,17 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	 * @param silent If true, do not prompt the user.
 	 */
 	private async ensureApiKey(silent: boolean): Promise<string | undefined> {
-		let apiKey = await this.secrets.get("huggingface.apiKey");
+		let apiKey = await this.secrets.get("oaicopilot.apiKey");
 		if (!apiKey && !silent) {
 			const entered = await vscode.window.showInputBox({
-				title: "Hugging Face API Key",
-				prompt: "Enter your Hugging Face API key",
+				title: "OAI Compatible API Key",
+				prompt: "Enter your OAI Compatible API key",
 				ignoreFocusOut: true,
 				password: true,
 			});
 			if (entered && entered.trim()) {
 				apiKey = entered.trim();
-				await this.secrets.store("huggingface.apiKey", apiKey);
+				await this.secrets.store("oaicopilot.apiKey", apiKey);
 			}
 		}
 		return apiKey;
@@ -411,6 +459,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 						try {
 							const parsed = JSON.parse(data);
+							// console.log(parsed)
                         await this.processDelta(parsed, progress);
                     } catch {
                         // Silently ignore malformed SSE lines temporarily
@@ -748,7 +797,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
             const parsed = tryParseJSONObject(buf.args);
             if (!parsed.ok) {
                 if (throwOnInvalid) {
-                    console.error("[Hugging Face Model Provider] Invalid JSON for tool call", { idx, snippet: (buf.args || "").slice(0, 200) });
+                    console.error("[OAI Compatible Model Provider] Invalid JSON for tool call", { idx, snippet: (buf.args || "").slice(0, 200) });
                     throw new Error("Invalid JSON for tool call");
                 }
                 // When not throwing (e.g. on [DONE]), drop silently to reduce noise
