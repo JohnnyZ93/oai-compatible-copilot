@@ -30,11 +30,11 @@ export interface OpenAIChatMessage {
  * 聊天消息内容接口（支持多模态）
  */
 export interface ChatMessageContent {
-    type: 'text' | 'image_url';
-    text?: string;
-    image_url?: {
-        url: string;
-    };
+	type: 'text' | 'image_url';
+	text?: string;
+	image_url?: {
+		url: string;
+	};
 }
 
 /**
@@ -52,19 +52,19 @@ export interface HFProvider {
  * A model entry returned by the Hugging Face router models endpoint.
  */
 export interface HFArchitecture {
-    input_modalities?: string[];
-    output_modalities?: string[];
+	input_modalities?: string[];
+	output_modalities?: string[];
 }
 
 export interface HFModelItem {
-    id: string;
-    object?: string;
-    created?: number;
-    owned_by: string;
-    providers?: HFProvider[];
-    architecture?: HFArchitecture;
+	id: string;
+	object?: string;
+	created?: number;
+	owned_by: string;
+	providers?: HFProvider[];
+	architecture?: HFArchitecture;
 	context_length?: number;
-	vision?:boolean;
+	vision?: boolean;
 }
 
 /**
@@ -72,8 +72,8 @@ export interface HFModelItem {
  */
 // Deprecated: extra model info was previously fetched from the hub API
 export interface HFExtraModelInfo {
-    id: string;
-    pipeline_tag?: string;
+	id: string;
+	pipeline_tag?: string;
 }
 
 /**
