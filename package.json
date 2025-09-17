@@ -8,7 +8,7 @@
 		"type": "git",
 		"url": "https://github.com/JohnnyZ93/oai-compatible-copilot"
 	},
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"engines": {
 		"vscode": "^1.104.0"
 	},
@@ -18,9 +18,9 @@
 	],
 	"badges": [
 		{
-		"url": "https://img.shields.io/github/stars/JohnnyZ93/oai-compatible-copilot?style=social",
-		"description": "Star oai-compatible-copilot on Github",
-		"href": "https://github.com/JohnnyZ93/oai-compatible-copilot"
+			"url": "https://img.shields.io/github/stars/JohnnyZ93/oai-compatible-copilot?style=social",
+			"description": "Star oai-compatible-copilot on Github",
+			"href": "https://github.com/JohnnyZ93/oai-compatible-copilot"
 		}
 	],
 	"bugs": {
@@ -44,32 +44,6 @@
 		"configuration": {
 			"title": "OAI Compatible Copilot",
 			"properties": {
-				"oaicopilot.temperature": {
-					"type": "number",
-					"default": 0,
-					"minimum": 0,
-					"maximum": 2,
-					"description": "Controls the randomness of the model's output. Lower values make output more deterministic, higher values make it more creative."
-				},
-				"oaicopilot.topP": {
-					"type": "number",
-					"default": 1,
-					"minimum": 0,
-					"maximum": 1,
-					"description": "Controls diversity via nucleus sampling. Values between 0 and 1. 1 means no nucleus sampling."
-				},
-				"oaicopilot.maxTokens": {
-					"type": "number",
-					"default": 4096,
-					"minimum": 1,
-					"maximum": 10240000,
-					"description": "Controls api limit maximum output tokens."
-				},
-				"oaicopilot.enableThinking": {
-					"type": "boolean",
-					"default": false,
-					"description": "Enable model thinking process output."
-				},
 				"oaicopilot.baseUrl": {
 					"type": "string",
 					"default": "https://router.huggingface.co/v1",
@@ -81,14 +55,93 @@
 					"items": {
 						"type": "object",
 						"properties": {
-							"id": { "type": "string", "description": "Model ID" },
-							"owned_by": { "type": "string", "default": "Unknown", "description": "Model Provider" },
-							"context_length": { "type": "number", "default": 128000, "description": "Model Support Context Length" },
-							"vision": { "type": "boolean", "default": false, "description": "if Model Support Vision or not" }
+							"id": {
+								"type": "string",
+								"description": "Model ID"
+							},
+							"owned_by": {
+								"type": "string",
+								"description": "Model provider"
+							},
+							"context_length": {
+								"type": "number",
+								"default": 128000,
+								"minimum": 1000,
+								"maximum": 10000000,
+								"description": "Model support context length. Default is 128000."
+							},
+							"vision": {
+								"type": "boolean",
+								"default": false,
+								"description": "Model support vision. Default is false."
+							},
+							"max_tokens": {
+								"type": "number",
+								"default": 4096,
+								"minimum": 1,
+								"maximum": 10000000,
+								"description": "Maximum number of tokens to generate (range: [1, context_length)). Default is 4096."
+							},
+							"enable_thinking": {
+								"type": "boolean",
+								"default": false,
+								"description": "Switches between thinking and non-thinking modes. Default is false."
+							},
+							"temperature": {
+								"type": "number",
+								"default": 0,
+								"minimum": 0,
+								"maximum": 2,
+								"description": "Sampling temperature (range: [0, 2]). Lower values make output more deterministic, higher values make it more creative. Default is 0."
+							},
+							"top_p": {
+								"type": "number",
+								"default": 1,
+								"minimum": 0,
+								"maximum": 1,
+								"description": "Top-p sampling value (range: (0, 1]). Default is 1."
+							},
+							"top_k": {
+								"type": "number",
+								"default": 50,
+								"minimum": 1,
+								"description": "Top-k sampling value (range: [1, Infinity)). Not required."
+							},
+							"min_p": {
+								"type": "number",
+								"default": 0,
+								"minimum": 0,
+								"maximum": 1,
+								"description": "Minimum probability threshold (range: [0, 1]). Not required."
+							},
+							"frequency_penalty": {
+								"type": "number",
+								"default": 0,
+								"minimum": -2,
+								"maximum": 2,
+								"description": "Frequency penalty (range: [-2, 2]). Not required."
+							},
+							"presence_penalty": {
+								"type": "number",
+								"default": 0,
+								"minimum": -2,
+								"maximum": 2,
+								"description": "Presence penalty (range: [-2, 2]). Not required."
+							},
+							"repetition_penalty": {
+								"type": "number",
+								"default": 0,
+								"minimum": 0,
+								"maximum": 2,
+								"description": "Repetition penalty (range: (0, 2]). Not required."
+							}
 						},
-						"required": ["id", "owned_by"]
+						"required": [
+							"id",
+							"owned_by"
+						]
 					},
-					"description": "A list of preferred models to use. If provided, these models will be used directly instead of fetching from the API. Model Value is id, owned_by, context_length and vision."
+					"description": "A list of preferred models to use. If provided, these models will be used directly instead of fetching from the API."
 				}
 			}
 		}

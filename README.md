@@ -1,8 +1,6 @@
 # 🤗 OAI Compatible Provider for Copilot
 
 [![CI](https://github.com/JohnnyZ93/oai-compatible-copilot/actions/workflows/release.yml/badge.svg)](https://github.com/JohnnyZ93/oai-compatible-copilot/actions)
-[![Version](https://img.shields.io/visual-studio-marketplace/v/johnny-zhao.oai-compatible-copilot?color=blue&label=Version)](https://marketplace.visualstudio.com/items?itemName=johnny-zhao.oai-compatible-copilot)
-[![Downloads](https://img.shields.io/visual-studio-marketplace/d/johnny-zhao.oai-compatible-copilot?color=green&label=Downloads)](https://marketplace.visualstudio.com/items?itemName=johnny-zhao.oai-compatible-copilot)
 [![License](https://img.shields.io/github/license/JohnnyZ93/oai-compatible-copilot?color=orange&label=License)](https://github.com/JohnnyZ93/oai-compatible-copilot/blob/main/LICENSE)
 
 Use frontier open LLMs like Kimi K2, DeepSeek V3.1, GLM 4.5 and more in VS Code with GitHub Copilot Chat powered by any OpenAI-compatible provider 🔥

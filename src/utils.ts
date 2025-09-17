@@ -182,16 +182,15 @@ export function convertMessages(messages: readonly vscode.LanguageModelChatReque
 
 		if (textParts.length > 0) {
 			if (role === "user") {
-				// 多模态消息：包含图片、文本
-				const contentArray: ChatMessageContent[] = [];
-				contentArray.push({
-					type: 'text',
-					text: textParts.join('\n')
-				});
-
-				// 添加图片内容
 				if (imageParts.length > 0) {
-					// 模型支持图像输入，添加图片内容
+					// 多模态消息：包含图片、文本
+					const contentArray: ChatMessageContent[] = [];
+					contentArray.push({
+						type: 'text',
+						text: textParts.join('\n')
+					});
+
+					// 添加图片内容
 					for (const imagePart of imageParts) {
 						const dataUrl = createDataUrl(imagePart);
 						contentArray.push({
@@ -201,8 +200,11 @@ export function convertMessages(messages: readonly vscode.LanguageModelChatReque
 							}
 						});
 					}
+					out.push({ role, content: contentArray });
+				} else {
+					// 纯文本消息
+					out.push({ role, content: textParts.join("\n") });
 				}
-				out.push({ role, content: contentArray });
 			} else if ((role === "system" || (role === "assistant" && !emittedAssistantToolCall))) {
 				out.push({ role, content: textParts.join("\n") });
 			}

@@ -14,6 +14,8 @@ import type { HFModelItem, HFModelsResponse } from "./types";
 import { convertTools, convertMessages, tryParseJSONObject, validateRequest } from "./utils";
 
 const DEFAULT_CONTEXT_LENGTH = 128000;
+const DEFAULT_MAX_TOKENS = 4096;
+const MAX_TOOLS_PER_REQUEST = 128;
 
 /**
  * VS Code Chat provider backed by Hugging Face Inference Providers.
@@ -60,11 +62,21 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		for (const m of msgs) {
 			for (const part of m.content) {
 				if (part instanceof vscode.LanguageModelTextPart) {
-					total += Math.ceil(part.value.length / 4);
+					total += this.estimateTextTokens(part.value);
 				}
 			}
 		}
 		return total;
+	}
+
+	/** 针对不同内容类型的 token 估算 */
+	private estimateTextTokens(text: string): number {
+		const chineseChars = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+		const englishWords = (text.match(/\b[a-zA-Z]+\b/g) || []).length;
+		const symbols = text.length - chineseChars - englishWords;
+
+		// 中文字符约1.5个token，英文单词约1个token，符号约0.5个token
+		return Math.ceil(chineseChars * 1.5 + englishWords + symbols * 0.5);
 	}
 
 	/** Rough token estimate for tool definitions by JSON size */
@@ -96,14 +108,13 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		// Check for user-configured models first
 		const config = vscode.workspace.getConfiguration();
 		const userModels = config.get<HFModelItem[]>('oaicopilot.models', []);
-		const userMaxTokens = config.get<number>('oaicopilot.maxTokens', 4096);
 
 		let infos: LanguageModelChatInformation[];
 		if (userModels && userModels.length > 0) {
 			// Return user-provided models directly
 			infos = userModels.map((m) => {
 				const contextLen = m?.context_length ?? DEFAULT_CONTEXT_LENGTH;
-				const maxOutput = userMaxTokens;
+				const maxOutput = m?.max_tokens ?? DEFAULT_MAX_TOKENS;
 				const maxInput = Math.max(1, contextLen - maxOutput);
 				return {
 					id: `${m.id}`,
@@ -134,7 +145,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 				for (const p of toolProviders) {
 					const contextLen = p?.context_length ?? DEFAULT_CONTEXT_LENGTH;
-					const maxOutput = userMaxTokens;
+					const maxOutput = DEFAULT_MAX_TOKENS;
 					const maxInput = Math.max(1, contextLen - maxOutput);
 					entries.push({
 						id: `${m.id}:${p.provider}`,
@@ -154,7 +165,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				if (entries.length === 0) {
 					const base = providers.length > 0 ? providers[0] : null;
 					const contextLen = base?.context_length ?? DEFAULT_CONTEXT_LENGTH;
-					const maxOutput = userMaxTokens;
+					const maxOutput = DEFAULT_MAX_TOKENS;
 					const maxInput = Math.max(1, contextLen - maxOutput);
 					entries.push({
 						id: `${m.id}`,
@@ -276,71 +287,82 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			if (!apiKey) {
 				throw new Error("OAI Compatible API key not found");
 			}
+			if (options.tools && options.tools.length > MAX_TOOLS_PER_REQUEST) {
+				throw new Error(`Cannot have more than ${MAX_TOOLS_PER_REQUEST} tools per request.`);
+			}
 
 			const openaiMessages = convertMessages(messages);
-
 			validateRequest(messages);
 
-			const toolConfig = convertTools(options);
-
-			if (options.tools && options.tools.length > 128) {
-				throw new Error("Cannot have more than 128 tools per request.");
-			}
-
-			const inputTokenCount = this.estimateMessagesTokens(messages);
-			const toolTokenCount = this.estimateToolTokens(toolConfig.tools);
-			const tokenLimit = Math.max(1, model.maxInputTokens);
-			if (inputTokenCount + toolTokenCount > tokenLimit) {
-				console.error("[OAI Compatible Model Provider] Message exceeds token limit", { total: inputTokenCount + toolTokenCount, tokenLimit });
-				throw new Error("Message exceeds token limit.");
-			}
-
+			// get model config from user settings
 			const config = vscode.workspace.getConfiguration();
-			const userTemperature = config.get<number>('oaicopilot.temperature', 0);
-			const topP = config.get<number>('oaicopilot.topP', 1);
-			const enableThinking = config.get<boolean>('oaicopilot.enableThinking', true);
-			const userMaxTokens = config.get<number>('oaicopilot.maxTokens', 4096);
+			const userModels = config.get<HFModelItem[]>('oaicopilot.models', []);
+			const um = userModels.find((um) => um.id === model.id);
 
-			const temperature = options.modelOptions?.temperature ?? userTemperature;
-			// 确保 temperature 在 0-2 范围内
-			const validatedTemperature = Math.min(Math.max(temperature, userTemperature), 2);
+			// 配置 temperature
+			const oTemperature = options.modelOptions?.temperature ?? 0;
+			const temperature = um?.temperature ?? oTemperature;
 
+			// 配置 top_p
+			const oTopP = options.modelOptions?.top_p ?? 1;
+			const topP = um?.top_p ?? oTopP;
+
+			// 配置 max_tokens
+			const oMaxTokens = options.modelOptions?.max_tokens ?? DEFAULT_MAX_TOKENS;
+			const maxTokens = um?.max_tokens ?? oMaxTokens;
+
+			// 配置 requestBody
 			requestBody = {
 				model: model.id,
 				messages: openaiMessages,
 				stream: true,
 				stream_options: { include_usage: true },
-				max_tokens: Math.max(options.modelOptions?.max_tokens || 4096, userMaxTokens),
-				temperature: validatedTemperature,
-				top_p: topP,
+				max_tokens: maxTokens,
+				temperature: temperature,
+				top_p: topP
 			};
 
-			// 添加 enable_thinking 配置
+			// 配置 enable_thinking
+			const enableThinking = um?.enable_thinking ?? false;
 			if (enableThinking) {
-				(requestBody as Record<string, unknown>).enable_thinking = true;
+				(requestBody as Record<string, unknown>).enable_thinking = enableThinking;
 			}
-			// Allow-list model options
+
+			// 配置 stop
 			if (options.modelOptions) {
 				const mo = options.modelOptions as Record<string, unknown>;
 				if (typeof mo.stop === "string" || Array.isArray(mo.stop)) {
 					(requestBody as Record<string, unknown>).stop = mo.stop;
 				}
-				if (typeof mo.frequency_penalty === "number") {
-					(requestBody as Record<string, unknown>).frequency_penalty = mo.frequency_penalty;
-				}
-				if (typeof mo.presence_penalty === "number") {
-					(requestBody as Record<string, unknown>).presence_penalty = mo.presence_penalty;
-				}
 			}
 
+			// 配置 tools
+			const toolConfig = convertTools(options);
 			if (toolConfig.tools) {
 				(requestBody as Record<string, unknown>).tools = toolConfig.tools;
 			}
 			if (toolConfig.tool_choice) {
 				(requestBody as Record<string, unknown>).tool_choice = toolConfig.tool_choice;
 			}
-			// console.log(JSON.stringify(requestBody))
 
+			// 配置 用户定义其他参数
+			if (um?.top_k !== undefined) {
+				(requestBody as Record<string, unknown>).top_k = um.top_k;
+			}
+			if (um?.min_p !== undefined) {
+				(requestBody as Record<string, unknown>).min_p = um.min_p;
+			}
+			if (um?.frequency_penalty !== undefined) {
+				(requestBody as Record<string, unknown>).frequency_penalty = um.frequency_penalty;
+			}
+			if (um?.presence_penalty !== undefined) {
+				(requestBody as Record<string, unknown>).presence_penalty = um.presence_penalty;
+			}
+			if (um?.repetition_penalty !== undefined) {
+				(requestBody as Record<string, unknown>).repetition_penalty = um.repetition_penalty;
+			}
+
+			// 发送请求
 			const BASE_URL = config.get<string>('oaicopilot.baseUrl', "");
 			const response = await fetch(`${BASE_URL}/chat/completions`, {
 				method: "POST",
@@ -354,7 +376,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 			if (!response.ok) {
 				const errorText = await response.text();
-				console.error("[OAI Compatible Model Provider] HF API error response", errorText);
+				console.error("[OAI Compatible Model Provider] OAI Compatible API error response", errorText);
 				throw new Error(
 					`OAI Compatible API error: ${response.status} ${response.statusText}${errorText ? `\n${errorText}` : ""}`
 				);
@@ -386,15 +408,40 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		text: string | LanguageModelChatMessage,
 		_token: CancellationToken
 	): Promise<number> {
-		if (typeof text === "string") {
-			return Math.ceil(text.length / 4);
+		if (typeof text === 'string') {
+			// 纯文本直接估算token
+			return this.estimateTextTokens(text);
 		} else {
+			// 对于复杂消息，分别计算各部分的token
 			let totalTokens = 0;
+
 			for (const part of text.content) {
 				if (part instanceof vscode.LanguageModelTextPart) {
-					totalTokens += Math.ceil(part.value.length / 4);
+					// 纯文本部分直接估算token
+					totalTokens += this.estimateTextTokens(part.value);
+				} else if (part instanceof vscode.LanguageModelDataPart) {
+					// 图片或数据部分根据类型估算token
+					if (part.mimeType.startsWith('image/')) {
+						// 图片大约170个token
+						totalTokens += 170;
+					} else {
+						// 对于其他二进制数据，使用更保守的估算
+						totalTokens += Math.ceil(part.data.length / 4);
+					}
+				} else if (part instanceof vscode.LanguageModelToolCallPart) {
+					// 工具调用的token计算
+					const toolCallText = `${part.name}(${JSON.stringify(part.input)})`;
+					totalTokens += this.estimateTextTokens(toolCallText);
+				} else if (part instanceof vscode.LanguageModelToolResultPart) {
+					// 工具结果的token计算
+					const resultText = typeof part.content === 'string' ? part.content : JSON.stringify(part.content);
+					totalTokens += this.estimateTextTokens(resultText);
 				}
 			}
+
+			// 添加角色和结构的固定开销
+			totalTokens += 4;
+
 			return totalTokens;
 		}
 	}
@@ -459,7 +506,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 					try {
 						const parsed = JSON.parse(data);
-						// console.log(parsed)
 						await this.processDelta(parsed, progress);
 					} catch {
 						// Silently ignore malformed SSE lines temporarily
