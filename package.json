@@ -8,7 +8,7 @@
 		"type": "git",
 		"url": "https://github.com/JohnnyZ93/oai-compatible-copilot"
 	},
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"engines": {
 		"vscode": "^1.104.0"
 	},
@@ -85,7 +85,14 @@
 							"enable_thinking": {
 								"type": "boolean",
 								"default": false,
-								"description": "Switches between thinking and non-thinking modes. Default is false."
+								"description": "Switches between thinking and non-thinking modes. Not required."
+							},
+							"thinking_budget": {
+								"type": "number",
+								"default": 128,
+								"minimum": 128,
+								"maximum": 10000000,
+								"description": "Maximum number of tokens for chain-of-thought output. Not required."
 							},
 							"temperature": {
 								"type": "number",

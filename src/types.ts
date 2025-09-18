@@ -67,6 +67,7 @@ export interface HFModelItem {
 	vision?: boolean;
 	max_tokens?: number;
 	enable_thinking?: boolean;
+	thinking_budget?: number;
 	temperature?: number;
 	top_p?: number;
 	top_k?: number;

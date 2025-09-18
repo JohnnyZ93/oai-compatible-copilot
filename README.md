@@ -3,7 +3,7 @@
 [![CI](https://github.com/JohnnyZ93/oai-compatible-copilot/actions/workflows/release.yml/badge.svg)](https://github.com/JohnnyZ93/oai-compatible-copilot/actions)
 [![License](https://img.shields.io/github/license/JohnnyZ93/oai-compatible-copilot?color=orange&label=License)](https://github.com/JohnnyZ93/oai-compatible-copilot/blob/main/LICENSE)
 
-Use frontier open LLMs like Kimi K2, DeepSeek V3.1, GLM 4.5 and more in VS Code with GitHub Copilot Chat powered by any OpenAI-compatible provider 🔥
+Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.1, GLM 4.5 and more in VS Code with GitHub Copilot Chat powered by any OpenAI-compatible provider 🔥
 
 ---
 
@@ -20,6 +20,8 @@ Use frontier open LLMs like Kimi K2, DeepSeek V3.1, GLM 4.5 and more in VS Code 
 - Supports almost all OpenAI-compatible providers, such as ModelScope, SiliconFlow, DeepSeek...
 - Supports vision models.
 - Offers additional configuration options for chat requests.
+- Supports control model thinking and reasoning content show in chat interface.
+  > ![thinkingPartDemo](./assets/thinkingPartDemo.png)
 
 ---
 

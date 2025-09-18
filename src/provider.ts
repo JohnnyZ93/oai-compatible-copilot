@@ -323,9 +323,13 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			};
 
 			// 配置 enable_thinking
-			const enableThinking = um?.enable_thinking ?? false;
-			if (enableThinking) {
+			const enableThinking = um?.enable_thinking;
+			if (enableThinking !== undefined) {
 				(requestBody as Record<string, unknown>).enable_thinking = enableThinking;
+
+				if (um?.thinking_budget !== undefined) {
+					(requestBody as Record<string, unknown>).thinking_budget = um.thinking_budget;
+				}
 			}
 
 			// 配置 stop
@@ -492,10 +496,10 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				buffer = lines.pop() || "";
 
 				for (const line of lines) {
-					if (!line.startsWith("data: ")) {
+					if (!line.startsWith("data:")) {
 						continue;
 					}
-					const data = line.slice(6);
+					const data = line.slice(5).trim();
 					if (data === "[DONE]") {
 						// Do not throw on [DONE]; any incomplete/empty buffers are ignored.
 						await this.flushToolCallBuffers(progress, /*throwOnInvalid*/ false);
@@ -542,7 +546,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 		// report thinking progress if backend provides it and host supports it
 		try {
-			const maybeThinking = (choice as Record<string, unknown> | undefined)?.thinking ?? (deltaObj as Record<string, unknown> | undefined)?.thinking;
+			const maybeThinking = (choice as Record<string, unknown> | undefined)?.thinking ?? (deltaObj as Record<string, unknown> | undefined)?.thinking ?? (deltaObj as Record<string, unknown> | undefined)?.reasoning_content;
 			if (maybeThinking !== undefined) {
 				const vsAny = (vscode as unknown as Record<string, unknown>);
 				const ThinkingCtor = vsAny["LanguageModelThinkingPart"] as
