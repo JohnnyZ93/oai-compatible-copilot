@@ -5,6 +5,13 @@
 
 Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.1, GLM 4.5 and more in VS Code with GitHub Copilot Chat powered by any OpenAI-compatible provider 🔥
 
+## ✨ Why Use the OAI Compatible Provider in Copilot
+- Supports almost all OpenAI-compatible providers, such as ModelScope, SiliconFlow, DeepSeek...
+- Supports vision models.
+- Offers additional configuration options for chat requests.
+- Supports control model thinking and reasoning content show in chat interface.
+  > ![thinkingPartDemo](./assets/thinkingPartDemo.png)
+
 ---
 
 ## ⚡ Quick Start
@@ -16,18 +23,27 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.1, GLM 4.5 and mor
 6. Enter your API key — it will be saved locally.
 7. Select the models you want to add to the model picker.
 
-## ✨ Why Use the OAI Compatible Provider in Copilot
-- Supports almost all OpenAI-compatible providers, such as ModelScope, SiliconFlow, DeepSeek...
-- Supports vision models.
-- Offers additional configuration options for chat requests.
-- Supports control model thinking and reasoning content show in chat interface.
-  > ![thinkingPartDemo](./assets/thinkingPartDemo.png)
-
----
-
-## Requirements
+### Requirements
 - VS Code 1.104.0 or higher.
 - OpenAI-compatible provider API key.
+
+### Settings Example
+
+```json
+"oaicopilot.baseUrl": "https://api-inference.modelscope.cn/v1",
+"oaicopilot.models": [
+    {
+        "id": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+        "owned_by": "modelscope",
+        "context_length": 256000,
+        "max_tokens": 8192,
+        "temperature": 0,
+        "top_p": 1
+    }
+]
+```
+
+---
 
 ## 🛠️ Development
 ```bash
