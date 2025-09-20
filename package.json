@@ -141,6 +141,43 @@
 								"minimum": 0,
 								"maximum": 2,
 								"description": "Repetition penalty (range: (0, 2]). Not required."
+							},
+							"reasoning": {
+								"type": "object",
+								"default": {
+									"effort": "medium"
+								},
+								"properties": {
+									"effort": {
+										"type": "string",
+										"default": "medium",
+										"enum": [
+											"high",
+											"medium",
+											"low",
+											"minimal",
+											"auto"
+										],
+										"description": "Reasoning effort level for OpenRouter/xAI (high, medium, low, minimal, auto)"
+									},
+									"exclude": {
+										"type": "boolean",
+										"default": false,
+										"description": "Exclude reasoning tokens from the final response"
+									},
+									"max_tokens": {
+										"type": "number",
+										"default": 2000,
+										"minimum": 1,
+										"description": "Specific token limit for reasoning (Anthropic-style, alternative to effort)"
+									},
+									"enabled": {
+										"type": "boolean",
+										"default": true,
+										"description": "Enable reasoning (inferred from effort or max_tokens if not specified)"
+									}
+								},
+								"description": "Reasoning configuration for OpenRouter-compatible providers"
 							}
 						},
 						"required": [
@@ -149,6 +186,43 @@
 						]
 					},
 					"description": "A list of preferred models to use. If provided, these models will be used directly instead of fetching from the API."
+				},
+				"oaicopilot.reasoning": {
+					"type": "object",
+					"default": {
+						"effort": "medium"
+					},
+					"properties": {
+						"effort": {
+							"type": "string",
+							"default": "medium",
+							"enum": [
+								"high",
+								"medium",
+								"low",
+								"minimal",
+								"auto"
+							],
+							"description": "Default reasoning effort level for OpenRouter/xAI"
+						},
+						"exclude": {
+							"type": "boolean",
+							"default": false,
+							"description": "Default: Exclude reasoning tokens from the final response"
+						},
+						"max_tokens": {
+							"type": "number",
+							"default": 2000,
+							"minimum": 1,
+							"description": "Default specific token limit for reasoning"
+						},
+						"enabled": {
+							"type": "boolean",
+							"default": true,
+							"description": "Default: Enable reasoning"
+						}
+					},
+					"description": "Global default reasoning configuration for OpenRouter-compatible providers"
 				}
 			}
 		}

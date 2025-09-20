@@ -30,7 +30,7 @@ export interface OpenAIChatMessage {
  * 聊天消息内容接口（支持多模态）
  */
 export interface ChatMessageContent {
-	type: 'text' | 'image_url';
+	type: "text" | "image_url";
 	text?: string;
 	image_url?: {
 		url: string;
@@ -75,6 +75,12 @@ export interface HFModelItem {
 	frequency_penalty?: number;
 	presence_penalty?: number;
 	repetition_penalty?: number;
+	reasoning?: {
+		effort?: string;
+		exclude?: boolean;
+		max_tokens?: number;
+		enabled?: boolean;
+	};
 }
 
 /**
@@ -105,3 +111,27 @@ export interface ToolCallBuffer {
 
 /** OpenAI-style chat roles. */
 export type OpenAIChatRole = "system" | "user" | "assistant" | "tool";
+
+export interface ReasoningDetailCommon {
+	id: string | null;
+	format: string; // e.g., "anthropic-claude-v1", "openai-responses-v1"
+	index?: number;
+}
+
+export interface ReasoningSummaryDetail extends ReasoningDetailCommon {
+	type: "reasoning.summary";
+	summary: string;
+}
+
+export interface ReasoningEncryptedDetail extends ReasoningDetailCommon {
+	type: "reasoning.encrypted";
+	data: string; // Base64 encoded
+}
+
+export interface ReasoningTextDetail extends ReasoningDetailCommon {
+	type: "reasoning.text";
+	text: string;
+	signature?: string | null;
+}
+
+export type ReasoningDetail = ReasoningSummaryDetail | ReasoningEncryptedDetail | ReasoningTextDetail;
