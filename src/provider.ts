@@ -322,13 +322,23 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				top_p: topP
 			};
 
+			const rb = requestBody as Record<string, unknown>;
+
+			// If user model config explicitly sets sampling params to null, remove them so provider defaults apply
+			if (um && um.temperature === null) {
+				delete rb.temperature;
+			}
+			if (um && um.top_p === null) {
+				delete rb.top_p;
+			}
+
 			// 配置 enable_thinking
 			const enableThinking = um?.enable_thinking;
 			if (enableThinking !== undefined) {
-				(requestBody as Record<string, unknown>).enable_thinking = enableThinking;
+				rb.enable_thinking = enableThinking;
 
 				if (um?.thinking_budget !== undefined) {
-					(requestBody as Record<string, unknown>).thinking_budget = um.thinking_budget;
+					rb.thinking_budget = um.thinking_budget;
 				}
 			}
 
@@ -336,34 +346,34 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			if (options.modelOptions) {
 				const mo = options.modelOptions as Record<string, unknown>;
 				if (typeof mo.stop === "string" || Array.isArray(mo.stop)) {
-					(requestBody as Record<string, unknown>).stop = mo.stop;
+					rb.stop = mo.stop;
 				}
 			}
 
 			// 配置 tools
 			const toolConfig = convertTools(options);
 			if (toolConfig.tools) {
-				(requestBody as Record<string, unknown>).tools = toolConfig.tools;
+				rb.tools = toolConfig.tools;
 			}
 			if (toolConfig.tool_choice) {
-				(requestBody as Record<string, unknown>).tool_choice = toolConfig.tool_choice;
+				rb.tool_choice = toolConfig.tool_choice;
 			}
 
 			// 配置 用户定义其他参数
 			if (um?.top_k !== undefined) {
-				(requestBody as Record<string, unknown>).top_k = um.top_k;
+				rb.top_k = um.top_k;
 			}
 			if (um?.min_p !== undefined) {
-				(requestBody as Record<string, unknown>).min_p = um.min_p;
+				rb.min_p = um.min_p;
 			}
 			if (um?.frequency_penalty !== undefined) {
-				(requestBody as Record<string, unknown>).frequency_penalty = um.frequency_penalty;
+				rb.frequency_penalty = um.frequency_penalty;
 			}
 			if (um?.presence_penalty !== undefined) {
-				(requestBody as Record<string, unknown>).presence_penalty = um.presence_penalty;
+				rb.presence_penalty = um.presence_penalty;
 			}
 			if (um?.repetition_penalty !== undefined) {
-				(requestBody as Record<string, unknown>).repetition_penalty = um.repetition_penalty;
+				rb.repetition_penalty = um.repetition_penalty;
 			}
 
 			// 发送请求
