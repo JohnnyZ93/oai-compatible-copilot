@@ -77,12 +77,7 @@ export interface HFModelItem {
 	frequency_penalty?: number;
 	presence_penalty?: number;
 	repetition_penalty?: number;
-	reasoning?: {
-		effort?: string;
-		exclude?: boolean;
-		max_tokens?: number;
-		enabled?: boolean;
-	};
+	reasoning?: ReasoningConfig;
 	/**
 	 * Optional family specification for the model. This allows users to specify
 	 * the model family (e.g., "gpt-4", "claude-3", "gemini") to enable family-specific
@@ -90,6 +85,16 @@ export interface HFModelItem {
 	 * defaults to "oai-compatible".
 	 */
 	family?: string;
+}
+
+/**
+ * OpenRouter reasoning configuration
+ */
+export interface ReasoningConfig {
+	effort?: string;
+	exclude?: boolean;
+	max_tokens?: number;
+	enabled?: boolean;
 }
 
 /**

@@ -15,6 +15,7 @@ import type {
 	ReasoningDetail,
 	ReasoningSummaryDetail,
 	ReasoningTextDetail,
+	ReasoningConfig,
 } from "./types";
 
 import { convertTools, convertMessages, tryParseJSONObject, validateRequest } from "./utils";
@@ -308,19 +309,19 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			const userModels = config.get<HFModelItem[]>("oaicopilot.models", []);
 			const um = userModels.find((um) => um.id === model.id);
 
-			// 配置 temperature
+			// temperature
 			const oTemperature = options.modelOptions?.temperature ?? 0;
 			const temperature = um?.temperature ?? oTemperature;
 
-			// 配置 top_p
+			// top_p
 			const oTopP = options.modelOptions?.top_p ?? 1;
 			const topP = um?.top_p ?? oTopP;
 
-			// 配置 max_tokens
+			// max_tokens
 			const oMaxTokens = options.modelOptions?.max_tokens ?? DEFAULT_MAX_TOKENS;
 			const maxTokens = um?.max_tokens ?? oMaxTokens;
 
-			// 配置 requestBody
+			// requestBody
 			requestBody = {
 				model: model.id,
 				messages: openaiMessages,
@@ -331,8 +332,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				top_p: topP,
 			};
 
-			const BASE_URL = config.get<string>("oaicopilot.baseUrl", "");
-			const isOpenRouter = BASE_URL.includes("openrouter.ai");
 
 			const rb = requestBody as Record<string, unknown>;
 
@@ -344,9 +343,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				delete rb.top_p;
 			}
 
-			// 配置 enable_thinking (non-OpenRouter only)
+			// enable_thinking (non-OpenRouter only)
 			const enableThinking = um?.enable_thinking;
-			if (enableThinking !== undefined && !isOpenRouter) {
+			if (enableThinking !== undefined) {
 				rb.enable_thinking = enableThinking;
 
 				if (um?.thinking_budget !== undefined) {
@@ -355,9 +354,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			}
 
 			// OpenRouter reasoning configuration
-			if (isOpenRouter) {
-				const reasoningConfig: ReasoningConfig =
-					(um?.reasoning as ReasoningConfig) ?? config.get("oaicopilot.reasoning", { effort: "medium" });
+			if (um?.reasoning !== undefined) {
+				const reasoningConfig: ReasoningConfig = (um.reasoning as ReasoningConfig);
 				if (reasoningConfig.enabled !== false) {
 					const reasoningObj: Record<string, unknown> = {};
 					const effort = reasoningConfig.effort;
@@ -371,11 +369,11 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					if (reasoningConfig.exclude !== undefined) {
 						reasoningObj.exclude = reasoningConfig.exclude;
 					}
-					(requestBody as Record<string, unknown>).reasoning = reasoningObj;
+					rb.reasoning = reasoningObj;
 				}
 			}
 
-			// 配置 stop
+			// stop
 			if (options.modelOptions) {
 				const mo = options.modelOptions as Record<string, unknown>;
 				if (typeof mo.stop === "string" || Array.isArray(mo.stop)) {
@@ -383,7 +381,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				}
 			}
 
-			// 配置 tools
+			// tools
 			const toolConfig = convertTools(options);
 			if (toolConfig.tools) {
 				rb.tools = toolConfig.tools;
@@ -392,7 +390,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				rb.tool_choice = toolConfig.tool_choice;
 			}
 
-			// 配置 用户定义其他参数
+			// Configure user-defined additional parameters
 			if (um?.top_k !== undefined) {
 				rb.top_k = um.top_k;
 			}
@@ -409,7 +407,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				rb.repetition_penalty = um.repetition_penalty;
 			}
 
-			// 发送请求
+			// send request
+			const BASE_URL = config.get<string>("oaicopilot.baseUrl", "");
 			const response = await fetch(`${BASE_URL}/chat/completions`, {
 				method: "POST",
 				headers: {
@@ -455,37 +454,37 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		_token: CancellationToken
 	): Promise<number> {
 		if (typeof text === "string") {
-			// 纯文本直接估算token
+			// Estimate tokens directly for plain text
 			return this.estimateTextTokens(text);
 		} else {
-			// 对于复杂消息，分别计算各部分的token
+			// For complex messages, calculate tokens for each part separately
 			let totalTokens = 0;
 
 			for (const part of text.content) {
 				if (part instanceof vscode.LanguageModelTextPart) {
-					// 纯文本部分直接估算token
+					// Estimate tokens directly for plain text
 					totalTokens += this.estimateTextTokens(part.value);
 				} else if (part instanceof vscode.LanguageModelDataPart) {
-					// 图片或数据部分根据类型估算token
+					// Estimate tokens for image or data parts based on type
 					if (part.mimeType.startsWith("image/")) {
-						// 图片大约170个token
+						// Images are approximately 170 tokens
 						totalTokens += 170;
 					} else {
-						// 对于其他二进制数据，使用更保守的估算
+						// For other binary data, use a more conservative estimate
 						totalTokens += Math.ceil(part.data.length / 4);
 					}
 				} else if (part instanceof vscode.LanguageModelToolCallPart) {
-					// 工具调用的token计算
+					// Tool call token calculation
 					const toolCallText = `${part.name}(${JSON.stringify(part.input)})`;
 					totalTokens += this.estimateTextTokens(toolCallText);
 				} else if (part instanceof vscode.LanguageModelToolResultPart) {
-					// 工具结果的token计算
+					// Tool result token calculation
 					const resultText = typeof part.content === "string" ? part.content : JSON.stringify(part.content);
 					totalTokens += this.estimateTextTokens(resultText);
 				}
 			}
 
-			// 添加角色和结构的固定开销
+			// Add fixed overhead for roles and structure
 			totalTokens += 4;
 
 			return totalTokens;
@@ -988,12 +987,4 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			return text;
 		}
 	}
-}
-
-// Add this interface at the top of the file, after imports
-interface ReasoningConfig {
-	effort?: string;
-	exclude?: boolean;
-	max_tokens?: number;
-	enabled?: boolean;
 }
