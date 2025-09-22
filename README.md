@@ -39,10 +39,18 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.1, GLM 4.5 and mor
         "max_tokens": 8192,
         "temperature": 0,
         "top_p": 1
+    },
+    {
+        "id": "gpt-5-turbo",
+        "owned_by": "custom-provider",
+        "family": "gpt-5",
+        "context_length": 128000,
+        "max_tokens": 4096
     }
 ]
 ```
 
+**Optional `family` parameter:** Specify model family (e.g., `gpt-4`, `claude-3`, `gemini`) to enable model-specific optimizations. Defaults to `oai-compatible`.
 ---
 
 ## 🛠️ Development
