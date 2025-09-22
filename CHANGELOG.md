@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.0.4 (2025-09-23)
+
+- Fix: [Base url should be model specific](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/4)
+- Fix: [Set the effort variable of the reasoning model](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/5)
+- Fix: [Allow setting a custom model 'family'](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/8)
+
 ## 0.0.3 (2025-09-18)
 
 - Now you can see the model reasoning content in chat interface.

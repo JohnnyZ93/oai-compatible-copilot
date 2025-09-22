@@ -8,7 +8,7 @@
 		"type": "git",
 		"url": "https://github.com/JohnnyZ93/oai-compatible-copilot"
 	},
-	"version": "0.0.3",
+	"version": "0.0.4",
 	"engines": {
 		"vscode": "^1.104.0"
 	},
@@ -38,7 +38,11 @@
 		"commands": [
 			{
 				"command": "oaicopilot.setApikey",
-				"title": "Set OAI Compatible Apikey"
+				"title": "OAICopilot: Set OAI Compatible Apikey"
+			},
+			{
+				"command": "oaicopilot.setProviderApikey",
+				"title": "OAICopilot: Set OAI Compatible Multi-Provider Apikey"
 			}
 		],
 		"configuration": {
@@ -66,6 +70,10 @@
 							"family": {
 								"type": "string",
 								"description": "Model family (e.g., 'gpt-4', 'claude-3', 'gemini'). Enables model-specific optimizations and behaviors. Defaults to 'oai-compatible' if not specified."
+							},
+							"baseUrl": {
+								"type": "string",
+								"description": "Base URL for the model provider. If not provided, the global oaicopilot.baseUrl will be used."
 							},
 							"context_length": {
 								"type": "number",

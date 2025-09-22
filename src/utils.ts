@@ -1,5 +1,11 @@
 import * as vscode from "vscode";
-import type { OpenAIChatMessage, OpenAIChatRole, OpenAIFunctionToolDef, OpenAIToolCall, ChatMessageContent } from "./types";
+import type {
+	OpenAIChatMessage,
+	OpenAIChatRole,
+	OpenAIFunctionToolDef,
+	OpenAIToolCall,
+	ChatMessageContent,
+} from "./types";
 
 // Tool calling sanitization helpers
 
@@ -186,18 +192,18 @@ export function convertMessages(messages: readonly vscode.LanguageModelChatReque
 					// 多模态消息：包含图片、文本
 					const contentArray: ChatMessageContent[] = [];
 					contentArray.push({
-						type: 'text',
-						text: textParts.join('\n')
+						type: "text",
+						text: textParts.join("\n"),
 					});
 
 					// 添加图片内容
 					for (const imagePart of imageParts) {
 						const dataUrl = createDataUrl(imagePart);
 						contentArray.push({
-							type: 'image_url',
+							type: "image_url",
 							image_url: {
-								url: dataUrl
-							}
+								url: dataUrl,
+							},
 						});
 					}
 					out.push({ role, content: contentArray });
@@ -205,7 +211,7 @@ export function convertMessages(messages: readonly vscode.LanguageModelChatReque
 					// 纯文本消息
 					out.push({ role, content: textParts.join("\n") });
 				}
-			} else if ((role === "system" || (role === "assistant" && !emittedAssistantToolCall))) {
+			} else if (role === "system" || (role === "assistant" && !emittedAssistantToolCall)) {
 				out.push({ role, content: textParts.join("\n") });
 			}
 		}
@@ -215,19 +221,16 @@ export function convertMessages(messages: readonly vscode.LanguageModelChatReque
 
 /**
  * 检查是否为图片MIME类型
-*/
+ */
 function isImageMimeType(mimeType: string): boolean {
-	return (
-		mimeType.startsWith('image/') &&
-		['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(mimeType)
-	);
+	return mimeType.startsWith("image/") && ["image/jpeg", "image/png", "image/gif", "image/webp"].includes(mimeType);
 }
 
 /**
  * 创建图片的data URL
  */
 function createDataUrl(dataPart: vscode.LanguageModelDataPart): string {
-	const base64Data = Buffer.from(dataPart.data).toString('base64');
+	const base64Data = Buffer.from(dataPart.data).toString("base64");
 	return `data:${dataPart.mimeType};base64,${base64Data}`;
 }
 
@@ -315,7 +318,10 @@ export function validateRequest(messages: readonly vscode.LanguageModelChatReque
 			while (toolCallIds.size > 0) {
 				const nextMessage = messages[nextMessageIdx++];
 				if (!nextMessage || nextMessage.role !== vscode.LanguageModelChatMessageRole.User) {
-					console.error("[OAI Compatible Model Provider] Validation failed: missing tool result for call IDs:", Array.from(toolCallIds));
+					console.error(
+						"[OAI Compatible Model Provider] Validation failed: missing tool result for call IDs:",
+						Array.from(toolCallIds)
+					);
 					throw new Error(errMsg);
 				}
 
@@ -324,7 +330,10 @@ export function validateRequest(messages: readonly vscode.LanguageModelChatReque
 						const ctorName =
 							(Object.getPrototypeOf(part as object) as { constructor?: { name?: string } } | undefined)?.constructor
 								?.name ?? typeof part;
-						console.error("[OAI Compatible Model Provider] Validation failed: expected tool result part, got:", ctorName);
+						console.error(
+							"[OAI Compatible Model Provider] Validation failed: expected tool result part, got:",
+							ctorName
+						);
 						throw new Error(errMsg);
 					}
 					const callId = (part as { callId: string }).callId;

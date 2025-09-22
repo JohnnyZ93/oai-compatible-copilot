@@ -11,16 +11,18 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.1, GLM 4.5 and mor
 - Offers additional configuration options for chat requests.
 - Supports control model thinking and reasoning content show in chat interface.
   > ![thinkingPartDemo](./assets/thinkingPartDemo.png)
-
+- Supports configuring models from multiple providers simultaneously, automatically managing API keys without switch them repeatedly.
 ---
 
 ## ⚡ Quick Start
 1. Install the OAI Compatible Provider for Copilot extension [here](https://marketplace.visualstudio.com/items?itemName=johnny-zhao.oai-compatible-copilot).
-2. Open VS Code Settings and configure `baseUrl` and `models`.
+2. Open VS Code Settings and configure `oaicopilot.baseUrl` and `oaicopilot.models`.
 3. Open VS Code's chat interface.
 4. Click the model picker and select "Manage Models...".
 5. Choose "OAI Compatible" provider.
 6. Enter your API key — it will be saved locally.
+   - For multiple providers, configuring baseUrl in `oaicopilot.models` firstly.
+   - Use the command "OAICopilot: Set OAI Compatible Multi-Provider Apikey" to configure provider-specific API keys.
 7. Select the models you want to add to the model picker.
 
 ### Requirements
@@ -38,11 +40,18 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.1, GLM 4.5 and mor
         "context_length": 256000,
         "max_tokens": 8192,
         "temperature": 0,
-        "top_p": 1
+        "top_p": 1,
+        "enable_thinking": true,
+        "reasoning": {
+            "enabled": true,
+            "effort": "high",
+            "exclude": false
+        }
     },
     {
         "id": "gpt-5-turbo",
         "owned_by": "custom-provider",
+        "baseUrl": "https://api.custom-provider.com/v1",
         "family": "gpt-5",
         "context_length": 128000,
         "max_tokens": 4096
@@ -50,7 +59,11 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.1, GLM 4.5 and mor
 ]
 ```
 
-**Optional `family` parameter:** Specify model family (e.g., `gpt-4`, `claude-3`, `gemini`) to enable model-specific optimizations. Defaults to `oai-compatible`.
+**Optional parameters:**
+- `family`: Specify model family (e.g., `gpt-4`, `claude-3`, `gemini`) to enable model-specific optimizations. Defaults to `oai-compatible`.
+- `baseUrl`: Model-specific base URL. If not provided, the global `oaicopilot.baseUrl` will be used.
+- `enable_thinking`: Enable model thinking and reasoning content (for non-OpenRouter providers).
+- `reasoning`: OpenRouter reasoning configuration with options like `enabled`, `effort`, `exclude`, and `max_tokens`.
 ---
 
 ## 🛠️ Development

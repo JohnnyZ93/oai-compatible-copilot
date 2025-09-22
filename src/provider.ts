@@ -221,7 +221,10 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	 */
 	private async fetchModels(apiKey: string): Promise<{ models: HFModelItem[] }> {
 		const config = vscode.workspace.getConfiguration();
-		const BASE_URL = config.get<string>("oaicopilot.baseUrl", "");
+		let BASE_URL = config.get<string>("oaicopilot.baseUrl", "");
+		if (!BASE_URL || !BASE_URL.startsWith("http")) {
+			throw new Error(`Invalid base URL configuration.`);
+		}
 		const modelsList = (async () => {
 			const resp = await fetch(`${BASE_URL}/models`, {
 				method: "GET",
@@ -309,6 +312,13 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			const userModels = config.get<HFModelItem[]>("oaicopilot.models", []);
 			const um = userModels.find((um) => um.id === model.id);
 
+			// Get API key for the model's provider
+			const provider = um?.owned_by;
+			const modelApiKey = await this.ensureApiKey(true, provider);
+			if (!modelApiKey) {
+				throw new Error("OAI Compatible API key not found");
+			}
+
 			// temperature
 			const oTemperature = options.modelOptions?.temperature ?? 0;
 			const temperature = um?.temperature ?? oTemperature;
@@ -332,7 +342,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				top_p: topP,
 			};
 
-
 			const rb = requestBody as Record<string, unknown>;
 
 			// If user model config explicitly sets sampling params to null, remove them so provider defaults apply
@@ -355,7 +364,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 			// OpenRouter reasoning configuration
 			if (um?.reasoning !== undefined) {
-				const reasoningConfig: ReasoningConfig = (um.reasoning as ReasoningConfig);
+				const reasoningConfig: ReasoningConfig = um.reasoning as ReasoningConfig;
 				if (reasoningConfig.enabled !== false) {
 					const reasoningObj: Record<string, unknown> = {};
 					const effort = reasoningConfig.effort;
@@ -407,12 +416,15 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				rb.repetition_penalty = um.repetition_penalty;
 			}
 
-			// send request
-			const BASE_URL = config.get<string>("oaicopilot.baseUrl", "");
+			// 发送请求
+			let BASE_URL = um?.baseUrl || config.get<string>("oaicopilot.baseUrl", "");
+			if (!BASE_URL || !BASE_URL.startsWith("http")) {
+				throw new Error(`Invalid base URL configuration.`);
+			}
 			const response = await fetch(`${BASE_URL}/chat/completions`, {
 				method: "POST",
 				headers: {
-					Authorization: `Bearer ${apiKey}`,
+					Authorization: `Bearer ${modelApiKey}`,
 					"Content-Type": "application/json",
 					"User-Agent": this.userAgent,
 				},
@@ -494,9 +506,22 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	/**
 	 * Ensure an API key exists in SecretStorage, optionally prompting the user when not silent.
 	 * @param silent If true, do not prompt the user.
+	 * @param provider Optional provider name to get provider-specific API key.
 	 */
-	private async ensureApiKey(silent: boolean): Promise<string | undefined> {
-		let apiKey = await this.secrets.get("oaicopilot.apiKey");
+	private async ensureApiKey(silent: boolean, provider?: string): Promise<string | undefined> {
+		// Try to get provider-specific API key first
+		let apiKey: string | undefined;
+		if (provider && provider.trim() !== "") {
+			const normalizedProvider = provider.toLowerCase();
+			const providerKey = `oaicopilot.apiKey.${normalizedProvider}`;
+			apiKey = await this.secrets.get(providerKey);
+		}
+
+		// Fall back to generic API key
+		if (!apiKey) {
+			apiKey = await this.secrets.get("oaicopilot.apiKey");
+		}
+
 		if (!apiKey && !silent) {
 			const entered = await vscode.window.showInputBox({
 				title: "OAI Compatible API Key",
@@ -534,11 +559,21 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					break;
 				}
 
+				// 在循环中定期检查取消状态
+				if (token.isCancellationRequested) {
+					break;
+				}
+
 				buffer += decoder.decode(value, { stream: true });
 				const lines = buffer.split("\n");
 				buffer = lines.pop() || "";
 
 				for (const line of lines) {
+					// 在处理每一行前检查取消状态
+					if (token.isCancellationRequested) {
+						break;
+					}
+
 					if (!line.startsWith("data:")) {
 						continue;
 					}
