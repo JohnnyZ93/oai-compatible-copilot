@@ -63,6 +63,10 @@
 								"type": "string",
 								"description": "Model provider"
 							},
+							"family": {
+								"type": "string",
+								"description": "Model family (e.g., 'gpt-4', 'claude-3', 'gemini'). Enables model-specific optimizations and behaviors. Defaults to 'oai-compatible' if not specified."
+							},
 							"context_length": {
 								"type": "number",
 								"default": 128000,

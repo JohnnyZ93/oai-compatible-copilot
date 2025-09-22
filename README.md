@@ -39,10 +39,18 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.1, GLM 4.5 and mor
         "max_tokens": 8192,
         "temperature": 0,
         "top_p": 1
+    },
+    {
+        "id": "gpt-5-turbo",
+        "owned_by": "custom-provider",
+        "family": "gpt-5",
+        "context_length": 128000,
+        "max_tokens": 4096
     }
 ]
 ```
 
+**Optional `family` parameter:** Specify model family (e.g., `gpt-4`, `claude-3`, `gemini`) to enable model-specific optimizations. Defaults to `oai-compatible`.
 ---
 
 ## 🛠️ Development
@@ -64,8 +72,12 @@ Common scripts:
 ---
 
 ## Thanks to
-- Hugging Face Chat Extension: https://github.com/huggingface/huggingface-vscode-chat
-- VS Code Chat Provider API: https://code.visualstudio.com/api/extension-guides/ai/language-model-chat-provider
+
+Thanks to all the people who contribute.
+
+- [Contributors](https://github.com/JohnnyZ93/oai-compatible-copilot/graphs/contributors)
+- [Hugging Face Chat Extension](https://github.com/huggingface/huggingface-vscode-chat)
+- [VS Code Chat Provider API](https://code.visualstudio.com/api/extension-guides/ai/language-model-chat-provider)
 
 ---
 
