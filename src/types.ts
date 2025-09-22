@@ -75,6 +75,13 @@ export interface HFModelItem {
 	frequency_penalty?: number;
 	presence_penalty?: number;
 	repetition_penalty?: number;
+	/**
+	 * Optional family specification for the model. This allows users to specify
+	 * the model family (e.g., "gpt-4", "claude-3", "gemini") to enable family-specific
+	 * optimizations and behaviors in the Copilot extension. If not specified,
+	 * defaults to "oai-compatible".
+	 */
+	family?: string;
 }
 
 /**
