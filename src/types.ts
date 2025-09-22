@@ -68,8 +68,10 @@ export interface HFModelItem {
 	max_tokens?: number;
 	enable_thinking?: boolean;
 	thinking_budget?: number;
-	temperature?: number;
-	top_p?: number;
+	// Allow null so user can explicitly disable sending this parameter (fall back to provider default)
+	temperature?: number | null;
+	// Allow null so user can explicitly disable sending this parameter (fall back to provider default)
+	top_p?: number | null;
 	top_k?: number;
 	min_p?: number;
 	frequency_penalty?: number;

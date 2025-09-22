@@ -322,6 +322,14 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				top_p: topP
 			};
 
+			// If user model config explicitly sets sampling params to null, remove them so provider defaults apply
+			if (um && um.temperature === null) {
+				delete (requestBody as Record<string, unknown>).temperature;
+			}
+			if (um && um.top_p === null) {
+				delete (requestBody as Record<string, unknown>).top_p;
+			}
+
 			// 配置 enable_thinking
 			const enableThinking = um?.enable_thinking;
 			if (enableThinking !== undefined) {
