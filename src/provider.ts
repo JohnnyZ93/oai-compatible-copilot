@@ -353,11 +353,27 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			}
 
 			// enable_thinking (non-OpenRouter only)
+			// Support both enable_thinking (boolean) and Z.AI's thinking object format
 			const enableThinking = um?.enable_thinking;
 			if (enableThinking !== undefined) {
-				rb.enable_thinking = enableThinking;
+				// Check if we're using Z.AI or similar providers that expect thinking object
+				// Z.AI expects: { "thinking": { "type": "enabled" } }
+				if (enableThinking === true) {
+					rb.thinking = {
+						type: "enabled"
+					};
+				} else if (enableThinking === false) {
+					rb.thinking = {
+						type: "disabled"
+					};
+				} else {
+					// Fallback to direct boolean for other providers
+					rb.enable_thinking = enableThinking;
+				}
 
 				if (um?.thinking_budget !== undefined) {
+					// For Z.AI, thinking_budget would need to be handled differently
+					// For now, keep both approaches
 					rb.thinking_budget = um.thinking_budget;
 				}
 			}
