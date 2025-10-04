@@ -5,7 +5,7 @@
 
 Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.1, GLM 4.5 and more in VS Code with GitHub Copilot Chat powered by any OpenAI-compatible provider 🔥
 
-## ✨ Why Use the OAI Compatible Provider in Copilot
+## ✨ Features
 - Supports almost all OpenAI-compatible providers, such as ModelScope, SiliconFlow, DeepSeek...
 - Supports vision models.
 - Offers additional configuration options for chat requests.
@@ -14,20 +14,19 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.1, GLM 4.5 and mor
 - Supports configuring models from multiple providers simultaneously, automatically managing API keys without switch them repeatedly.
 ---
 
+## Requirements
+- VS Code 1.104.0 or higher.
+- OpenAI-compatible provider API key.
+---
+
 ## ⚡ Quick Start
 1. Install the OAI Compatible Provider for Copilot extension [here](https://marketplace.visualstudio.com/items?itemName=johnny-zhao.oai-compatible-copilot).
 2. Open VS Code Settings and configure `oaicopilot.baseUrl` and `oaicopilot.models`.
-3. Open VS Code's chat interface.
+3. Open Github Copilot Chat interface.
 4. Click the model picker and select "Manage Models...".
 5. Choose "OAI Compatible" provider.
 6. Enter your API key — it will be saved locally.
-   - For multiple providers, configuring baseUrl in `oaicopilot.models` firstly.
-   - Use the command "OAICopilot: Set OAI Compatible Multi-Provider Apikey" to configure provider-specific API keys.
 7. Select the models you want to add to the model picker.
-
-### Requirements
-- VS Code 1.104.0 or higher.
-- OpenAI-compatible provider API key.
 
 ### Settings Example
 
@@ -35,53 +34,77 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.1, GLM 4.5 and mor
 "oaicopilot.baseUrl": "https://api-inference.modelscope.cn/v1",
 "oaicopilot.models": [
     {
-        "id": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+        "id": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
         "owned_by": "modelscope",
         "context_length": 256000,
         "max_tokens": 8192,
         "temperature": 0,
-        "top_p": 1,
-        "enable_thinking": true,
-        "reasoning": {
-            "enabled": true,
-            "effort": "high",
-            "exclude": false
-        }
+        "top_p": 1
+    }
+]
+```
+---
+
+## (Optional) Multi-Provider Guide
+
+1. Open VS Code Settings and configure `oaicopilot.models`.
+2. Open command center ( Ctrl + Shift + P ), and search "OAICopilot: Set OAI Compatible Multi-Provider Apikey" to configure provider-specific API keys.
+3. Open Github Copilot Chat interface.
+4. Click the model picker and select "Manage Models...".
+5. Choose "OAI Compatible" provider.
+6. Select the models you want to add to the model picker.
+
+### Settings Example
+
+```json
+"oaicopilot.baseUrl": "https://api-inference.modelscope.cn/v1",
+"oaicopilot.models": [
+    {
+        "id": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+        "owned_by": "modelscope",
+        "context_length": 256000,
+        "max_tokens": 8192,
+        "temperature": 0,
+        "top_p": 1
     },
     {
-        "id": "gpt-5-turbo",
-        "owned_by": "custom-provider",
-        "baseUrl": "https://api.custom-provider.com/v1",
-        "family": "gpt-5",
-        "context_length": 128000,
-        "max_tokens": 4096
+        "id": "qwen3-coder",
+        "owned_by": "iflow",
+        "baseUrl": "https://apis.iflow.cn/v1",
+        "context_length": 256000,
+        "max_tokens": 8192,
+        "temperature": 0,
+        "top_p": 1
     }
 ]
 ```
 
-**Optional parameters:**
-- `family`: Specify model family (e.g., `gpt-4`, `claude-3`, `gemini`) to enable model-specific optimizations. Defaults to `oai-compatible`.
-- `baseUrl`: Model-specific base URL. If not provided, the global `oaicopilot.baseUrl` will be used.
-- `enable_thinking`: Enable model thinking and reasoning content (for non-OpenRouter providers).
-- `reasoning`: OpenRouter reasoning configuration with options like `enabled`, `effort`, `exclude`, and `max_tokens`.
 ---
 
-## 🛠️ Development
-```bash
-git clone https://github.com/JohnnyZ93/oai-compatible-copilot
-cd oai-compatible-copilot
-npm install
-npm run compile
-```
-Press F5 to launch an Extension Development Host.
+## Model Parameters
+All parameters support individual configuration for different models, providing highly flexible model tuning capabilities.
 
-Common scripts:
-- Build: `npm run compile`
-- Watch: `npm run watch`
-- Lint: `npm run lint`
-- Format: `npm run format`
-- Publish: `npx @vscode/vsce package -o extension.vsix`
-
+- `id` (required): Model identifier
+- `owned_by` (required): Model provider
+- `family`: Model family (e.g., 'gpt-4', 'claude-3', 'gemini'). Enables model-specific optimizations and behaviors. Defaults to 'oai-compatible' if not specified.
+- `baseUrl`: Model-specific base URL. If not provided, the global `oaicopilot.baseUrl` will be used
+- `context_length`: The context length supported by the model. Default value is 128000
+- `max_tokens`: Maximum number of tokens to generate (range: [1, context_length]). Default value is 4096
+- `vision`: Whether the model supports vision capabilities. Defaults to false
+- `temperature`: Sampling temperature (range: [0, 2]). Lower values make the output more deterministic, higher values more creative. Default value is 0
+- `top_p`: Top-p sampling value (range: (0, 1]). Default value is 1
+- `top_k`: Top-k sampling value (range: [1, ∞)). Optional parameter
+- `min_p`: Minimum probability threshold (range: [0, 1]). Optional parameter
+- `frequency_penalty`: Frequency penalty (range: [-2, 2]). Optional parameter
+- `presence_penalty`: Presence penalty (range: [-2, 2]). Optional parameter
+- `repetition_penalty`: Repetition penalty (range: (0, 2]). Optional parameter
+- `enable_thinking`: Enable model thinking and reasoning content display (for non-OpenRouter providers)
+- `thinking_budget`: Maximum token count for thinking chain output. Optional parameter
+- `reasoning`: OpenRouter reasoning configuration, includes the following options:
+  - `enabled`: Enable reasoning functionality (if not specified, will be inferred from effort or max_tokens)
+  - `effort`: Reasoning effort level (high, medium, low, minimal, auto)
+  - `exclude`: Exclude reasoning tokens from the final response
+  - `max_tokens`: Specific token limit for reasoning (Anthropic style, as an alternative to effort)
 ---
 
 ## Thanks to
