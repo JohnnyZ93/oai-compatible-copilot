@@ -1,5 +1,14 @@
 # Change Log
 
+## 0.0.5 (2025-10-09)
+
+- Feat: [GLM 4.6 - no thinking tags](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/15)
+- Feat: [Multi-config for the same model](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/18)
+- Enhanced `oaicopilot.models` configuration including:
+  - `configId`: Configuration ID for this model. Allows defining the same model with different settings (e.g. 'glm-4.6::thinking', 'glm-4.6::no-thinking')
+  - `thinking`: Thinking configuration for Zai provider
+    - `type`: Set to 'enabled' to enable thinking, 'disabled' to disable thinking
+
 ## 0.0.4 (2025-09-23)
 
 - Fix: [Base url should be model specific](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/4)
