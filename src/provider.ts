@@ -383,6 +383,13 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				}
 			}
 
+			// thinking (Zai provider)
+			if (um?.thinking?.type !== undefined) {
+				rb.thinking = {
+					type: um.thinking.type
+				};
+			}
+
 			// OpenRouter reasoning configuration
 			if (um?.reasoning !== undefined) {
 				const reasoningConfig: ReasoningConfig = um.reasoning as ReasoningConfig;
@@ -436,6 +443,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			if (um?.repetition_penalty !== undefined) {
 				rb.repetition_penalty = um.repetition_penalty;
 			}
+
+			// debug log
+			// console.log("[OAI Compatible Model Provider] Request", JSON.stringify(requestBody));
 
 			// 发送请求
 			let BASE_URL = um?.baseUrl || config.get<string>("oaicopilot.baseUrl", "");

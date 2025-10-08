@@ -70,6 +70,8 @@ export interface HFModelItem {
 	max_tokens?: number;
 	enable_thinking?: boolean;
 	thinking_budget?: number;
+	// New thinking configuration for Zai provider
+	thinking?: ThinkingConfig;
 	// Allow null so user can explicitly disable sending this parameter (fall back to provider default)
 	temperature?: number | null;
 	// Allow null so user can explicitly disable sending this parameter (fall back to provider default)
@@ -151,3 +153,10 @@ export interface ReasoningTextDetail extends ReasoningDetailCommon {
 }
 
 export type ReasoningDetail = ReasoningSummaryDetail | ReasoningEncryptedDetail | ReasoningTextDetail;
+
+/**
+ * Thinking configuration for Zai provider
+ */
+export interface ThinkingConfig {
+	type?: 'enabled' | 'disabled';
+}

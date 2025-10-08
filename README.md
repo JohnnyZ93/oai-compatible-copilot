@@ -150,6 +150,8 @@ All parameters support individual configuration for different models, providing 
   - `effort`: Reasoning effort level (high, medium, low, minimal, auto)
   - `exclude`: Exclude reasoning tokens from the final response
   - `max_tokens`: Specific token limit for reasoning (Anthropic style, as an alternative to effort)
+- `thinking`: Thinking configuration for Zai provider
+  - `type`: Set to 'enabled' to enable thinking, 'disabled' to disable thinking
 ---
 
 ## Thanks to

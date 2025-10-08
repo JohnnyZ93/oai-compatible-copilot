@@ -98,6 +98,20 @@
 								"maximum": 10000000,
 								"description": "Maximum number of tokens to generate (range: [1, context_length)). Default is 4096."
 							},
+							"thinking": {
+								"type": "object",
+								"description": "Thinking configuration for Zai provider",
+								"properties": {
+									"type": {
+										"type": "string",
+										"enum": [
+											"enabled",
+											"disabled"
+										],
+										"description": "Set to 'enabled' to enable thinking, 'disabled' to disable thinking"
+									}
+								}
+							},
 							"enable_thinking": {
 								"type": "boolean",
 								"default": false,
