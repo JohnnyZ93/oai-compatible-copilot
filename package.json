@@ -61,11 +61,15 @@
 						"properties": {
 							"id": {
 								"type": "string",
-								"description": "Model ID"
+								"description": "Model ID (e.g., 'glm-4.6')."
+							},
+							"configId": {
+								"type": "string",
+								"description": "(Optional) Configuration ID for this model. Allows defining the same model with different settings (e.g. 'glm-4.6::thinking', 'glm-4.6::no-thinking')."
 							},
 							"owned_by": {
 								"type": "string",
-								"description": "Model provider"
+								"description": "Model provider (e.g., 'zai', 'openai')."
 							},
 							"family": {
 								"type": "string",

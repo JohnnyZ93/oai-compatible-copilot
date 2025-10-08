@@ -12,6 +12,7 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.1, GLM 4.5 and mor
 - Supports control model thinking and reasoning content show in chat interface.
   > ![thinkingPartDemo](./assets/thinkingPartDemo.png)
 - Supports configuring models from multiple providers simultaneously, automatically managing API keys without switch them repeatedly.
+- Supports defining multiple configurations for the same model ID with different settings (e.g. thinking enable/disable for GLM-4.6).
 ---
 
 ## Requirements
@@ -81,10 +82,54 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.1, GLM 4.5 and mor
 
 ---
 
+## (Optional) Multi-config for the same model
+
+You can define multiple configurations for the same model ID by using the `configId` field. This allows you to have the same base model with different settings for different use cases.
+
+To use this feature:
+
+1. Add the `configId` field to your model configuration
+2. Each configuration with the same `id` must have a unique `configId`
+3. The model will appear as separate entries in the VS Code model picker
+
+### Settings Example
+
+```json
+"oaicopilot.models": [
+    {
+        "id": "glm-4.6",
+        "configId": "thinking",
+        "owned_by": "zai",
+        "temperature": 0.7,
+        "top_p": 1,
+        "thinking": {
+            "type": "enabled"
+        }
+    },
+    {
+        "id": "glm-4.6",
+        "configId": "no-thinking",
+        "owned_by": "zai",
+        "temperature": 0,
+        "top_p": 1,
+        "thinking": {
+            "type": "disabled"
+        }
+    }
+]
+```
+
+In this example, you'll have three different configurations of the glm-4.6 model available in VS Code:
+- `glm-4.6::thinking` - use GLM-4.6 with thinking
+- `glm-4.6::no-thinking` - use GLM-4.6 without thinking
+
+---
+
 ## Model Parameters
 All parameters support individual configuration for different models, providing highly flexible model tuning capabilities.
 
 - `id` (required): Model identifier
+- `configId`: Configuration ID for this model. Allows defining the same model with different settings (e.g. 'glm-4.6::thinking', 'glm-4.6::no-thinking')
 - `owned_by` (required): Model provider
 - `family`: Model family (e.g., 'gpt-4', 'claude-3', 'gemini'). Enables model-specific optimizations and behaviors. Defaults to 'oai-compatible' if not specified.
 - `baseUrl`: Model-specific base URL. If not provided, the global `oaicopilot.baseUrl` will be used

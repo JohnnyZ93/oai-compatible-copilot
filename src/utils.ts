@@ -7,6 +7,29 @@ import type {
 	ChatMessageContent,
 } from "./types";
 
+// Model ID parsing helper
+export interface ParsedModelId {
+	baseId: string;
+	configId?: string;
+}
+
+/**
+ * Parse a model ID that may contain a configuration ID separator.
+ * Format: "baseId::configId" or just "baseId"
+ */
+export function parseModelId(modelId: string): ParsedModelId {
+	const parts = modelId.split("::");
+	if (parts.length >= 2) {
+		return {
+			baseId: parts[0],
+			configId: parts.slice(1).join("::"), // In case configId itself contains '::'
+		};
+	}
+	return {
+		baseId: modelId,
+	};
+}
+
 // Tool calling sanitization helpers
 
 function isIntegerLikePropertyName(propertyName: string | undefined): boolean {

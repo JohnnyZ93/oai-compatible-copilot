@@ -18,7 +18,7 @@ import type {
 	ReasoningConfig,
 } from "./types";
 
-import { convertTools, convertMessages, tryParseJSONObject, validateRequest } from "./utils";
+import { convertTools, convertMessages, tryParseJSONObject, validateRequest, parseModelId } from "./utils";
 
 const DEFAULT_CONTEXT_LENGTH = 128000;
 const DEFAULT_MAX_TOKENS = 4096;
@@ -130,10 +130,15 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				const contextLen = m?.context_length ?? DEFAULT_CONTEXT_LENGTH;
 				const maxOutput = m?.max_tokens ?? DEFAULT_MAX_TOKENS;
 				const maxInput = Math.max(1, contextLen - maxOutput);
+
+				// 使用配置ID（如果存在）来生成唯一的模型ID
+				const modelId = m.configId ? `${m.id}::${m.configId}` : m.id;
+				const modelName = m.configId ? `${m.id}::${m.configId} via ${m.owned_by}` : `${m.id} via ${m.owned_by}`;
+
 				return {
-					id: `${m.id}`,
-					name: `${m.id} via ${m.owned_by}`,
-					tooltip: `OAI Compatible via ${m.owned_by}`,
+					id: modelId,
+					name: modelName,
+					tooltip: m.configId ? `OAI Compatible ${m.id} (config: ${m.configId}) via ${m.owned_by}` : `OAI Compatible via ${m.owned_by}`,
 					family: m.family ?? "oai-compatible",
 					version: "1.0.0",
 					maxInputTokens: maxInput,
@@ -310,7 +315,23 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			// get model config from user settings
 			const config = vscode.workspace.getConfiguration();
 			const userModels = config.get<HFModelItem[]>("oaicopilot.models", []);
-			const um = userModels.find((um) => um.id === model.id);
+
+			// 解析模型ID以处理配置ID
+			const parsedModelId = parseModelId(model.id);
+
+			// 查找匹配的用户模型配置
+			// 优先匹配同时具有相同基础ID和配置ID的模型
+			// 如果没有配置ID，则匹配基础ID相同的模型
+			let um: HFModelItem | undefined = userModels.find(um =>
+				um.id === parsedModelId.baseId &&
+				((parsedModelId.configId && um.configId === parsedModelId.configId) ||
+				(!parsedModelId.configId && !um.configId))
+			);
+
+			// 如果仍然没有找到模型，尝试查找任何匹配基础ID的模型（最宽松的匹配，用于向后兼容）
+			if (!um) {
+				um = userModels.find((um) => um.id === parsedModelId.baseId);
+			}
 
 			// Get API key for the model's provider
 			const provider = um?.owned_by;
@@ -333,7 +354,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 			// requestBody
 			requestBody = {
-				model: model.id,
+				model: parsedModelId.baseId,
 				messages: openaiMessages,
 				stream: true,
 				stream_options: { include_usage: true },
