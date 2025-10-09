@@ -68,6 +68,9 @@ export interface HFModelItem {
 	context_length?: number;
 	vision?: boolean;
 	max_tokens?: number;
+	// OpenAI new standard parameter
+	max_completion_tokens?: number;
+	reasoning_effort?: string;
 	enable_thinking?: boolean;
 	thinking_budget?: number;
 	// New thinking configuration for Zai provider
@@ -158,5 +161,5 @@ export type ReasoningDetail = ReasoningSummaryDetail | ReasoningEncryptedDetail 
  * Thinking configuration for Zai provider
  */
 export interface ThinkingConfig {
-	type?: 'enabled' | 'disabled';
+	type?: string;
 }

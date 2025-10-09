@@ -98,6 +98,24 @@
 								"maximum": 10000000,
 								"description": "Maximum number of tokens to generate (range: [1, context_length)). Default is 4096."
 							},
+							"max_completion_tokens": {
+								"type": "number",
+								"default": 4096,
+								"minimum": 1,
+								"maximum": 10000000,
+								"description": "Maximum number of tokens to generate (OpenAI new standard parameter)."
+							},
+							"reasoning_effort": {
+								"type": "string",
+								"default": "medium",
+								"enum": [
+									"high",
+									"medium",
+									"low",
+									"minimal"
+								],
+								"description": "Reasoning effort level (OpenAI reasoning configuration)"
+							},
 							"thinking": {
 								"type": "object",
 								"description": "Thinking configuration for Zai provider",
@@ -228,7 +246,7 @@
 		"lint": "eslint",
 		"format": "prettier --write .",
 		"watch": "tsc -watch -p ./",
-		"test": "pnpm run compile && vscode-test"
+		"test": "npm run compile && vscode-test"
 	},
 	"dependencies": {},
 	"devDependencies": {
