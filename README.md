@@ -135,6 +135,7 @@ All parameters support individual configuration for different models, providing 
 - `baseUrl`: Model-specific base URL. If not provided, the global `oaicopilot.baseUrl` will be used
 - `context_length`: The context length supported by the model. Default value is 128000
 - `max_tokens`: Maximum number of tokens to generate (range: [1, context_length]). Default value is 4096
+- `max_completion_tokens`: Maximum number of tokens to generate (OpenAI new standard parameter)
 - `vision`: Whether the model supports vision capabilities. Defaults to false
 - `temperature`: Sampling temperature (range: [0, 2]). Lower values make the output more deterministic, higher values more creative. Default value is 0
 - `top_p`: Top-p sampling value (range: (0, 1]). Default value is 1
@@ -152,6 +153,7 @@ All parameters support individual configuration for different models, providing 
   - `max_tokens`: Specific token limit for reasoning (Anthropic style, as an alternative to effort)
 - `thinking`: Thinking configuration for Zai provider
   - `type`: Set to 'enabled' to enable thinking, 'disabled' to disable thinking
+- `reasoning_effort`: Reasoning effort level (OpenAI reasoning configuration)
 ---
 
 ## Thanks to

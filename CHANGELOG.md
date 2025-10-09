@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.0.6 (2025-10-10)
+
+- Feat: [OpenAI use `max_completion_tokens` instead of `max_tokens` for GPT-5](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/19)
+- Enhanced `oaicopilot.models` configuration including:
+  - `max_completion_tokens`: Maximum number of tokens to generate (OpenAI new standard parameter)
+  - `reasoning_effort`: Reasoning effort level (OpenAI reasoning configuration)
+
+
 ## 0.0.5 (2025-10-09)
 
 - Feat: [GLM 4.6 - no thinking tags](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/15)
