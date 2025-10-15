@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.0.7 (2025-10-15)
+
+- Feat: [`<think>` block is not detected properly for Perplexity Sonar models](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/21)
+- Update VS Code proposed api version.
+
 ## 0.0.6 (2025-10-10)
 
 - Feat: [OpenAI use `max_completion_tokens` instead of `max_tokens` for GPT-5](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/19)
