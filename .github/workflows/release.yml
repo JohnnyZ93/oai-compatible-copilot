@@ -52,4 +52,4 @@ jobs:
           path: .
 
       - name: Publish to VS Code Marketplace
-        run: npx @vscode/vsce publish --pat ${{ secrets.MARKETPLACE_TOKEN }} --packagePath ./extension.vsix
+        run: npx @vscode/vsce publish --allow-all-proposed-apis --pat ${{ secrets.MARKETPLACE_TOKEN }} --packagePath ./extension.vsix
