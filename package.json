@@ -4,6 +4,13 @@
 	"displayName": "OAI Compatible Provider for Copilot",
 	"description": "An extension that integrates Openai Compatible Inference Providers into GitHub Copilot Chat",
 	"icon": "assets/logo.png",
+	"keywords": [
+        "ai",
+        "chat",
+        "copilot",
+        "github-copilot",
+        "language-model"
+    ],
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/JohnnyZ93/oai-compatible-copilot"
@@ -12,6 +19,9 @@
 	"engines": {
 		"vscode": "^1.104.0"
 	},
+	"extensionDependencies": [
+        "github.copilot-chat"
+    ],
 	"categories": [
 		"AI",
 		"Chat"
@@ -27,6 +37,11 @@
 		"url": "https://github.com/JohnnyZ93/oai-compatible-copilot/issues"
 	},
 	"license": "MIT",
+	"enabledApiProposals": [
+        "chatProvider",
+		"languageModelDataPart",
+		"languageModelThinkingPart"
+    ],
 	"contributes": {
 		"languageModelChatProviders": [
 			{
@@ -241,7 +256,7 @@
 	"main": "./out/extension.js",
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
-		"download-api": "dts dev",
+		"download-api": "dts dev && mv vscode.proposed.*.ts src",
 		"compile": "tsc -p ./",
 		"lint": "eslint",
 		"format": "prettier --write .",

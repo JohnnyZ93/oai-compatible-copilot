@@ -2,16 +2,15 @@ import * as vscode from "vscode";
 import {
 	CancellationToken,
 	LanguageModelChatInformation,
-	LanguageModelChatMessage,
 	LanguageModelChatProvider,
-	LanguageModelChatRequestHandleOptions,
-	LanguageModelResponsePart,
+	LanguageModelChatRequestMessage,
+	ProvideLanguageModelChatResponseOptions,
+	LanguageModelResponsePart2,
 	Progress,
 } from "vscode";
 
 import type {
 	HFModelItem,
-	HFModelsResponse,
 	ReasoningDetail,
 	ReasoningSummaryDetail,
 	ReasoningTextDetail,
@@ -20,15 +19,15 @@ import type {
 
 import { convertTools, convertMessages, tryParseJSONObject, validateRequest, parseModelId } from "./utils";
 
-const DEFAULT_CONTEXT_LENGTH = 128000;
-const DEFAULT_MAX_TOKENS = 4096;
+import { prepareLanguageModelChatInformation } from "./provideModel";
+import { prepareTokenCount } from "./provideToken";
+
 const MAX_TOOLS_PER_REQUEST = 128;
 
 /**
  * VS Code Chat provider backed by Hugging Face Inference Providers.
  */
 export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
-	private _chatEndpoints: { model: string; modelMaxPromptTokens: number }[] = [];
 	/** Buffer for assembling streamed tool calls by index. */
 	private _toolCallBuffers: Map<number, { id?: string; name?: string; args: string }> = new Map<
 		number,
@@ -66,51 +65,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		private readonly userAgent: string
 	) {}
 
-	/** Roughly estimate tokens for VS Code chat messages (text only) */
-	private estimateMessagesTokens(msgs: readonly vscode.LanguageModelChatMessage[]): number {
-		let total = 0;
-		for (const m of msgs) {
-			for (const part of m.content) {
-				if (part instanceof vscode.LanguageModelTextPart) {
-					total += this.estimateTextTokens(part.value);
-				}
-			}
-		}
-		return total;
-	}
-
-	/** 针对不同内容类型的 token 估算 */
-	private estimateTextTokens(text: string): number {
-		const chineseChars = (text.match(/[\u4e00-\u9fff]/g) || []).length;
-		const englishWords = (text.match(/\b[a-zA-Z]+\b/g) || []).length;
-		const symbols = text.length - chineseChars - englishWords;
-
-		// 中文字符约1.5个token，英文单词约1个token，符号约0.5个token
-		return Math.ceil(chineseChars * 1.5 + englishWords + symbols * 0.5);
-	}
-
-	/** Rough token estimate for tool definitions by JSON size */
-	private estimateToolTokens(
-		tools: { type: string; function: { name: string; description?: string; parameters?: object } }[] | undefined
-	): number {
-		if (!tools || tools.length === 0) {
-			return 0;
-		}
-		try {
-			const json = JSON.stringify(tools);
-			return Math.ceil(json.length / 4);
-		} catch {
-			return 0;
-		}
-	}
-
-	/**
-	 * Get the list of available language models contributed by this provider
-	 * @param options Options which specify the calling context of this function
-	 * @param token A cancellation token which signals if the user cancelled the request or not
-	 * @returns A promise that resolves to the list of available language models
-	 */
-	async prepareLanguageModelChatInformation(
+	async provideLanguageModelChatInformation(
 		options: { silent: boolean },
 		_token: CancellationToken
 	): Promise<LanguageModelChatInformation[]> {
@@ -118,149 +73,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		if (!apiKey) {
 			return [];
 		}
-
-		// Check for user-configured models first
-		const config = vscode.workspace.getConfiguration();
-		const userModels = config.get<HFModelItem[]>("oaicopilot.models", []);
-
-		let infos: LanguageModelChatInformation[];
-		if (userModels && userModels.length > 0) {
-			// Return user-provided models directly
-			infos = userModels.map((m) => {
-				const contextLen = m?.context_length ?? DEFAULT_CONTEXT_LENGTH;
-				const maxOutput = m?.max_completion_tokens ?? m?.max_tokens ?? DEFAULT_MAX_TOKENS;
-				const maxInput = Math.max(1, contextLen - maxOutput);
-
-				// 使用配置ID（如果存在）来生成唯一的模型ID
-				const modelId = m.configId ? `${m.id}::${m.configId}` : m.id;
-				const modelName = m.configId ? `${m.id}::${m.configId} via ${m.owned_by}` : `${m.id} via ${m.owned_by}`;
-
-				return {
-					id: modelId,
-					name: modelName,
-					tooltip: m.configId
-						? `OAI Compatible ${m.id} (config: ${m.configId}) via ${m.owned_by}`
-						: `OAI Compatible via ${m.owned_by}`,
-					family: m.family ?? "oai-compatible",
-					version: "1.0.0",
-					maxInputTokens: maxInput,
-					maxOutputTokens: maxOutput,
-					capabilities: {
-						toolCalling: true,
-						imageInput: m?.vision ?? false,
-					},
-				} satisfies LanguageModelChatInformation;
-			});
-		} else {
-			// Fallback: Fetch models from Hugging Face API
-			const { models } = await this.fetchModels(apiKey);
-
-			infos = models.flatMap((m) => {
-				const providers = m?.providers ?? [];
-				const modalities = m.architecture?.input_modalities ?? [];
-				const vision = Array.isArray(modalities) && modalities.includes("image");
-
-				// Build entries for all providers that support tool calling
-				const toolProviders = providers.filter((p) => p.supports_tools === true);
-				const entries: LanguageModelChatInformation[] = [];
-
-				for (const p of toolProviders) {
-					const contextLen = p?.context_length ?? DEFAULT_CONTEXT_LENGTH;
-					const maxOutput = DEFAULT_MAX_TOKENS;
-					const maxInput = Math.max(1, contextLen - maxOutput);
-					entries.push({
-						id: `${m.id}:${p.provider}`,
-						name: `${m.id} via ${p.provider}`,
-						tooltip: `OAI Compatible via ${p.provider}`,
-						family: m.family ?? "oai-compatible",
-						version: "1.0.0",
-						maxInputTokens: maxInput,
-						maxOutputTokens: maxOutput,
-						capabilities: {
-							toolCalling: true,
-							imageInput: vision,
-						},
-					} satisfies LanguageModelChatInformation);
-				}
-
-				if (entries.length === 0) {
-					const base = providers.length > 0 ? providers[0] : null;
-					const contextLen = base?.context_length ?? DEFAULT_CONTEXT_LENGTH;
-					const maxOutput = DEFAULT_MAX_TOKENS;
-					const maxInput = Math.max(1, contextLen - maxOutput);
-					entries.push({
-						id: `${m.id}`,
-						name: `${m.id} via OAI Compatible`,
-						tooltip: "OAI Compatible",
-						family: m.family ?? "oai-compatible",
-						version: "1.0.0",
-						maxInputTokens: maxInput,
-						maxOutputTokens: maxOutput,
-						capabilities: {
-							toolCalling: true,
-							imageInput: true,
-						},
-					} satisfies LanguageModelChatInformation);
-				}
-
-				return entries;
-			});
-		}
-
-		this._chatEndpoints = infos.map((info) => ({
-			model: info.id,
-			modelMaxPromptTokens: info.maxInputTokens + info.maxOutputTokens,
-		}));
-
-		return infos;
-	}
-
-	async provideLanguageModelChatInformation(
-		options: { silent: boolean },
-		_token: CancellationToken
-	): Promise<LanguageModelChatInformation[]> {
-		return this.prepareLanguageModelChatInformation({ silent: options.silent ?? false }, _token);
-	}
-
-	/**
-	 * Fetch the list of models and supplementary metadata from Hugging Face.
-	 * @param apiKey The HF API key used to authenticate.
-	 */
-	private async fetchModels(apiKey: string): Promise<{ models: HFModelItem[] }> {
-		const config = vscode.workspace.getConfiguration();
-		let BASE_URL = config.get<string>("oaicopilot.baseUrl", "");
-		if (!BASE_URL || !BASE_URL.startsWith("http")) {
-			throw new Error(`Invalid base URL configuration.`);
-		}
-		const modelsList = (async () => {
-			const resp = await fetch(`${BASE_URL}/models`, {
-				method: "GET",
-				headers: { Authorization: `Bearer ${apiKey}`, "User-Agent": this.userAgent },
-			});
-			if (!resp.ok) {
-				let text = "";
-				try {
-					text = await resp.text();
-				} catch (error) {
-					console.error("[OAI Compatible Model Provider] Failed to read response text", error);
-				}
-				const err = new Error(
-					`Failed to fetch OAI Compatible models: ${resp.status} ${resp.statusText}${text ? `\n${text}` : ""}`
-				);
-				console.error("[OAI Compatible Model Provider] Failed to fetch OAI Compatible models", err);
-				throw err;
-			}
-			const parsed = (await resp.json()) as HFModelsResponse;
-			return parsed.data ?? [];
-		})();
-
-		try {
-			const models = await modelsList;
-			return { models };
-		} catch (err) {
-			console.error("[OAI Compatible Model Provider] Failed to fetch OAI Compatible models", err);
-			throw err;
-		}
+		return prepareLanguageModelChatInformation({ silent: options.silent ?? false }, _token, apiKey, this.userAgent);
 	}
 
 	/**
@@ -275,9 +88,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	 */
 	async provideLanguageModelChatResponse(
 		model: LanguageModelChatInformation,
-		messages: readonly LanguageModelChatMessage[],
-		options: LanguageModelChatRequestHandleOptions,
-		progress: Progress<LanguageModelResponsePart>,
+		messages: readonly LanguageModelChatRequestMessage[],
+		options: ProvideLanguageModelChatResponseOptions,
+		progress: Progress<LanguageModelResponsePart2>,
 		token: CancellationToken
 	): Promise<void> {
 		this._toolCallBuffers.clear();
@@ -290,7 +103,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		this._emittedTextToolCallIds.clear();
 
 		let requestBody: Record<string, unknown> | undefined;
-		const trackingProgress: Progress<LanguageModelResponsePart> = {
+		const trackingProgress: Progress<LanguageModelResponsePart2> = {
 			report: (part) => {
 				try {
 					progress.report(part);
@@ -343,122 +156,17 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				throw new Error("OAI Compatible API key not found");
 			}
 
-			// temperature
-			const oTemperature = options.modelOptions?.temperature ?? 0;
-			const temperature = um?.temperature ?? oTemperature;
-
-			// top_p
-			const oTopP = options.modelOptions?.top_p ?? 1;
-			const topP = um?.top_p ?? oTopP;
-
 			// requestBody
 			requestBody = {
 				model: parsedModelId.baseId,
 				messages: openaiMessages,
 				stream: true,
 				stream_options: { include_usage: true },
-				temperature: temperature,
-				top_p: topP,
 			};
-
-			const rb = requestBody as Record<string, unknown>;
-
-			// If user model config explicitly sets sampling params to null, remove them so provider defaults apply
-			if (um && um.temperature === null) {
-				delete rb.temperature;
-			}
-			if (um && um.top_p === null) {
-				delete rb.top_p;
-			}
-
-			// max_tokens
-			if (um?.max_tokens !== undefined) {
-				rb.max_tokens = um.max_tokens;
-			}
-
-			// max_completion_tokens (OpenAI new standard parameter)
-			if (um?.max_completion_tokens !== undefined) {
-				rb.max_completion_tokens = um.max_completion_tokens;
-			}
-
-			// OpenAI reasoning configuration
-			if (um?.reasoning_effort !== undefined) {
-				rb.reasoning_effort = um.reasoning_effort;
-			}
-
-			// enable_thinking (non-OpenRouter only)
-			const enableThinking = um?.enable_thinking;
-			if (enableThinking !== undefined) {
-				rb.enable_thinking = enableThinking;
-
-				if (um?.thinking_budget !== undefined) {
-					rb.thinking_budget = um.thinking_budget;
-				}
-			}
-
-			// thinking (Zai provider)
-			if (um?.thinking?.type !== undefined) {
-				rb.thinking = {
-					type: um.thinking.type,
-				};
-			}
-
-			// OpenRouter reasoning configuration
-			if (um?.reasoning !== undefined) {
-				const reasoningConfig: ReasoningConfig = um.reasoning as ReasoningConfig;
-				if (reasoningConfig.enabled !== false) {
-					const reasoningObj: Record<string, unknown> = {};
-					const effort = reasoningConfig.effort;
-					const maxTokensReasoning = reasoningConfig.max_tokens || 2000; // Default 2000 as per docs
-					if (effort && effort !== "auto") {
-						reasoningObj.effort = effort;
-					} else {
-						// If auto or unspecified, use max_tokens (Anthropic-style fallback)
-						reasoningObj.max_tokens = maxTokensReasoning;
-					}
-					if (reasoningConfig.exclude !== undefined) {
-						reasoningObj.exclude = reasoningConfig.exclude;
-					}
-					rb.reasoning = reasoningObj;
-				}
-			}
-
-			// stop
-			if (options.modelOptions) {
-				const mo = options.modelOptions as Record<string, unknown>;
-				if (typeof mo.stop === "string" || Array.isArray(mo.stop)) {
-					rb.stop = mo.stop;
-				}
-			}
-
-			// tools
-			const toolConfig = convertTools(options);
-			if (toolConfig.tools) {
-				rb.tools = toolConfig.tools;
-			}
-			if (toolConfig.tool_choice) {
-				rb.tool_choice = toolConfig.tool_choice;
-			}
-
-			// Configure user-defined additional parameters
-			if (um?.top_k !== undefined) {
-				rb.top_k = um.top_k;
-			}
-			if (um?.min_p !== undefined) {
-				rb.min_p = um.min_p;
-			}
-			if (um?.frequency_penalty !== undefined) {
-				rb.frequency_penalty = um.frequency_penalty;
-			}
-			if (um?.presence_penalty !== undefined) {
-				rb.presence_penalty = um.presence_penalty;
-			}
-			if (um?.repetition_penalty !== undefined) {
-				rb.repetition_penalty = um.repetition_penalty;
-			}
+			requestBody = this.prepareRequestBody(requestBody, um, options);
 
 			// debug log
-			// console.log("[OAI Compatible Model Provider] Request", JSON.stringify(requestBody));
+			// console.log("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(requestBody));
 
 			// 发送请求
 			let BASE_URL = um?.baseUrl || config.get<string>("oaicopilot.baseUrl", "");
@@ -497,6 +205,118 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		}
 	}
 
+	private prepareRequestBody(
+		rb: Record<string, unknown>,
+		um: HFModelItem | undefined,
+		options: ProvideLanguageModelChatResponseOptions
+	) {
+		// temperature
+		const oTemperature = options.modelOptions?.temperature ?? 0;
+		const temperature = um?.temperature ?? oTemperature;
+		rb.temperature = temperature;
+
+		// top_p
+		const oTopP = options.modelOptions?.top_p ?? 1;
+		const topP = um?.top_p ?? oTopP;
+		rb.top_p = topP;
+
+		// If user model config explicitly sets sampling params to null, remove them so provider defaults apply
+		if (um && um.temperature === null) {
+			delete rb.temperature;
+		}
+		if (um && um.top_p === null) {
+			delete rb.top_p;
+		}
+
+		// max_tokens
+		if (um?.max_tokens !== undefined) {
+			rb.max_tokens = um.max_tokens;
+		}
+
+		// max_completion_tokens (OpenAI new standard parameter)
+		if (um?.max_completion_tokens !== undefined) {
+			rb.max_completion_tokens = um.max_completion_tokens;
+		}
+
+		// OpenAI reasoning configuration
+		if (um?.reasoning_effort !== undefined) {
+			rb.reasoning_effort = um.reasoning_effort;
+		}
+
+		// enable_thinking (non-OpenRouter only)
+		const enableThinking = um?.enable_thinking;
+		if (enableThinking !== undefined) {
+			rb.enable_thinking = enableThinking;
+
+			if (um?.thinking_budget !== undefined) {
+				rb.thinking_budget = um.thinking_budget;
+			}
+		}
+
+		// thinking (Zai provider)
+		if (um?.thinking?.type !== undefined) {
+			rb.thinking = {
+				type: um.thinking.type,
+			};
+		}
+
+		// OpenRouter reasoning configuration
+		if (um?.reasoning !== undefined) {
+			const reasoningConfig: ReasoningConfig = um.reasoning as ReasoningConfig;
+			if (reasoningConfig.enabled !== false) {
+				const reasoningObj: Record<string, unknown> = {};
+				const effort = reasoningConfig.effort;
+				const maxTokensReasoning = reasoningConfig.max_tokens || 2000; // Default 2000 as per docs
+				if (effort && effort !== "auto") {
+					reasoningObj.effort = effort;
+				} else {
+					// If auto or unspecified, use max_tokens (Anthropic-style fallback)
+					reasoningObj.max_tokens = maxTokensReasoning;
+				}
+				if (reasoningConfig.exclude !== undefined) {
+					reasoningObj.exclude = reasoningConfig.exclude;
+				}
+				rb.reasoning = reasoningObj;
+			}
+		}
+
+		// stop
+		if (options.modelOptions) {
+			const mo = options.modelOptions as Record<string, unknown>;
+			if (typeof mo.stop === "string" || Array.isArray(mo.stop)) {
+				rb.stop = mo.stop;
+			}
+		}
+
+		// tools
+		const toolConfig = convertTools(options);
+		if (toolConfig.tools) {
+			rb.tools = toolConfig.tools;
+		}
+		if (toolConfig.tool_choice) {
+			rb.tool_choice = toolConfig.tool_choice;
+		}
+
+		// Configure user-defined additional parameters
+		if (um?.top_k !== undefined) {
+			rb.top_k = um.top_k;
+		}
+		if (um?.min_p !== undefined) {
+			rb.min_p = um.min_p;
+		}
+		if (um?.frequency_penalty !== undefined) {
+			rb.frequency_penalty = um.frequency_penalty;
+		}
+		if (um?.presence_penalty !== undefined) {
+			rb.presence_penalty = um.presence_penalty;
+		}
+		if (um?.repetition_penalty !== undefined) {
+			rb.repetition_penalty = um.repetition_penalty;
+		}
+
+		return rb;
+	}
+
 	/**
 	 * Returns the number of tokens for a given text using the model specific tokenizer logic
 	 * @param model The language model to use
@@ -506,45 +326,10 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	 */
 	async provideTokenCount(
 		model: LanguageModelChatInformation,
-		text: string | LanguageModelChatMessage,
+		text: string | LanguageModelChatRequestMessage,
 		_token: CancellationToken
 	): Promise<number> {
-		if (typeof text === "string") {
-			// Estimate tokens directly for plain text
-			return this.estimateTextTokens(text);
-		} else {
-			// For complex messages, calculate tokens for each part separately
-			let totalTokens = 0;
-
-			for (const part of text.content) {
-				if (part instanceof vscode.LanguageModelTextPart) {
-					// Estimate tokens directly for plain text
-					totalTokens += this.estimateTextTokens(part.value);
-				} else if (part instanceof vscode.LanguageModelDataPart) {
-					// Estimate tokens for image or data parts based on type
-					if (part.mimeType.startsWith("image/")) {
-						// Images are approximately 170 tokens
-						totalTokens += 170;
-					} else {
-						// For other binary data, use a more conservative estimate
-						totalTokens += Math.ceil(part.data.length / 4);
-					}
-				} else if (part instanceof vscode.LanguageModelToolCallPart) {
-					// Tool call token calculation
-					const toolCallText = `${part.name}(${JSON.stringify(part.input)})`;
-					totalTokens += this.estimateTextTokens(toolCallText);
-				} else if (part instanceof vscode.LanguageModelToolResultPart) {
-					// Tool result token calculation
-					const resultText = typeof part.content === "string" ? part.content : JSON.stringify(part.content);
-					totalTokens += this.estimateTextTokens(resultText);
-				}
-			}
-
-			// Add fixed overhead for roles and structure
-			totalTokens += 4;
-
-			return totalTokens;
-		}
+		return prepareTokenCount(model, text, _token);
 	}
 
 	/**
@@ -589,8 +374,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	 */
 	private async processStreamingResponse(
 		responseBody: ReadableStream<Uint8Array>,
-		progress: vscode.Progress<vscode.LanguageModelResponsePart>,
-		token: vscode.CancellationToken
+		progress: Progress<LanguageModelResponsePart2>,
+		token: CancellationToken
 	): Promise<void> {
 		const reader = responseBody.getReader();
 		const decoder = new TextDecoder();
@@ -632,6 +417,10 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 					try {
 						const parsed = JSON.parse(data);
+
+						// debug log
+						// console.log("[OAI Compatible Model Provider] Chunk Data:", parsed);
+
 						await this.processDelta(parsed, progress);
 					} catch {
 						// Silently ignore malformed SSE lines temporarily
@@ -658,7 +447,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	 */
 	private async processDelta(
 		delta: Record<string, unknown>,
-		progress: vscode.Progress<vscode.LanguageModelResponsePart>
+		progress: Progress<LanguageModelResponsePart2>
 	): Promise<boolean> {
 		let emitted = false;
 		const choice = (delta.choices as Record<string, unknown>[] | undefined)?.[0];
@@ -698,20 +487,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					}
 
 					if (extractedText) {
-						const vsAny = vscode as unknown as Record<string, unknown>;
-						const ThinkingCtor = vsAny["LanguageModelThinkingPart"] as
-							| (new (text: string, id?: string, metadata?: unknown) => unknown)
-							| undefined;
-						if (ThinkingCtor) {
-							const metadata = { format: detail.format, type: detail.type, index: detail.index };
-							const thinkingPart = new (ThinkingCtor as new (text: string, id?: string, metadata?: unknown) => unknown)(
-								extractedText,
-								detail.id || undefined, // Handle null as undefined
-								metadata
-							) as unknown as vscode.LanguageModelResponsePart;
-							progress.report(thinkingPart);
-							emitted = true;
-						}
+						const metadata = { format: detail.format, type: detail.type, index: detail.index };
+						progress.report(new vscode.LanguageModelThinkingPart(extractedText, detail.id || undefined, metadata));
+						emitted = true;
 					}
 				}
 				maybeThinking = null; // Skip simple thinking if details present
@@ -719,31 +497,20 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 			// Fallback to simple thinking if no details
 			if (maybeThinking !== undefined && maybeThinking !== null) {
-				const vsAny = vscode as unknown as Record<string, unknown>;
-				const ThinkingCtor = vsAny["LanguageModelThinkingPart"] as
-					| (new (text: string, id?: string, metadata?: unknown) => unknown)
-					| undefined;
-				if (ThinkingCtor) {
-					let text = "";
-					let id: string | undefined;
-					let metadata: unknown;
-					if (maybeThinking && typeof maybeThinking === "object") {
-						const mt = maybeThinking as Record<string, unknown>;
-						text = typeof mt["text"] === "string" ? (mt["text"] as string) : JSON.stringify(mt);
-						id = typeof mt["id"] === "string" ? (mt["id"] as string) : undefined;
-						metadata = mt["metadata"] ?? mt;
-					} else if (typeof maybeThinking === "string") {
-						text = maybeThinking;
-					}
-					if (text) {
-						const thinkingPart = new (ThinkingCtor as new (text: string, id?: string, metadata?: unknown) => unknown)(
-							text,
-							id,
-							metadata
-						) as unknown as vscode.LanguageModelResponsePart;
-						progress.report(thinkingPart);
-						emitted = true;
-					}
+				let text = "";
+				let id: string | undefined;
+				let metadata: Record<string, unknown> | undefined;
+				if (maybeThinking && typeof maybeThinking === "object") {
+					const mt = maybeThinking as Record<string, unknown>;
+					text = typeof mt["text"] === "string" ? (mt["text"] as string) : JSON.stringify(mt);
+					id = typeof mt["id"] === "string" ? (mt["id"] as string) : undefined;
+					metadata = mt["metadata"] ? (mt["metadata"] as Record<string, unknown>) : undefined;
+				} else if (typeof maybeThinking === "string") {
+					text = maybeThinking;
+				}
+				if (text) {
+					progress.report(new vscode.LanguageModelThinkingPart(text, id, metadata));
+					emitted = true;
 				}
 			}
 		} catch (e) {
@@ -809,7 +576,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	 */
 	private processTextContent(
 		input: string,
-		progress: vscode.Progress<vscode.LanguageModelResponsePart>
+		progress: Progress<LanguageModelResponsePart2>
 	): { emittedText: boolean; emittedAny: boolean } {
 		const BEGIN = "<|tool_call_begin|>";
 		const ARG_BEGIN = "<|tool_call_argument_begin|>";
@@ -941,7 +708,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	}
 
 	private emitTextToolCallIfValid(
-		progress: vscode.Progress<vscode.LanguageModelResponsePart>,
+		progress: Progress<LanguageModelResponsePart2>,
 		call: { name?: string; index?: number; argBuffer: string; emitted?: boolean },
 		argText: string
 	): boolean {
@@ -969,7 +736,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		return true;
 	}
 
-	private async flushActiveTextToolCall(progress: vscode.Progress<vscode.LanguageModelResponsePart>): Promise<void> {
+	private async flushActiveTextToolCall(progress: Progress<LanguageModelResponsePart2>): Promise<void> {
 		if (!this._textToolActive) {
 			return;
 		}
@@ -988,10 +755,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	 * @param index The tool call index from the stream.
 	 * @param progress Progress reporter for parts.
 	 */
-	private async tryEmitBufferedToolCall(
-		index: number,
-		progress: vscode.Progress<vscode.LanguageModelResponsePart>
-	): Promise<void> {
+	private async tryEmitBufferedToolCall(index: number, progress: Progress<LanguageModelResponsePart2>): Promise<void> {
 		const buf = this._toolCallBuffers.get(index);
 		if (!buf) {
 			return;
@@ -1022,7 +786,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	 * @param throwOnInvalid If true, throw when a tool call has invalid JSON args.
 	 */
 	private async flushToolCallBuffers(
-		progress: vscode.Progress<vscode.LanguageModelResponsePart>,
+		progress: Progress<LanguageModelResponsePart2>,
 		throwOnInvalid: boolean
 	): Promise<void> {
 		if (this._toolCallBuffers.size === 0) {

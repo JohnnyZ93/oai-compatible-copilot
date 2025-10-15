@@ -261,7 +261,7 @@ function createDataUrl(dataPart: vscode.LanguageModelDataPart): string {
  * Convert VS Code tool definitions to OpenAI function tool definitions.
  * @param options Request options containing tools and toolMode.
  */
-export function convertTools(options: vscode.LanguageModelChatRequestHandleOptions): {
+export function convertTools(options: vscode.ProvideLanguageModelChatResponseOptions): {
 	tools?: OpenAIFunctionToolDef[];
 	tool_choice?: "auto" | { type: "function"; function: { name: string } };
 } {
