@@ -56,6 +56,10 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	private _emittedTextToolCallKeys = new Set<string>();
 	private _emittedTextToolCallIds = new Set<string>();
 
+	// XML think block parsing state
+	private _xmlThinkActive = false;
+	private _xmlThinkDetectionAttempted = false;
+
 	/**
 	 * Create a provider using the given secret storage for the API key.
 	 * @param secrets VS Code secret storage.
@@ -101,6 +105,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		this._textToolActive = undefined;
 		this._emittedTextToolCallKeys.clear();
 		this._emittedTextToolCallIds.clear();
+		this._xmlThinkActive = false;
+		this._xmlThinkDetectionAttempted = false;
 
 		let requestBody: Record<string, unknown> | undefined;
 		const trackingProgress: Progress<LanguageModelResponsePart2> = {
@@ -437,6 +443,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			this._textToolParserBuffer = "";
 			this._textToolActive = undefined;
 			this._emittedTextToolCallKeys.clear();
+			this._xmlThinkActive = false;
+			this._xmlThinkDetectionAttempted = false;
 		}
 	}
 
@@ -519,12 +527,20 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 		if (deltaObj?.content) {
 			const content = String(deltaObj.content);
-			const res = this.processTextContent(content, progress);
-			if (res.emittedText) {
-				this._hasEmittedAssistantText = true;
-			}
-			if (res.emittedAny) {
+
+			// Process XML think blocks or text content (mutually exclusive)
+			const xmlRes = this.processXmlThinkBlocks(content, progress);
+			if (xmlRes.emittedAny) {
 				emitted = true;
+			} else {
+				// Only process text content if no XML think blocks were emitted
+				const res = this.processTextContent(content, progress);
+				if (res.emittedText) {
+					this._hasEmittedAssistantText = true;
+				}
+				if (res.emittedAny) {
+					emitted = true;
+				}
 			}
 		}
 
@@ -829,5 +845,71 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		} catch {
 			return text;
 		}
+	}
+
+	/**
+	 * Process streamed text content for XML think blocks and emit thinking parts.
+	 * Returns whether any thinking content was emitted.
+	 */
+	private processXmlThinkBlocks(
+		input: string,
+		progress: Progress<LanguageModelResponsePart2>
+	): { emittedAny: boolean } {
+		// If we've already attempted detection and found no THINK_START, skip processing
+		if (this._xmlThinkDetectionAttempted && !this._xmlThinkActive) {
+			return { emittedAny: false };
+		}
+
+		const THINK_START = "<think>";
+		const THINK_END = "</think>";
+
+		let data = input;
+		let emittedAny = false;
+
+		while (data.length > 0) {
+			if (!this._xmlThinkActive) {
+				// Look for think start tag
+				const startIdx = data.indexOf(THINK_START);
+				if (startIdx === -1) {
+					// No think start found, mark detection as attempted and skip future processing
+					this._xmlThinkDetectionAttempted = true;
+					data = "";
+					break;
+				}
+
+				// Found think start tag
+				this._xmlThinkActive = true;
+
+				// Skip the start tag and continue processing
+				data = data.slice(startIdx + THINK_START.length);
+				continue;
+			}
+
+			// We are inside a think block, look for end tag
+			const endIdx = data.indexOf(THINK_END);
+			if (endIdx === -1) {
+				// No end tag found, emit current chunk content as thinking part
+				const thinkContent = data.trim();
+				if (thinkContent) {
+					progress.report(new vscode.LanguageModelThinkingPart(thinkContent));
+					emittedAny = true;
+				}
+				data = "";
+				break;
+			}
+
+			// Found end tag, emit final thinking part
+			const thinkContent = data.slice(0, endIdx);
+			if (thinkContent) {
+				progress.report(new vscode.LanguageModelThinkingPart(thinkContent));
+				emittedAny = true;
+			}
+
+			// Reset state and continue with remaining data
+			this._xmlThinkActive = false;
+			data = data.slice(endIdx + THINK_END.length);
+		}
+
+		return { emittedAny };
 	}
 }
