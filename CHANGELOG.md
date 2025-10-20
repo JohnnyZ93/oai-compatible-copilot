@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.0.8 (2025-10-21)
+
+- Fix: [LLM output missing `<`](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/19)
+- Remove inline tool call response processing, significantly accelerating model response speed.
+
 ## 0.0.7 (2025-10-15)
 
 - Feat: [`<think>` block is not detected properly for Perplexity Sonar models](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/21)
