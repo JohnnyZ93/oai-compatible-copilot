@@ -43,8 +43,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	/** Track if we emitted the begin-tool-calls whitespace flush. */
 	private _emittedBeginToolCallsHint = false;
 
-	// Lightweight tokenizer state for tool calls embedded in text
-	private _textToolParserBuffer = "";
 	private _textToolActive:
 		| undefined
 		| {
@@ -101,7 +99,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		this._completedToolCallIndices.clear();
 		this._hasEmittedAssistantText = false;
 		this._emittedBeginToolCallsHint = false;
-		this._textToolParserBuffer = "";
 		this._textToolActive = undefined;
 		this._emittedTextToolCallKeys.clear();
 		this._emittedTextToolCallIds.clear();
@@ -440,7 +437,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			this._completedToolCallIndices.clear();
 			this._hasEmittedAssistantText = false;
 			this._emittedBeginToolCallsHint = false;
-			this._textToolParserBuffer = "";
 			this._textToolActive = undefined;
 			this._emittedTextToolCallKeys.clear();
 			this._xmlThinkActive = false;
@@ -594,131 +590,16 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		input: string,
 		progress: Progress<LanguageModelResponsePart2>
 	): { emittedText: boolean; emittedAny: boolean } {
-		const BEGIN = "<|tool_call_begin|>";
-		const ARG_BEGIN = "<|tool_call_argument_begin|>";
-		const END = "<|tool_call_end|>";
-
-		let data = this._textToolParserBuffer + input;
 		let emittedText = false;
 		let emittedAny = false;
-		let visibleOut = "";
-
-		while (data.length > 0) {
-			if (!this._textToolActive) {
-				const b = data.indexOf(BEGIN);
-				if (b === -1) {
-					// No tool-call start: emit visible portion, but keep any partial BEGIN prefix as buffer
-					const longestPartialPrefix = (() => {
-						for (let k = Math.min(BEGIN.length - 1, data.length - 1); k > 0; k--) {
-							if (data.endsWith(BEGIN.slice(0, k))) {
-								return k;
-							}
-						}
-						return 0;
-					})();
-					if (longestPartialPrefix > 0) {
-						const visible = data.slice(0, data.length - longestPartialPrefix);
-						if (visible) {
-							visibleOut += this.stripControlTokens(visible);
-						}
-						this._textToolParserBuffer = data.slice(data.length - longestPartialPrefix);
-						data = "";
-						break;
-					} else {
-						// All visible, clean other control tokens
-						visibleOut += this.stripControlTokens(data);
-						data = "";
-						break;
-					}
-				}
-				// Emit text before the token
-				const pre = data.slice(0, b);
-				if (pre) {
-					visibleOut += this.stripControlTokens(pre);
-				}
-				// Advance past BEGIN
-				data = data.slice(b + BEGIN.length);
-
-				// Find the delimiter that ends the name/index segment
-				const a = data.indexOf(ARG_BEGIN);
-				const e = data.indexOf(END);
-				let delimIdx = -1;
-				let delimKind: "arg" | "end" | undefined = undefined;
-				if (a !== -1 && (e === -1 || a < e)) {
-					delimIdx = a;
-					delimKind = "arg";
-				} else if (e !== -1) {
-					delimIdx = e;
-					delimKind = "end";
-				} else {
-					// Incomplete header; keep for next chunk (re-add BEGIN so we don't lose it)
-					this._textToolParserBuffer = BEGIN + data;
-					data = "";
-					break;
-				}
-
-				const header = data.slice(0, delimIdx).trim();
-				const m = header.match(/^([A-Za-z0-9_\-.]+)(?::(\d+))?/);
-				const name = m?.[1] ?? undefined;
-				const index = m?.[2] ? Number(m?.[2]) : undefined;
-				this._textToolActive = { name, index, argBuffer: "", emitted: false };
-				// Advance past delimiter token
-				if (delimKind === "arg") {
-					data = data.slice(delimIdx + ARG_BEGIN.length);
-				} /* end */ else {
-					// No args, finalize immediately
-					data = data.slice(delimIdx + END.length);
-					const did = this.emitTextToolCallIfValid(progress, this._textToolActive, "{}");
-					if (did) {
-						this._textToolActive.emitted = true;
-						emittedAny = true;
-					}
-					this._textToolActive = undefined;
-				}
-				continue;
-			}
-
-			// We are inside arguments, collect until END and emit as soon as JSON becomes valid
-			const e2 = data.indexOf(END);
-			if (e2 === -1) {
-				// No end marker yet, accumulate and check for early valid JSON
-				this._textToolActive.argBuffer += data;
-				// Early emit when JSON becomes valid and we haven't emitted yet
-				if (!this._textToolActive.emitted) {
-					const did = this.emitTextToolCallIfValid(progress, this._textToolActive, this._textToolActive.argBuffer);
-					if (did) {
-						this._textToolActive.emitted = true;
-						emittedAny = true;
-					}
-				}
-				data = "";
-				break;
-			} else {
-				this._textToolActive.argBuffer += data.slice(0, e2);
-				// Consume END
-				data = data.slice(e2 + END.length);
-				// Final attempt to emit if not already
-				if (!this._textToolActive.emitted) {
-					const did = this.emitTextToolCallIfValid(progress, this._textToolActive, this._textToolActive.argBuffer);
-					if (did) {
-						emittedAny = true;
-					}
-				}
-				this._textToolActive = undefined;
-				continue;
-			}
-		}
 
 		// Emit any visible text
-		const textToEmit = visibleOut;
+		const textToEmit = input;
 		if (textToEmit && textToEmit.length > 0) {
 			progress.report(new vscode.LanguageModelTextPart(textToEmit));
 			emittedText = true;
 			emittedAny = true;
 		}
-
-		// Store leftover for next chunk
-		this._textToolParserBuffer = data;
 
 		return { emittedText, emittedAny };
 	}
@@ -835,17 +716,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		}
 	}
 
-	/** Strip provider control tokens like <|tool_calls_section_begin|> and <|tool_call_begin|> from streamed text. */
-	private stripControlTokens(text: string): string {
-		try {
-			// Remove section markers and explicit tool call begin/argument/end markers that some backends stream as text
-			return text
-				.replace(/<\|[a-zA-Z0-9_-]+_section_(?:begin|end)\|>/g, "")
-				.replace(/<\|tool_call_(?:argument_)?(?:begin|end)\|>/g, "");
-		} catch {
-			return text;
-		}
-	}
 
 	/**
 	 * Process streamed text content for XML think blocks and emit thinking parts.
