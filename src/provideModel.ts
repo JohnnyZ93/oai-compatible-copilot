@@ -117,7 +117,7 @@ export async function prepareLanguageModelChatInformation(
  */
 async function fetchModels(apiKey: string, userAgent: string): Promise<{ models: HFModelItem[] }> {
 	const config = vscode.workspace.getConfiguration();
-	let BASE_URL = config.get<string>("oaicopilot.baseUrl", "");
+	const BASE_URL = config.get<string>("oaicopilot.baseUrl", "");
 	if (!BASE_URL || !BASE_URL.startsWith("http")) {
 		throw new Error(`Invalid base URL configuration.`);
 	}

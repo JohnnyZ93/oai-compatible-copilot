@@ -498,28 +498,35 @@ export async function executeWithRetry<T>(
 			lastError = error instanceof Error ? error : new Error(String(error));
 
 			// Check if error is retryable based on status codes
-			const isRetryableError = RETRYABLE_STATUS_CODES.some(code =>
-				lastError?.message.includes(`[${code}]`)
-			);
+			const isRetryableError = RETRYABLE_STATUS_CODES.some((code) => lastError?.message.includes(`[${code}]`));
 
 			if (!isRetryableError || attempt === maxAttempts) {
 				throw lastError;
 			}
 
-			console.warn(`[OAI Compatible Model Provider] Retryable error detected, retrying in ${intervalMs}ms (attempt ${attempt}/${maxAttempts})`);
+			console.warn(
+				`[OAI Compatible Model Provider] Retryable error detected, retrying in ${intervalMs}ms (attempt ${attempt}/${maxAttempts})`
+			);
 
 			// Wait for the specified interval before retrying
 			await new Promise<void>((resolve) => {
-				const timeout = setTimeout(resolve, intervalMs);
+				let isResolved = false;
+				const cleanup = () => {
+					if (!isResolved) {
+						cancellationListener.dispose();
+						isResolved = true;
+					}
+				};
+				const timeout = setTimeout(() => {
+					cleanup();
+					resolve();
+				}, intervalMs);
 
-				// Handle cancellation during wait
 				const cancellationListener = token.onCancellationRequested(() => {
 					clearTimeout(timeout);
+					cleanup();
 					resolve();
 				});
-
-				// Clean up the listener after timeout or cancellation
-				setTimeout(() => cancellationListener.dispose(), intervalMs);
 			});
 
 			// Check if we were cancelled during the wait

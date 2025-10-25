@@ -17,7 +17,15 @@ import type {
 	ReasoningConfig,
 } from "./types";
 
-import { convertTools, convertMessages, tryParseJSONObject, validateRequest, parseModelId, createRetryConfig, executeWithRetry } from "./utils";
+import {
+	convertTools,
+	convertMessages,
+	tryParseJSONObject,
+	validateRequest,
+	parseModelId,
+	createRetryConfig,
+	executeWithRetry,
+} from "./utils";
 
 import { prepareLanguageModelChatInformation } from "./provideModel";
 import { prepareTokenCount } from "./provideToken";
@@ -172,7 +180,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			// console.log("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(requestBody));
 
 			// send chat request
-			let BASE_URL = um?.baseUrl || config.get<string>("oaicopilot.baseUrl", "");
+			const BASE_URL = um?.baseUrl || config.get<string>("oaicopilot.baseUrl", "");
 			if (!BASE_URL || !BASE_URL.startsWith("http")) {
 				throw new Error(`Invalid base URL configuration.`);
 			}
@@ -728,7 +736,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			this._completedToolCallIndices.add(idx);
 		}
 	}
-
 
 	/**
 	 * Process streamed text content for XML think blocks and emit thinking parts.
