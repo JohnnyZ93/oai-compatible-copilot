@@ -161,5 +161,14 @@ export type ReasoningDetail = ReasoningSummaryDetail | ReasoningEncryptedDetail 
  * Thinking configuration for Zai provider
  */
 export interface ThinkingConfig {
-	type?: string;
+  type?: string;
+}
+
+/**
+ * Retry configuration for rate limiting
+ */
+export interface RetryConfig {
+  enabled?: boolean;
+  max_attempts?: number;
+  interval_ms?: number;
 }

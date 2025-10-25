@@ -17,7 +17,7 @@ import type {
 	ReasoningConfig,
 } from "./types";
 
-import { convertTools, convertMessages, tryParseJSONObject, validateRequest, parseModelId } from "./utils";
+import { convertTools, convertMessages, tryParseJSONObject, validateRequest, parseModelId, createRetryConfig, executeWithRetry } from "./utils";
 
 import { prepareLanguageModelChatInformation } from "./provideModel";
 import { prepareTokenCount } from "./provideToken";
@@ -171,28 +171,41 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			// debug log
 			// console.log("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(requestBody));
 
-			// 发送请求
+			// send chat request
 			let BASE_URL = um?.baseUrl || config.get<string>("oaicopilot.baseUrl", "");
 			if (!BASE_URL || !BASE_URL.startsWith("http")) {
 				throw new Error(`Invalid base URL configuration.`);
 			}
-			const response = await fetch(`${BASE_URL}/chat/completions`, {
-				method: "POST",
-				headers: {
-					Authorization: `Bearer ${modelApiKey}`,
-					"Content-Type": "application/json",
-					"User-Agent": this.userAgent,
-				},
-				body: JSON.stringify(requestBody),
-			});
 
-			if (!response.ok) {
-				const errorText = await response.text();
-				console.error("[OAI Compatible Model Provider] OAI Compatible API error response", errorText);
-				throw new Error(
-					`OAI Compatible API error: ${response.status} ${response.statusText}${errorText ? `\n${errorText}` : ""}`
-				);
-			}
+			// get retry config
+			const retryConfig = createRetryConfig();
+
+			// send chat request with retry
+			const response = await executeWithRetry(
+				async () => {
+					const res = await fetch(`${BASE_URL}/chat/completions`, {
+						method: "POST",
+						headers: {
+							Authorization: `Bearer ${modelApiKey}`,
+							"Content-Type": "application/json",
+							"User-Agent": this.userAgent,
+						},
+						body: JSON.stringify(requestBody),
+					});
+
+					if (!res.ok) {
+						const errorText = await res.text();
+						console.error("[OAI Compatible Model Provider] OAI Compatible API error response", errorText);
+						throw new Error(
+							`OAI Compatible API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`
+						);
+					}
+
+					return res;
+				},
+				retryConfig,
+				token
+			);
 
 			if (!response.body) {
 				throw new Error("No response body from OAI Compatible API");

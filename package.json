@@ -249,6 +249,34 @@
 						]
 					},
 					"description": "A list of preferred models to use. If provided, these models will be used directly instead of fetching from the API."
+				},
+				"oaicopilot.retry": {
+					"type": "object",
+					"default": {
+						"enabled": true,
+						"max_attempts": 3,
+						"interval_ms": 1000
+					},
+					"properties": {
+						"enabled": {
+							"type": "boolean",
+							"default": true,
+							"description": "Enable retry mechanism for rate limiting (HTTP 429). Default is true."
+						},
+						"max_attempts": {
+							"type": "number",
+							"default": 3,
+							"minimum": 1,
+							"description": "Maximum number of retry attempts for rate limiting. Default is 3."
+						},
+						"interval_ms": {
+							"type": "number",
+							"default": 1000,
+							"minimum": 1,
+							"description": "Interval between retry attempts in milliseconds. Default is 1000 (1 seconds)."
+						}
+					},
+					"description": "Retry configuration for handling rate limiting errors."
 				}
 			}
 		}

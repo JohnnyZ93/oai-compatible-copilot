@@ -5,7 +5,11 @@ import type {
 	OpenAIFunctionToolDef,
 	OpenAIToolCall,
 	ChatMessageContent,
+	RetryConfig,
 } from "./types";
+
+const RETRY_MAX_ATTEMPTS = 3;
+const RETRY_INTERVAL_MS = 1000;
 
 // Model ID parsing helper
 export interface ParsedModelId {
@@ -438,4 +442,88 @@ export function tryParseJSONObject(text: string): { ok: true; value: Record<stri
 	} catch {
 		return { ok: false };
 	}
+}
+
+/**
+ * Create retry configuration from VS Code workspace settings.
+ * @returns Retry configuration with default values.
+ */
+export function createRetryConfig(): RetryConfig {
+	const config = vscode.workspace.getConfiguration();
+	const retryConfig = config.get<RetryConfig>("oaicopilot.retry", {
+		enabled: true,
+		max_attempts: RETRY_MAX_ATTEMPTS,
+		interval_ms: RETRY_INTERVAL_MS,
+	});
+
+	return {
+		enabled: retryConfig.enabled ?? true,
+		max_attempts: retryConfig.max_attempts ?? RETRY_MAX_ATTEMPTS,
+		interval_ms: retryConfig.interval_ms ?? RETRY_INTERVAL_MS,
+	};
+}
+
+/**
+ * Execute a function with retry logic for rate limiting.
+ * @param fn The async function to execute
+ * @param retryConfig Retry configuration
+ * @param token Cancellation token
+ * @returns Result of the function execution
+ */
+export async function executeWithRetry<T>(
+	fn: () => Promise<T>,
+	retryConfig: RetryConfig,
+	token: vscode.CancellationToken
+): Promise<T> {
+	if (!retryConfig.enabled) {
+		return await fn();
+	}
+
+	const maxAttempts = retryConfig.max_attempts ?? RETRY_MAX_ATTEMPTS;
+	const intervalMs = retryConfig.interval_ms ?? RETRY_INTERVAL_MS;
+	let lastError: Error | undefined;
+
+	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+		// Check for cancellation before each attempt
+		if (token.isCancellationRequested) {
+			throw new Error("Request was cancelled");
+		}
+
+		try {
+			return await fn();
+		} catch (error) {
+			lastError = error instanceof Error ? error : new Error(String(error));
+
+			// Only retry on rate limit errors (HTTP 429)
+			const isRateLimitError = lastError.message.includes("[429]");
+
+			if (!isRateLimitError || attempt === maxAttempts) {
+				throw lastError;
+			}
+
+			console.warn(`[OAI Compatible Model Provider] Rate limit hit, retrying in ${intervalMs}ms (attempt ${attempt}/${maxAttempts})`);
+
+			// Wait for the specified interval before retrying
+			await new Promise<void>((resolve) => {
+				const timeout = setTimeout(resolve, intervalMs);
+
+				// Handle cancellation during wait
+				const cancellationListener = token.onCancellationRequested(() => {
+					clearTimeout(timeout);
+					resolve();
+				});
+
+				// Clean up the listener after timeout or cancellation
+				setTimeout(() => cancellationListener.dispose(), intervalMs);
+			});
+
+			// Check if we were cancelled during the wait
+			if (token.isCancellationRequested) {
+				throw new Error("Request was cancelled");
+			}
+		}
+	}
+
+	// This should never be reached, but TypeScript needs it
+	throw lastError || new Error("Retry failed");
 }
