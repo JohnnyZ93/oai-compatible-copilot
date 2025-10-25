@@ -11,6 +11,9 @@ import type {
 const RETRY_MAX_ATTEMPTS = 3;
 const RETRY_INTERVAL_MS = 1000;
 
+// HTTP status codes that should trigger a retry
+const RETRYABLE_STATUS_CODES = [429, 500, 502, 503, 504];
+
 // Model ID parsing helper
 export interface ParsedModelId {
 	baseId: string;
@@ -494,14 +497,16 @@ export async function executeWithRetry<T>(
 		} catch (error) {
 			lastError = error instanceof Error ? error : new Error(String(error));
 
-			// Only retry on rate limit errors (HTTP 429)
-			const isRateLimitError = lastError.message.includes("[429]");
+			// Check if error is retryable based on status codes
+			const isRetryableError = RETRYABLE_STATUS_CODES.some(code =>
+				lastError?.message.includes(`[${code}]`)
+			);
 
-			if (!isRateLimitError || attempt === maxAttempts) {
+			if (!isRetryableError || attempt === maxAttempts) {
 				throw lastError;
 			}
 
-			console.warn(`[OAI Compatible Model Provider] Rate limit hit, retrying in ${intervalMs}ms (attempt ${attempt}/${maxAttempts})`);
+			console.warn(`[OAI Compatible Model Provider] Retryable error detected, retrying in ${intervalMs}ms (attempt ${attempt}/${maxAttempts})`);
 
 			// Wait for the specified interval before retrying
 			await new Promise<void>((resolve) => {
