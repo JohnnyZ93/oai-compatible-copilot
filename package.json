@@ -277,6 +277,12 @@
 						}
 					},
 					"description": "Retry configuration for handling api errors like [429, 500, 502, 503, 504]."
+				},
+				"oaicopilot.delay": {
+					"type": "number",
+					"default": 0,
+					"minimum": 0,
+					"description": "Fixed delay in milliseconds between consecutive requests. Default is 0 (no delay)."
 				}
 			}
 		}

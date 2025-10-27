@@ -69,6 +69,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	// Thinking content state management
 	private _currentThinkingId: string | null = null;
 
+	/** Track last request completion time for delay calculation. */
+	private _lastRequestTime: number | null = null;
+
 	/**
 	 * Create a provider using the given secret storage for the API key.
 	 * @param secrets VS Code secret storage.
@@ -117,6 +120,23 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		this._xmlThinkDetectionAttempted = false;
 		// Initialize thinking state for this request
 		this._currentThinkingId = null;
+
+		// Apply delay between consecutive requests
+		const config = vscode.workspace.getConfiguration();
+		const delayMs = config.get<number>("oaicopilot.delay", 0);
+
+		if (delayMs > 0 && this._lastRequestTime !== null) {
+			const elapsed = Date.now() - this._lastRequestTime;
+			if (elapsed < delayMs) {
+				const remainingDelay = delayMs - elapsed;
+				await new Promise<void>((resolve) => {
+					const timeout = setTimeout(() => {
+						clearTimeout(timeout);
+						resolve();
+					}, remainingDelay);
+				});
+			}
+		}
 
 		let requestBody: Record<string, unknown> | undefined;
 		const trackingProgress: Progress<LanguageModelResponsePart2> = {
@@ -231,6 +251,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				error: err instanceof Error ? { name: err.name, message: err.message } : String(err),
 			});
 			throw err;
+		} finally {
+			// Update last request time after successful completion
+			this._lastRequestTime = Date.now();
 		}
 	}
 
@@ -417,21 +440,11 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					break;
 				}
 
-				// 在循环中定期检查取消状态
-				if (token.isCancellationRequested) {
-					break;
-				}
-
 				buffer += decoder.decode(value, { stream: true });
 				const lines = buffer.split("\n");
 				buffer = lines.pop() || "";
 
 				for (const line of lines) {
-					// 在处理每一行前检查取消状态
-					if (token.isCancellationRequested) {
-						break;
-					}
-
 					if (!line.startsWith("data:")) {
 						continue;
 					}
