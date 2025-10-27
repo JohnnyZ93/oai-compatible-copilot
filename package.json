@@ -15,7 +15,7 @@
 		"type": "git",
 		"url": "https://github.com/JohnnyZ93/oai-compatible-copilot"
 	},
-	"version": "0.0.8",
+	"version": "0.0.9",
 	"engines": {
 		"vscode": "^1.104.0"
 	},
@@ -261,13 +261,13 @@
 						"enabled": {
 							"type": "boolean",
 							"default": true,
-							"description": "Enable retry mechanism for rate limiting (HTTP 429). Default is true."
+							"description": "Enable retry mechanism for api errors. Default is true."
 						},
 						"max_attempts": {
 							"type": "number",
 							"default": 3,
 							"minimum": 1,
-							"description": "Maximum number of retry attempts for rate limiting. Default is 3."
+							"description": "Maximum number of retry attempts. Default is 3."
 						},
 						"interval_ms": {
 							"type": "number",
@@ -276,7 +276,7 @@
 							"description": "Interval between retry attempts in milliseconds. Default is 1000 (1 seconds)."
 						}
 					},
-					"description": "Retry configuration for handling rate limiting errors."
+					"description": "Retry configuration for handling api errors like [429, 500, 502, 503, 504]."
 				}
 			}
 		}

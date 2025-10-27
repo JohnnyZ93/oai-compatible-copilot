@@ -13,6 +13,7 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.1, GLM 4.5 and mor
   > ![thinkingPartDemo](./assets/thinkingPartDemo.png)
 - Supports configuring models from multiple providers simultaneously, automatically managing API keys without switch them repeatedly.
 - Supports defining multiple configurations for the same model ID with different settings (e.g. thinking enable/disable for GLM-4.6).
+- Support auto retry mechanism for handling api errors like [429, 500, 502, 503, 504].
 ---
 
 ## Requirements

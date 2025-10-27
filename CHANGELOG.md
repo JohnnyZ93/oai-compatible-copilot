@@ -1,5 +1,15 @@
 # Change Log
 
+## 0.0.9 (2025-10-27)
+
+- Feat: [Add Retry Mechanism for Model 429 Errors](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/24)
+- Fix: [Thinking block not end and show in new chat](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/25)
+- Add `oaicopilot.retry` configuration including:
+  > Retry configuration for handling api errors like [429, 500, 502, 503, 504].
+  - `enabled`: Enable retry mechanism for api errors. Default is true.
+  - `max_attempts`: Maximum number of retry attempts. Default is 3.
+  - `interval_ms`: Interval between retry attempts in milliseconds. Default is 1000 (1 seconds).
+
 ## 0.0.8 (2025-10-21)
 
 - Fix: [LLM output missing `<`](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/19)
