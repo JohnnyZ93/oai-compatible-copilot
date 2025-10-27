@@ -66,6 +66,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	private _xmlThinkActive = false;
 	private _xmlThinkDetectionAttempted = false;
 
+	// Thinking content state management
+	private _currentThinkingId: string | null = null;
+
 	/**
 	 * Create a provider using the given secret storage for the API key.
 	 * @param secrets VS Code secret storage.
@@ -112,6 +115,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		this._emittedTextToolCallIds.clear();
 		this._xmlThinkActive = false;
 		this._xmlThinkDetectionAttempted = false;
+		// Initialize thinking state for this request
+		this._currentThinkingId = null;
 
 		let requestBody: Record<string, unknown> | undefined;
 		const trackingProgress: Progress<LanguageModelResponsePart2> = {
@@ -462,7 +467,15 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			this._emittedTextToolCallKeys.clear();
 			this._xmlThinkActive = false;
 			this._xmlThinkDetectionAttempted = false;
+			this._currentThinkingId = null;
 		}
+	}
+
+	/**
+	 * Generate a unique thinking ID based on request start time and random suffix
+	 */
+	private generateThinkingId(): string {
+		return `thinking_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 	}
 
 	/**
@@ -482,7 +495,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 		const deltaObj = choice.delta as Record<string, unknown> | undefined;
 
-		// Existing thinking/reasoning handling (keep for compatibility)
+		// Process thinking content first (before regular text content)
 		try {
 			let maybeThinking =
 				(choice as Record<string, unknown> | undefined)?.thinking ??
@@ -512,8 +525,12 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					}
 
 					if (extractedText) {
+						// Generate thinking ID if not provided by the model
+						if (!this._currentThinkingId) {
+							this._currentThinkingId = this.generateThinkingId();
+						}
 						const metadata = { format: detail.format, type: detail.type, index: detail.index };
-						progress.report(new vscode.LanguageModelThinkingPart(extractedText, detail.id || undefined, metadata));
+						progress.report(new vscode.LanguageModelThinkingPart(extractedText, this._currentThinkingId, metadata));
 						emitted = true;
 					}
 				}
@@ -523,18 +540,20 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			// Fallback to simple thinking if no details
 			if (maybeThinking !== undefined && maybeThinking !== null) {
 				let text = "";
-				let id: string | undefined;
 				let metadata: Record<string, unknown> | undefined;
 				if (maybeThinking && typeof maybeThinking === "object") {
 					const mt = maybeThinking as Record<string, unknown>;
 					text = typeof mt["text"] === "string" ? (mt["text"] as string) : JSON.stringify(mt);
-					id = typeof mt["id"] === "string" ? (mt["id"] as string) : undefined;
 					metadata = mt["metadata"] ? (mt["metadata"] as Record<string, unknown>) : undefined;
 				} else if (typeof maybeThinking === "string") {
 					text = maybeThinking;
 				}
 				if (text) {
-					progress.report(new vscode.LanguageModelThinkingPart(text, id, metadata));
+					// Generate thinking ID if not provided by the model
+					if (!this._currentThinkingId) {
+						this._currentThinkingId = this.generateThinkingId();
+					}
+					progress.report(new vscode.LanguageModelThinkingPart(text, this._currentThinkingId, metadata));
 					emitted = true;
 				}
 			}
@@ -550,6 +569,21 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			if (xmlRes.emittedAny) {
 				emitted = true;
 			} else {
+				// Check if content contains visible text (non-whitespace)
+				const hasVisibleContent = content.trim().length > 0;
+
+				// If we have visible content and there's an active thinking sequence, end it first
+				if (hasVisibleContent && this._currentThinkingId) {
+					try {
+						// End the current thinking sequence with empty content and same ID
+						progress.report(new vscode.LanguageModelThinkingPart("", this._currentThinkingId));
+					} catch (e) {
+						console.warn("[OAI Compatible Model Provider] Failed to end thinking sequence:", e);
+					} finally {
+						this._currentThinkingId = null;
+					}
+				}
+
 				// Only process text content if no XML think blocks were emitted
 				const res = this.processTextContent(content, progress);
 				if (res.emittedText) {
@@ -769,6 +803,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 				// Found think start tag
 				this._xmlThinkActive = true;
+				// Generate a new thinking ID for this XML think block
+				this._currentThinkingId = this.generateThinkingId();
 
 				// Skip the start tag and continue processing
 				data = data.slice(startIdx + THINK_START.length);
@@ -781,7 +817,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				// No end tag found, emit current chunk content as thinking part
 				const thinkContent = data.trim();
 				if (thinkContent) {
-					progress.report(new vscode.LanguageModelThinkingPart(thinkContent));
+					progress.report(new vscode.LanguageModelThinkingPart(thinkContent, this._currentThinkingId || undefined));
 					emittedAny = true;
 				}
 				data = "";
@@ -791,12 +827,13 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			// Found end tag, emit final thinking part
 			const thinkContent = data.slice(0, endIdx);
 			if (thinkContent) {
-				progress.report(new vscode.LanguageModelThinkingPart(thinkContent));
+				progress.report(new vscode.LanguageModelThinkingPart(thinkContent, this._currentThinkingId || undefined));
 				emittedAny = true;
 			}
 
 			// Reset state and continue with remaining data
 			this._xmlThinkActive = false;
+			this._currentThinkingId = null;
 			data = data.slice(endIdx + THINK_END.length);
 		}
 
