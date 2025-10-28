@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.1.0 (2025-10-28)
+
+- Feat: [Add request delay to prevent 429 Errors](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/24)
+- Fix: [Not Asking for Key when add new provider](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/26)
+- Add `oaicopilot.delay` configuration: Fixed delay in milliseconds between consecutive requests. Default is 0 (no delay).
+
 ## 0.0.9 (2025-10-27)
 
 - Feat: [Add Retry Mechanism for Model 429 Errors](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/24)
