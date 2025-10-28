@@ -85,7 +85,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		options: { silent: boolean },
 		_token: CancellationToken
 	): Promise<LanguageModelChatInformation[]> {
-		const apiKey = await this.ensureApiKey(options.silent);
+		const apiKey = await this.ensureApiKey(false);
 		if (!apiKey) {
 			return [];
 		}
@@ -152,10 +152,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			},
 		};
 		try {
-			const apiKey = await this.ensureApiKey(true);
-			if (!apiKey) {
-				throw new Error("OAI Compatible API key not found");
-			}
 			if (options.tools && options.tools.length > MAX_TOOLS_PER_REQUEST) {
 				throw new Error(`Cannot have more than ${MAX_TOOLS_PER_REQUEST} tools per request.`);
 			}
@@ -187,7 +183,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 			// Get API key for the model's provider
 			const provider = um?.owned_by;
-			const modelApiKey = await this.ensureApiKey(true, provider);
+			const modelApiKey = await this.ensureApiKey(false, provider);
 			if (!modelApiKey) {
 				throw new Error("OAI Compatible API key not found");
 			}
@@ -396,12 +392,24 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			const normalizedProvider = provider.toLowerCase();
 			const providerKey = `oaicopilot.apiKey.${normalizedProvider}`;
 			apiKey = await this.secrets.get(providerKey);
+
+			if (!apiKey && !silent) {
+				const entered = await vscode.window.showInputBox({
+					title: `OAI Compatible API Key for ${normalizedProvider}`,
+					prompt: `Enter your OAI Compatible API key for ${normalizedProvider}`,
+					ignoreFocusOut: true,
+					password: true,
+				});
+				if (entered && entered.trim()) {
+					apiKey = entered.trim();
+					await this.secrets.store(providerKey, apiKey);
+				}
+			}
+			return apiKey;
 		}
 
 		// Fall back to generic API key
-		if (!apiKey) {
-			apiKey = await this.secrets.get("oaicopilot.apiKey");
-		}
+		apiKey = await this.secrets.get("oaicopilot.apiKey");
 
 		if (!apiKey && !silent) {
 			const entered = await vscode.window.showInputBox({
