@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.1.1 (2025-10-28)
+
+- Fix: Cannot change apiKey when the `oaicopilot.models` have no baseUrl.
+
 ## 0.1.0 (2025-10-28)
 
 - Feat: [Add request delay to prevent 429 Errors](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/24)
