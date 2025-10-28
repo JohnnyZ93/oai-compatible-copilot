@@ -46,14 +46,8 @@ export function activate(context: vscode.ExtensionContext) {
 			const userModels = config.get<HFModelItem[]>("oaicopilot.models", []);
 
 			// Extract unique providers (case-insensitive)
-			// Filter out models without baseUrl configuration
 			const providers = Array.from(
-				new Set(
-					userModels
-						.filter((m) => m.baseUrl && m.baseUrl.trim() !== "")
-						.map((m) => m.owned_by.toLowerCase())
-						.filter((p) => p && p.trim() !== "")
-				)
+				new Set(userModels.map((m) => m.owned_by.toLowerCase()).filter((p) => p && p.trim() !== ""))
 			).sort();
 
 			if (providers.length === 0) {
