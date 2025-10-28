@@ -362,6 +362,16 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			rb.repetition_penalty = um.repetition_penalty;
 		}
 
+		// Process extra configuration parameters
+		if (um?.extra && typeof um.extra === "object") {
+			// Add all extra parameters directly to the request body
+			for (const [key, value] of Object.entries(um.extra)) {
+				if (value !== undefined) {
+					rb[key] = value;
+				}
+			}
+		}
+
 		return rb;
 	}
 

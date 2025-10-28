@@ -92,6 +92,13 @@ export interface HFModelItem {
 	 * defaults to "oai-compatible".
 	 */
 	family?: string;
+
+	/**
+	 * Extra configuration parameters that can be used for custom functionality.
+	 * This allows users to add any additional parameters they might need
+	 * without modifying the core interface.
+	 */
+	extra?: Record<string, any>;
 }
 
 /**
