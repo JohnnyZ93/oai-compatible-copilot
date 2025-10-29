@@ -241,6 +241,10 @@
 									}
 								},
 								"description": "Reasoning configuration for OpenRouter-compatible providers"
+							},
+							"extra": {
+								"type": "object",
+								"description": "Extra request parameters that will be used in /chat/completions."
 							}
 						},
 						"required": [

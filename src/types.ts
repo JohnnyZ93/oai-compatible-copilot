@@ -98,7 +98,7 @@ export interface HFModelItem {
 	 * This allows users to add any additional parameters they might need
 	 * without modifying the core interface.
 	 */
-	extra?: Record<string, any>;
+	extra?: Record<string, unknown>;
 }
 
 /**

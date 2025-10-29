@@ -49,6 +49,8 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.1, GLM 4.5 and mor
 
 ## (Optional) Multi-Provider Guide
 
+> `owned_by` in model config is used for group apiKey. The storage key is `oaicopilot.apiKey.${owned_by}`.
+
 1. Open VS Code Settings and configure `oaicopilot.models`.
 2. Open command center ( Ctrl + Shift + P ), and search "OAICopilot: Set OAI Compatible Multi-Provider Apikey" to configure provider-specific API keys.
 3. Open Github Copilot Chat interface.
