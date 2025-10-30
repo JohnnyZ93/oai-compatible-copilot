@@ -157,6 +157,7 @@ All parameters support individual configuration for different models, providing 
 - `thinking`: Thinking configuration for Zai provider
   - `type`: Set to 'enabled' to enable thinking, 'disabled' to disable thinking
 - `reasoning_effort`: Reasoning effort level (OpenAI reasoning configuration)
+- `extra`: Extra request parameters that will be used in /chat/completions.
 ---
 
 ## Thanks to
