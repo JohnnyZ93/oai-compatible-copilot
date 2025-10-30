@@ -81,15 +81,37 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		private readonly userAgent: string
 	) {}
 
+	/**
+	 * Get the list of available language models contributed by this provider
+	 * @param options Options which specify the calling context of this function
+	 * @param token A cancellation token which signals if the user cancelled the request or not
+	 * @returns A promise that resolves to the list of available language models
+	 */
 	async provideLanguageModelChatInformation(
 		options: { silent: boolean },
 		_token: CancellationToken
 	): Promise<LanguageModelChatInformation[]> {
-		const apiKey = await this.ensureApiKey(false);
-		if (!apiKey) {
-			return [];
-		}
-		return prepareLanguageModelChatInformation({ silent: options.silent ?? false }, _token, apiKey, this.userAgent);
+		return prepareLanguageModelChatInformation(
+			{ silent: options.silent ?? false },
+			_token,
+			this.secrets,
+			this.userAgent
+		);
+	}
+
+	/**
+	 * Returns the number of tokens for a given text using the model specific tokenizer logic
+	 * @param model The language model to use
+	 * @param text The text to count tokens for
+	 * @param token A cancellation token for the request
+	 * @returns A promise that resolves to the number of tokens
+	 */
+	async provideTokenCount(
+		model: LanguageModelChatInformation,
+		text: string | LanguageModelChatRequestMessage,
+		_token: CancellationToken
+	): Promise<number> {
+		return prepareTokenCount(model, text, _token);
 	}
 
 	/**
@@ -183,7 +205,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 			// Get API key for the model's provider
 			const provider = um?.owned_by;
-			const modelApiKey = await this.ensureApiKey(false, provider);
+			const useGenericKey = !um?.baseUrl;
+			const modelApiKey = await this.ensureApiKey(useGenericKey, provider);
 			if (!modelApiKey) {
 				throw new Error("OAI Compatible API key not found");
 			}
@@ -376,26 +399,11 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	}
 
 	/**
-	 * Returns the number of tokens for a given text using the model specific tokenizer logic
-	 * @param model The language model to use
-	 * @param text The text to count tokens for
-	 * @param token A cancellation token for the request
-	 * @returns A promise that resolves to the number of tokens
-	 */
-	async provideTokenCount(
-		model: LanguageModelChatInformation,
-		text: string | LanguageModelChatRequestMessage,
-		_token: CancellationToken
-	): Promise<number> {
-		return prepareTokenCount(model, text, _token);
-	}
-
-	/**
 	 * Ensure an API key exists in SecretStorage, optionally prompting the user when not silent.
-	 * @param silent If true, do not prompt the user.
+	 * @param useGenericKey If true, use generic API key.
 	 * @param provider Optional provider name to get provider-specific API key.
 	 */
-	private async ensureApiKey(silent: boolean, provider?: string): Promise<string | undefined> {
+	private async ensureApiKey(useGenericKey: boolean, provider?: string): Promise<string | undefined> {
 		// Try to get provider-specific API key first
 		let apiKey: string | undefined;
 		if (provider && provider.trim() !== "") {
@@ -403,7 +411,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			const providerKey = `oaicopilot.apiKey.${normalizedProvider}`;
 			apiKey = await this.secrets.get(providerKey);
 
-			if (!apiKey && !silent) {
+			if (!apiKey && !useGenericKey) {
 				const entered = await vscode.window.showInputBox({
 					title: `OAI Compatible API Key for ${normalizedProvider}`,
 					prompt: `Enter your OAI Compatible API key for ${normalizedProvider}`,
@@ -415,13 +423,14 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					await this.secrets.store(providerKey, apiKey);
 				}
 			}
-			return apiKey;
 		}
 
 		// Fall back to generic API key
-		apiKey = await this.secrets.get("oaicopilot.apiKey");
+		if (!apiKey) {
+			apiKey = await this.secrets.get("oaicopilot.apiKey");
+		}
 
-		if (!apiKey && !silent) {
+		if (!apiKey && useGenericKey) {
 			const entered = await vscode.window.showInputBox({
 				title: "OAI Compatible API Key",
 				prompt: "Enter your OAI Compatible API key",
