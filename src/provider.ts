@@ -209,16 +209,22 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			// get retry config
 			const retryConfig = createRetryConfig();
 
+			// prepare headers with custom headers if specified
+			const defaultHeaders: Record<string, string> = {
+				Authorization: `Bearer ${modelApiKey}`,
+				"Content-Type": "application/json",
+				"User-Agent": this.userAgent,
+			};
+
+			// merge custom headers if specified in model config
+			const requestHeaders = um?.headers ? { ...defaultHeaders, ...um.headers } : defaultHeaders;
+
 			// send chat request with retry
 			const response = await executeWithRetry(
 				async () => {
 					const res = await fetch(`${BASE_URL}/chat/completions`, {
 						method: "POST",
-						headers: {
-							Authorization: `Bearer ${modelApiKey}`,
-							"Content-Type": "application/json",
-							"User-Agent": this.userAgent,
-						},
+						headers: requestHeaders,
 						body: JSON.stringify(requestBody),
 					});
 
