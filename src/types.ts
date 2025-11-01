@@ -62,6 +62,7 @@ export interface HFModelItem {
 	created?: number;
 	owned_by: string;
 	configId?: string;
+	displayName?: string;
 	baseUrl?: string;
 	providers?: HFProvider[];
 	architecture?: HFArchitecture;
