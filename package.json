@@ -245,6 +245,13 @@
 							"extra": {
 								"type": "object",
 								"description": "Extra request parameters that will be used in /chat/completions."
+							},
+							"headers": {
+								"type": "object",
+								"additionalProperties": {
+									"type": "string"
+								},
+								"description": "Custom HTTP headers to be sent with every request to this model's provider. These headers will be merged with the default headers (Authorization, Content-Type, User-Agent)."
 							}
 						},
 						"required": [
@@ -299,7 +306,8 @@
 		"lint": "eslint",
 		"format": "prettier --write .",
 		"watch": "tsc -watch -p ./",
-		"test": "npm run compile && vscode-test"
+		"test": "npm run compile && vscode-test",
+		"build": "npx @vscode/vsce package -o extension.vsix"
 	},
 	"dependencies": {},
 	"devDependencies": {
