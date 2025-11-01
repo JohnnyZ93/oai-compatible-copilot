@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.1.3 (2025-10-31)
+
+- Fix: [Forces a prompt to set the default API key every time VS Code starts](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/30)
+
 ## 0.1.2 (2025-10-29)
 
 - Feat: [add support for extra configuration parameters](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/28)

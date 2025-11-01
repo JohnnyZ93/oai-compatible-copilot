@@ -200,6 +200,7 @@ All parameters support individual configuration for different models, providing 
   - `type`: Set to 'enabled' to enable thinking, 'disabled' to disable thinking
 - `reasoning_effort`: Reasoning effort level (OpenAI reasoning configuration)
 - `headers`: Custom HTTP headers to be sent with every request to this model's provider (e.g., `{"X-API-Version": "v1", "X-Custom-Header": "value"}`). These headers will be merged with the default headers (Authorization, Content-Type, User-Agent)
+- `extra`: Extra request parameters that will be used in /chat/completions.
 ---
 
 ## Thanks to
