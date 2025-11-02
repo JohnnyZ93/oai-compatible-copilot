@@ -78,6 +78,10 @@
 								"type": "string",
 								"description": "Model ID (e.g., 'glm-4.6')."
 							},
+							"displayName": {
+								"type": "string",
+								"description": "(Optional) Display name for the model that will be shown in the Copilot interface. If not provided, will be generated automatically."
+							},
 							"configId": {
 								"type": "string",
 								"description": "(Optional) Configuration ID for this model. Allows defining the same model with different settings (e.g. 'glm-4.6::thinking', 'glm-4.6::no-thinking')."
