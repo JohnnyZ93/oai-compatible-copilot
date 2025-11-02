@@ -32,7 +32,8 @@ export async function prepareLanguageModelChatInformation(
 
 			// 使用配置ID（如果存在）来生成唯一的模型ID
 			const modelId = m.configId ? `${m.id}::${m.configId}` : m.id;
-			const modelName = m.displayName || (m.configId ? `${m.id}::${m.configId} via ${m.owned_by}` : `${m.id} via ${m.owned_by}`);
+			const modelName =
+				m.displayName || (m.configId ? `${m.id}::${m.configId} via ${m.owned_by}` : `${m.id} via ${m.owned_by}`);
 
 			return {
 				id: modelId,
