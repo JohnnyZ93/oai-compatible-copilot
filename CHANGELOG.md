@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.1.4 (2025-11-03)
+
+- Feat: [Add headers support](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/31)
+- Feat: [Add displayName option for models in Copilot interface](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/32)
+- Enhanced `oaicopilot.models` configuration including:
+  - `displayName`: Display name for the model that will be shown in the Copilot interface.
+  - `headers`: Custom HTTP headers to be sent with every request to this model's provider (e.g., `{"X-API-Version": "v1", "X-Custom-Header": "value"}`).
+
 ## 0.1.3 (2025-10-31)
 
 - Fix: [Forces a prompt to set the default API key every time VS Code starts](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/30)

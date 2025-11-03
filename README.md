@@ -41,11 +41,7 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.1, GLM 4.5 and mor
         "context_length": 256000,
         "max_tokens": 8192,
         "temperature": 0,
-        "top_p": 1,
-        "headers": {
-            "X-Request-Source": "vscode-extension",
-            "X-Model-Version": "v1.2"
-        }
+        "top_p": 1
     }
 ]
 ```
@@ -82,11 +78,7 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.1, GLM 4.5 and mor
         "context_length": 256000,
         "max_tokens": 8192,
         "temperature": 0,
-        "top_p": 1,
-        "headers": {
-            "X-API-Version": "v1",
-            "X-Custom-Header": "custom-value"
-        }
+        "top_p": 1
     }
 ]
 ```
@@ -174,8 +166,9 @@ You can specify custom HTTP headers that will be sent with every request to a sp
 All parameters support individual configuration for different models, providing highly flexible model tuning capabilities.
 
 - `id` (required): Model identifier
-- `configId`: Configuration ID for this model. Allows defining the same model with different settings (e.g. 'glm-4.6::thinking', 'glm-4.6::no-thinking')
 - `owned_by` (required): Model provider
+- `displayName`: Display name for the model that will be shown in the Copilot interface.
+- `configId`: Configuration ID for this model. Allows defining the same model with different settings (e.g. 'glm-4.6::thinking', 'glm-4.6::no-thinking')
 - `family`: Model family (e.g., 'gpt-4', 'claude-3', 'gemini'). Enables model-specific optimizations and behaviors. Defaults to 'oai-compatible' if not specified.
 - `baseUrl`: Model-specific base URL. If not provided, the global `oaicopilot.baseUrl` will be used
 - `context_length`: The context length supported by the model. Default value is 128000
