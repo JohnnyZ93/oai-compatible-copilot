@@ -99,6 +99,13 @@ export interface HFModelItem {
 	 * without modifying the core interface.
 	 */
 	extra?: Record<string, unknown>;
+
+	/**
+	 * Custom HTTP headers to be sent with every request to this model's provider.
+	 * These headers will be merged with the default headers (Authorization, Content-Type, User-Agent).
+	 * Example: { "X-API-Version": "v1", "X-Custom-Header": "value" }
+	 */
+	headers?: Record<string, string>;
 }
 
 /**

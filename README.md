@@ -41,7 +41,11 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.1, GLM 4.5 and mor
         "context_length": 256000,
         "max_tokens": 8192,
         "temperature": 0,
-        "top_p": 1
+        "top_p": 1,
+        "headers": {
+            "X-Request-Source": "vscode-extension",
+            "X-Model-Version": "v1.2"
+        }
     }
 ]
 ```
@@ -78,7 +82,11 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.1, GLM 4.5 and mor
         "context_length": 256000,
         "max_tokens": 8192,
         "temperature": 0,
-        "top_p": 1
+        "top_p": 1,
+        "headers": {
+            "X-API-Version": "v1",
+            "X-Custom-Header": "custom-value"
+        }
     }
 ]
 ```
@@ -128,6 +136,40 @@ In this example, you'll have three different configurations of the glm-4.6 model
 
 ---
 
+## Custom Headers
+
+You can specify custom HTTP headers that will be sent with every request to a specific model's provider. This is useful for:
+
+- API versioning headers
+- Custom authentication headers (in addition to the standard Authorization header)
+- Provider-specific headers required by certain APIs
+- Request tracking or debugging headers
+
+### Custom Headers Example
+
+```json
+"oaicopilot.models": [
+    {
+        "id": "custom-model",
+        "owned_by": "provider",
+        "baseUrl": "https://api.example.com/v1",
+        "headers": {
+            "X-API-Version": "2024-01",
+            "X-Request-Source": "vscode-copilot",
+            "Custom-Auth-Token": "additional-token-if-needed"
+        }
+    }
+]
+```
+
+**Important Notes:**
+- Custom headers are merged with default headers (Authorization, Content-Type, User-Agent)
+- If a custom header conflicts with a default header, the custom header takes precedence
+- Headers are applied on a per-model basis, allowing different headers for different providers
+- Header values must be strings
+
+---
+
 ## Model Parameters
 All parameters support individual configuration for different models, providing highly flexible model tuning capabilities.
 
@@ -157,6 +199,7 @@ All parameters support individual configuration for different models, providing 
 - `thinking`: Thinking configuration for Zai provider
   - `type`: Set to 'enabled' to enable thinking, 'disabled' to disable thinking
 - `reasoning_effort`: Reasoning effort level (OpenAI reasoning configuration)
+- `headers`: Custom HTTP headers to be sent with every request to this model's provider (e.g., `{"X-API-Version": "v1", "X-Custom-Header": "value"}`). These headers will be merged with the default headers (Authorization, Content-Type, User-Agent)
 - `extra`: Extra request parameters that will be used in /chat/completions.
 ---
 
