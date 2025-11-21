@@ -245,7 +245,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			// send chat request with retry
 			const response = await executeWithRetry(
 				async () => {
-					const res = await fetch(`${BASE_URL}/chat/completions`, {
+					const res = await fetch(`${BASE_URL.replace(/\/+$/, "")}/chat/completions`, {
 						method: "POST",
 						headers: requestHeaders,
 						body: JSON.stringify(requestBody),

@@ -131,7 +131,7 @@ async function fetchModels(apiKey: string, userAgent: string): Promise<{ models:
 		throw new Error(`Invalid base URL configuration.`);
 	}
 	const modelsList = (async () => {
-		const resp = await fetch(`${BASE_URL}/models`, {
+		const resp = await fetch(`${BASE_URL.replace(/\/+$/, "")}/models`, {
 			method: "GET",
 			headers: { Authorization: `Bearer ${apiKey}`, "User-Agent": userAgent },
 		});
