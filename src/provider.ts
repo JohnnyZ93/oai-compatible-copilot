@@ -287,22 +287,35 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		um: HFModelItem | undefined,
 		options: ProvideLanguageModelChatResponseOptions
 	) {
-		// temperature
+		// temperature and top_p: Some OAI-compatible endpoints don't allow both parameters
+		// Prioritize temperature if set, otherwise use top_p
 		const oTemperature = options.modelOptions?.temperature ?? 0;
 		const temperature = um?.temperature ?? oTemperature;
-		rb.temperature = temperature;
-
-		// top_p
 		const oTopP = options.modelOptions?.top_p ?? 1;
 		const topP = um?.top_p ?? oTopP;
-		rb.top_p = topP;
 
-		// If user model config explicitly sets sampling params to null, remove them so provider defaults apply
-		if (um && um.temperature === null) {
-			delete rb.temperature;
+		// Determine which sampling parameter to use
+		const hasExplicitTemperature =
+			(um?.temperature !== undefined && um.temperature !== null) ||
+			(options.modelOptions?.temperature !== undefined && options.modelOptions.temperature !== 0);
+		const hasExplicitTopP =
+			(um?.top_p !== undefined && um.top_p !== null) ||
+			(options.modelOptions?.top_p !== undefined && options.modelOptions.top_p !== 1);
+
+		// Prefer temperature if both are explicitly set
+		if (um?.temperature === null) {
+			// User explicitly disabled temperature
+		} else if (hasExplicitTemperature) {
+			rb.temperature = temperature;
 		}
-		if (um && um.top_p === null) {
-			delete rb.top_p;
+
+		// Only include top_p if temperature is not being used
+		if (!("temperature" in rb)) {
+			if (um?.top_p === null) {
+				// User explicitly disabled top_p
+			} else if (hasExplicitTopP) {
+				rb.top_p = topP;
+			}
 		}
 
 		// max_tokens
