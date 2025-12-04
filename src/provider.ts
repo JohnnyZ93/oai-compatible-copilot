@@ -21,7 +21,6 @@ import {
 	convertTools,
 	convertMessages,
 	tryParseJSONObject,
-	validateRequest,
 	parseModelId,
 	createRetryConfig,
 	executeWithRetry,
@@ -179,7 +178,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			}
 
 			const openaiMessages = convertMessages(messages);
-			validateRequest(messages);
 
 			// get model config from user settings
 			const config = vscode.workspace.getConfiguration();

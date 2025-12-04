@@ -184,6 +184,7 @@ export function convertMessages(messages: readonly vscode.LanguageModelChatReque
 		const imageParts: vscode.LanguageModelDataPart[] = [];
 		const toolCalls: OpenAIToolCall[] = [];
 		const toolResults: { callId: string; content: string }[] = [];
+		const reasoningParts: string[] = [];
 
 		for (const part of m.content ?? []) {
 			if (part instanceof vscode.LanguageModelTextPart) {
@@ -203,20 +204,43 @@ export function convertMessages(messages: readonly vscode.LanguageModelChatReque
 				const callId = (part as { callId?: string }).callId ?? "";
 				const content = collectToolResultText(part as { content?: ReadonlyArray<unknown> });
 				toolResults.push({ callId, content });
+			} else if (part instanceof vscode.LanguageModelThinkingPart) {
+				// 处理思考内容
+				const content = Array.isArray(part.value) ? part.value.join("") : part.value;
+				reasoningParts.push(content);
 			}
 		}
 
-		let emittedAssistantToolCall = false;
-		if (toolCalls.length > 0) {
-			out.push({ role: "assistant", content: textParts.join("") || undefined, tool_calls: toolCalls });
-			emittedAssistantToolCall = true;
+		// 构建 assistant 消息，包含思考内容
+		if (role === "assistant") {
+			const assistantMessage: OpenAIChatMessage = {
+				role: "assistant",
+				content: textParts.join("\n") || undefined,
+			};
+
+			// 添加思考内容
+			if (reasoningParts.length > 0) {
+				assistantMessage.reasoning_content = reasoningParts.join("\n");
+			}
+
+			// 添加工具调用
+			if (toolCalls.length > 0) {
+				assistantMessage.tool_calls = toolCalls;
+			}
+
+			// 只有当消息有内容、思考内容或工具调用时才添加
+			if (assistantMessage.content || assistantMessage.reasoning_content || assistantMessage.tool_calls) {
+				out.push(assistantMessage);
+			}
 		}
 
+		// 处理工具结果
 		for (const tr of toolResults) {
 			out.push({ role: "tool", tool_call_id: tr.callId, content: tr.content || "" });
 		}
 
-		if (textParts.length > 0) {
+		// 处理用户和系统消息
+		if (textParts.length > 0 && role !== "assistant") {
 			if (role === "user") {
 				if (imageParts.length > 0) {
 					// 多模态消息：包含图片、文本
@@ -241,7 +265,7 @@ export function convertMessages(messages: readonly vscode.LanguageModelChatReque
 					// 纯文本消息
 					out.push({ role, content: textParts.join("\n") });
 				}
-			} else if (role === "system" || (role === "assistant" && !emittedAssistantToolCall)) {
+			} else if (role === "system") {
 				out.push({ role, content: textParts.join("\n") });
 			}
 		}
@@ -318,60 +342,6 @@ export function validateTools(tools: readonly vscode.LanguageModelChatTool[]): v
 			);
 		}
 	}
-}
-
-/**
- * Validate the request message sequence for correct tool call/result pairing.
- * @param messages The full request message list.
- */
-export function validateRequest(messages: readonly vscode.LanguageModelChatRequestMessage[]): void {
-	const lastMessage = messages[messages.length - 1];
-	if (!lastMessage) {
-		console.error("[OAI Compatible Model Provider] No messages in request");
-		throw new Error("Invalid request: no messages.");
-	}
-
-	messages.forEach((message, i) => {
-		if (message.role === vscode.LanguageModelChatMessageRole.Assistant) {
-			const toolCallIds = new Set(
-				message.content
-					.filter((part) => part instanceof vscode.LanguageModelToolCallPart)
-					.map((part) => (part as unknown as vscode.LanguageModelToolCallPart).callId)
-			);
-			if (toolCallIds.size === 0) {
-				return;
-			}
-
-			let nextMessageIdx = i + 1;
-			const errMsg =
-				"Invalid request: Tool call part must be followed by a User message with a LanguageModelToolResultPart with a matching callId.";
-			while (toolCallIds.size > 0) {
-				const nextMessage = messages[nextMessageIdx++];
-				if (!nextMessage || nextMessage.role !== vscode.LanguageModelChatMessageRole.User) {
-					console.error(
-						"[OAI Compatible Model Provider] Validation failed: missing tool result for call IDs:",
-						Array.from(toolCallIds)
-					);
-					throw new Error(errMsg);
-				}
-
-				nextMessage.content.forEach((part) => {
-					if (!isToolResultPart(part)) {
-						const ctorName =
-							(Object.getPrototypeOf(part as object) as { constructor?: { name?: string } } | undefined)?.constructor
-								?.name ?? typeof part;
-						console.error(
-							"[OAI Compatible Model Provider] Validation failed: expected tool result part, got:",
-							ctorName
-						);
-						throw new Error(errMsg);
-					}
-					const callId = (part as { callId: string }).callId;
-					toolCallIds.delete(callId);
-				});
-			}
-		}
-	});
 }
 
 /**
