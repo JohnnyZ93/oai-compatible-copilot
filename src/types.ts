@@ -108,6 +108,12 @@ export interface HFModelItem {
 	 * Example: { "X-API-Version": "v1", "X-Custom-Header": "value" }
 	 */
 	headers?: Record<string, string>;
+
+	/**
+	 * Whether to include reasoning_content in assistant messages sent to the API.
+	 * Support deepseek-v3.2 or others.
+	 */
+	include_reasoning_in_request?: boolean;
 }
 
 /**

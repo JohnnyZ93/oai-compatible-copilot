@@ -174,9 +174,13 @@ function sanitizeSchema(input: unknown, propName?: string): Record<string, unkno
 /**
  * Convert VS Code chat request messages into OpenAI-compatible message objects.
  * @param messages The VS Code chat messages to convert.
+ * @param modelConfig model configuration that may affect message conversion.
  * @returns OpenAI-compatible messages array.
  */
-export function convertMessages(messages: readonly vscode.LanguageModelChatRequestMessage[]): OpenAIChatMessage[] {
+export function convertMessages(
+	messages: readonly vscode.LanguageModelChatRequestMessage[],
+	modelConfig: { includeReasoningInRequest: boolean }
+): OpenAIChatMessage[] {
 	const out: OpenAIChatMessage[] = [];
 	for (const m of messages) {
 		const role = mapRole(m);
@@ -218,8 +222,8 @@ export function convertMessages(messages: readonly vscode.LanguageModelChatReque
 				content: textParts.join("\n") || undefined,
 			};
 
-			// 添加思考内容
-			if (reasoningParts.length > 0) {
+			// 添加思考内容（根据配置决定是否包含）
+			if (modelConfig.includeReasoningInRequest && reasoningParts.length > 0) {
 				assistantMessage.reasoning_content = reasoningParts.join("\n");
 			}
 

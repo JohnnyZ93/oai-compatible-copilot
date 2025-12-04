@@ -256,6 +256,11 @@
 									"type": "string"
 								},
 								"description": "Custom HTTP headers to be sent with every request to this model's provider. These headers will be merged with the default headers (Authorization, Content-Type, User-Agent)."
+							},
+							"include_reasoning_in_request": {
+								"type": "boolean",
+								"default": false,
+								"description": "Whether to include reasoning_content in assistant messages sent to the API. Support deepseek-v3.2 or others."
 							}
 						},
 						"required": [
