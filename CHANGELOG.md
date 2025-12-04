@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.1.5 (2025-12-05)
+
+- Fix: [Deepseek v3.2 reasoning tool call failed](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/54)
+- Enhanced `oaicopilot.models` configuration including:
+  - `include_reasoning_in_request`: Whether to include reasoning_content in assistant messages sent to the API. Support deepseek-v3.2 or others.
+
 ## 0.1.4 (2025-11-03)
 
 - Feat: [Add headers support](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/31)

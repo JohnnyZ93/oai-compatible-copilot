@@ -201,7 +201,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 			// Prepare model configuration for message conversion
 			const modelConfig = {
-				includeReasoningInRequest: um?.include_reasoning_in_request ?? false
+				includeReasoningInRequest: um?.include_reasoning_in_request ?? false,
 			};
 
 			const openaiMessages = convertMessages(messages, modelConfig);
