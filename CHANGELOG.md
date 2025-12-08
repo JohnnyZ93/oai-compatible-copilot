@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.1.6 (2025-12-08)
+
+- Feat: [Сontext window state in statusBar](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/59)
+
 ## 0.1.5 (2025-12-05)
 
 - Fix: [Deepseek v3.2 reasoning tool call failed](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/54)
