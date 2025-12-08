@@ -41,6 +41,10 @@ export async function prepareTokenCount(
 				// Tool result token calculation
 				const resultText = typeof part.content === "string" ? part.content : JSON.stringify(part.content);
 				totalTokens += estimateTextTokens(resultText);
+			} else if (part instanceof vscode.LanguageModelThinkingPart) {
+				// Thinking Token
+				const thinkingText = Array.isArray(part.value) ? part.value.join("") : part.value;
+				totalTokens += estimateTextTokens(thinkingText);
 			}
 		}
 

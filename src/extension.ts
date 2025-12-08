@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { HuggingFaceChatModelProvider } from "./provider";
 import type { HFModelItem } from "./types";
+import { initStatusBar } from "./statusBar";
 
 export function activate(context: vscode.ExtensionContext) {
 	// Build a descriptive User-Agent to help quantify API usage
@@ -10,7 +11,8 @@ export function activate(context: vscode.ExtensionContext) {
 	// Keep UA minimal: only extension version and VS Code version
 	const ua = `oai-compatible-copilot/${extVersion} VSCode/${vscodeVersion}`;
 
-	const provider = new HuggingFaceChatModelProvider(context.secrets, ua);
+	const tokenCountStatusBarItem: vscode.StatusBarItem = initStatusBar(context);
+	const provider = new HuggingFaceChatModelProvider(context.secrets, ua, tokenCountStatusBarItem);
 	// Register the Hugging Face provider under the vendor id used in package.json
 	vscode.lm.registerLanguageModelChatProvider("oaicopilot", provider);
 

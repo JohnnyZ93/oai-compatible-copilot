@@ -28,6 +28,7 @@ import {
 
 import { prepareLanguageModelChatInformation } from "./provideModel";
 import { prepareTokenCount } from "./provideToken";
+import { updateContextStatusBar } from "./statusBar";
 
 const MAX_TOOLS_PER_REQUEST = 128;
 
@@ -77,7 +78,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	 */
 	constructor(
 		private readonly secrets: vscode.SecretStorage,
-		private readonly userAgent: string
+		private readonly userAgent: string,
+		private readonly statusBarItem: vscode.StatusBarItem
 	) {}
 
 	/**
@@ -141,6 +143,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		this._xmlThinkDetectionAttempted = false;
 		// Initialize thinking state for this request
 		this._currentThinkingId = null;
+
+		// Update Token Usage
+		updateContextStatusBar(messages, model, this.statusBarItem);
 
 		// Apply delay between consecutive requests
 		const config = vscode.workspace.getConfiguration();
