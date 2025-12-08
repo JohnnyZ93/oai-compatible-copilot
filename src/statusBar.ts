@@ -57,13 +57,16 @@ export async function updateContextStatusBar(
 	model: LanguageModelChatInformation,
 	statusBarItem: vscode.StatusBarItem
 ): Promise<void> {
-	// Loop through each message and count tokens
-	let totalTokenCount = 0;
+	// Create a single CancellationTokenSource for all token count operations
+	const cancellationTokenSource = new CancellationTokenSource();
 
-	for (const message of messages) {
-		const tokenCount = await prepareTokenCount(model, message, new CancellationTokenSource().token);
-		totalTokenCount += tokenCount;
-	}
+	// Calculate tokens for all messages in parallel
+	const tokenCountPromises = messages.map((message) =>
+		prepareTokenCount(model, message, cancellationTokenSource.token)
+	);
+
+	const tokenCounts = await Promise.all(tokenCountPromises);
+	const totalTokenCount = tokenCounts.reduce((sum, count) => sum + count, 0);
 
 	// Update status bar with token count and model context window
 	const maxTokens = model.maxInputTokens + model.maxOutputTokens;
