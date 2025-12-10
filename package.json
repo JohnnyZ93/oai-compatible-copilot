@@ -1,6 +1,6 @@
 {
-	"name": "oai-compatible-copilot",
-	"publisher": "johnny-zhao",
+	"name": "oai-compatible-copilot-myself",
+	"publisher": "ttcc",
 	"displayName": "OAI Compatible Provider for Copilot",
 	"description": "An extension that integrates Openai Compatible Inference Providers into GitHub Copilot Chat",
 	"icon": "assets/logo.png",
