@@ -15,7 +15,7 @@
 		"type": "git",
 		"url": "https://github.com/JohnnyZ93/oai-compatible-copilot"
 	},
-	"version": "0.1.6",
+	"version": "0.1.7",
 	"engines": {
 		"vscode": "^1.104.0"
 	},
@@ -39,7 +39,6 @@
 	"license": "MIT",
 	"enabledApiProposals": [
         "chatProvider",
-		"languageModelDataPart",
 		"languageModelThinkingPart"
     ],
 	"contributes": {
