@@ -58,8 +58,30 @@
 			{
 				"command": "oaicopilot.setProviderApikey",
 				"title": "OAICopilot: Set OAI Compatible Multi-Provider Apikey"
+			},
+			{
+				"command": "oaicopilot.openConfig",
+				"title": "OAICopilot: Open Configuration"
 			}
 		],
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "oaicopilot",
+					"title": "OAI Copilot",
+					"icon": "assets/logo.png"
+				}
+			]
+		},
+		"views": {
+			"oaicopilot": [
+				{
+					"id": "oaicopilot.configView",
+					"name": "Configuration",
+					"type": "webview"
+				}
+			]
+		},
 		"configuration": {
 			"title": "OAI Compatible Copilot",
 			"properties": {
