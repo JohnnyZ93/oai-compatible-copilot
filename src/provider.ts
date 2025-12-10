@@ -73,7 +73,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	private _lastRequestTime: number | null = null;
 
 	/** Buffer for accumulating thinking content before emitting. */
-	private _thinkingBuffer: string = '';
+	private _thinkingBuffer = "";
 
 	/** Timer for delayed flushing of thinking buffer. */
 	private _thinkingFlushTimer: NodeJS.Timeout | null = null;
@@ -150,7 +150,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		// Initialize thinking state for this request
 		this._currentThinkingId = null;
 		// Clear thinking buffer and timer
-		this._thinkingBuffer = '';
+		this._thinkingBuffer = "";
 		if (this._thinkingFlushTimer) {
 			clearTimeout(this._thinkingFlushTimer);
 			this._thinkingFlushTimer = null;
@@ -533,13 +533,29 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			this._emittedTextToolCallKeys.clear();
 			this._xmlThinkActive = false;
 			this._xmlThinkDetectionAttempted = false;
-			this._currentThinkingId = null;
-			// Clear thinking buffer and timer
-			this._thinkingBuffer = '';
-			if (this._thinkingFlushTimer) {
-				clearTimeout(this._thinkingFlushTimer);
-				this._thinkingFlushTimer = null;
+
+			// If there's an active thinking sequence, end it first
+			this.reportEndThinking(progress);
+		}
+	}
+
+	private reportEndThinking(progress: vscode.Progress<vscode.LanguageModelResponsePart2>) {
+		if (this._currentThinkingId) {
+			try {
+				this.flushThinkingBuffer(progress);
+				// End the current thinking sequence with empty content and same ID
+				progress.report(new vscode.LanguageModelThinkingPart("", this._currentThinkingId));
+			} catch (e) {
+				console.warn("[OAI Compatible Model Provider] Failed to end thinking sequence:", e);
 			}
+		}
+		// Always clean up state after attempting to end the thinking sequence
+		this._currentThinkingId = null;
+		// Clear thinking buffer and timer since sequence ended
+		this._thinkingBuffer = "";
+		if (this._thinkingFlushTimer) {
+			clearTimeout(this._thinkingFlushTimer);
+			this._thinkingFlushTimer = null;
 		}
 	}
 
@@ -597,19 +613,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					}
 
 					if (extractedText) {
-						// Generate thinking ID if not provided by the model
-						if (!this._currentThinkingId) {
-							this._currentThinkingId = this.generateThinkingId();
-						}
-						// Append to thinking buffer instead of immediate report
-						this._thinkingBuffer += extractedText;
-						// Schedule flush with 80ms delay
-						if (!this._thinkingFlushTimer) {
-							this._thinkingFlushTimer = setTimeout(() => {
-								this._thinkingFlushTimer = null;
-								this.flushThinkingBuffer(progress, false);
-							}, 80);
-						}
+						this.bufferThinkingContent(extractedText, progress);
 						emitted = true;
 					}
 				}
@@ -619,28 +623,16 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			// Fallback to simple thinking if no details
 			if (maybeThinking !== undefined && maybeThinking !== null) {
 				let text = "";
-				let metadata: Record<string, unknown> | undefined;
+				// let metadata: Record<string, unknown> | undefined;
 				if (maybeThinking && typeof maybeThinking === "object") {
 					const mt = maybeThinking as Record<string, unknown>;
 					text = typeof mt["text"] === "string" ? (mt["text"] as string) : JSON.stringify(mt);
-					metadata = mt["metadata"] ? (mt["metadata"] as Record<string, unknown>) : undefined;
+					// metadata = mt["metadata"] ? (mt["metadata"] as Record<string, unknown>) : undefined;
 				} else if (typeof maybeThinking === "string") {
 					text = maybeThinking;
 				}
 				if (text) {
-					// Generate thinking ID if not provided by the model
-					if (!this._currentThinkingId) {
-						this._currentThinkingId = this.generateThinkingId();
-					}
-					// Append to thinking buffer instead of immediate report
-					this._thinkingBuffer += text;
-					// Schedule flush with 80ms delay
-					if (!this._thinkingFlushTimer) {
-						this._thinkingFlushTimer = setTimeout(() => {
-							this._thinkingFlushTimer = null;
-							this.flushThinkingBuffer(progress, false);
-						}, 80);
-					}
+					this.bufferThinkingContent(text, progress);
 					emitted = true;
 				}
 			}
@@ -661,22 +653,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 				// If we have visible content and there's an active thinking sequence, end it first
 				if (hasVisibleContent && this._currentThinkingId) {
-					try {
-						// Flush any pending thinking content before ending the sequence
-						this.flushThinkingBuffer(progress, true);
-						// End the current thinking sequence with empty content and same ID
-						progress.report(new vscode.LanguageModelThinkingPart("", this._currentThinkingId));
-					} catch (e) {
-						console.warn("[OAI Compatible Model Provider] Failed to end thinking sequence:", e);
-					} finally {
-						this._currentThinkingId = null;
-						// Clear thinking buffer and timer since sequence ended
-						this._thinkingBuffer = '';
-						if (this._thinkingFlushTimer) {
-							clearTimeout(this._thinkingFlushTimer);
-							this._thinkingFlushTimer = null;
-						}
-					}
+					this.reportEndThinking(progress);
 				}
 
 				// Only process text content if no XML think blocks were emitted
@@ -936,28 +913,43 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	}
 
 	/**
+	 * Buffer and schedule a flush for thinking content.
+	 * @param text The thinking text to buffer
+	 * @param progress Progress reporter for parts
+	 */
+	private bufferThinkingContent(text: string, progress: Progress<LanguageModelResponsePart2>): void {
+		// Generate thinking ID if not provided by the model
+		if (!this._currentThinkingId) {
+			this._currentThinkingId = this.generateThinkingId();
+		}
+
+		// Append to thinking buffer
+		this._thinkingBuffer += text;
+
+		// Schedule flush with 100ms delay
+		if (!this._thinkingFlushTimer) {
+			this._thinkingFlushTimer = setTimeout(() => {
+				this.flushThinkingBuffer(progress);
+			}, 100);
+		}
+	}
+
+	/**
 	 * Flush the thinking buffer to the progress reporter.
 	 * @param progress Progress reporter for parts.
-	 * @param immediate If true, flush immediately; otherwise schedule with 80ms delay.
 	 */
-	private flushThinkingBuffer(progress: Progress<LanguageModelResponsePart2>, immediate: boolean = false): void {
-		if (this._thinkingBuffer && this._currentThinkingId) {
-			const text = this._thinkingBuffer;
-			this._thinkingBuffer = '';
-			progress.report(new vscode.LanguageModelThinkingPart(text, this._currentThinkingId));
-		}
+	private flushThinkingBuffer(progress: Progress<LanguageModelResponsePart2>): void {
+		// Always clear existing timer first
 		if (this._thinkingFlushTimer) {
 			clearTimeout(this._thinkingFlushTimer);
 			this._thinkingFlushTimer = null;
 		}
-		if (!immediate) {
-			// Schedule next flush after 80ms if there's new content
-			this._thinkingFlushTimer = setTimeout(() => {
-				this._thinkingFlushTimer = null;
-				if (this._thinkingBuffer && this._currentThinkingId) {
-					this.flushThinkingBuffer(progress, false);
-				}
-			}, 80);
+
+		// Flush current buffer if we have content
+		if (this._thinkingBuffer && this._currentThinkingId) {
+			const text = this._thinkingBuffer;
+			this._thinkingBuffer = "";
+			progress.report(new vscode.LanguageModelThinkingPart(text, this._currentThinkingId));
 		}
 	}
 }
