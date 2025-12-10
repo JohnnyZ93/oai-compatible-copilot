@@ -437,6 +437,7 @@ export function createRetryConfig(): RetryConfig {
 		enabled: retryConfig.enabled ?? true,
 		max_attempts: retryConfig.max_attempts ?? RETRY_MAX_ATTEMPTS,
 		interval_ms: retryConfig.interval_ms ?? RETRY_INTERVAL_MS,
+		status_codes: retryConfig.status_codes,
 	};
 }
 
@@ -458,6 +459,10 @@ export async function executeWithRetry<T>(
 
 	const maxAttempts = retryConfig.max_attempts ?? RETRY_MAX_ATTEMPTS;
 	const intervalMs = retryConfig.interval_ms ?? RETRY_INTERVAL_MS;
+	// Merge user-configured status codes with default ones, removing duplicates
+	const retryableStatusCodes = retryConfig.status_codes
+		? [...new Set([...RETRYABLE_STATUS_CODES, ...retryConfig.status_codes])]
+		: RETRYABLE_STATUS_CODES;
 	let lastError: Error | undefined;
 
 	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -472,7 +477,7 @@ export async function executeWithRetry<T>(
 			lastError = error instanceof Error ? error : new Error(String(error));
 
 			// Check if error is retryable based on status codes
-			const isRetryableError = RETRYABLE_STATUS_CODES.some((code) => lastError?.message.includes(`[${code}]`));
+			const isRetryableError = retryableStatusCodes.some((code) => lastError?.message.includes(`[${code}]`));
 
 			if (!isRetryableError || attempt === maxAttempts) {
 				throw lastError;

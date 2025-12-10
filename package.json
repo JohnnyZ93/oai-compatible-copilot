@@ -294,6 +294,13 @@
 							"default": 1000,
 							"minimum": 1,
 							"description": "Interval between retry attempts in milliseconds. Default is 1000 (1 seconds)."
+						},
+						"status_codes": {
+							"type": "array",
+							"items": {
+								"type": "number"
+							},
+							"description": "Additional HTTP status codes that will be merged. Default is [429, 500, 502, 503, 504]."
 						}
 					},
 					"description": "Retry configuration for handling api errors like [429, 500, 502, 503, 504]."

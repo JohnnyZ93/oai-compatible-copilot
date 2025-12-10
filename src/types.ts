@@ -193,4 +193,5 @@ export interface RetryConfig {
 	enabled?: boolean;
 	max_attempts?: number;
 	interval_ms?: number;
+	status_codes?: number[];
 }
