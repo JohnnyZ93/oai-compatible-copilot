@@ -15,6 +15,9 @@ import type {
 	ReasoningSummaryDetail,
 	ReasoningTextDetail,
 	ReasoningConfig,
+	OllamaMessage,
+	OllamaRequestBody,
+	OllamaStreamChunk,
 } from "./types";
 
 import {
@@ -221,8 +224,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				includeReasoningInRequest: um?.include_reasoning_in_request ?? false,
 			};
 
-			const openaiMessages = convertMessages(messages, modelConfig);
-
 			// Get API key for the model's provider
 			const provider = um?.owned_by;
 			const useGenericKey = !um?.baseUrl;
@@ -230,18 +231,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			if (!modelApiKey) {
 				throw new Error("OAI Compatible API key not found");
 			}
-
-			// requestBody
-			requestBody = {
-				model: parsedModelId.baseId,
-				messages: openaiMessages,
-				stream: true,
-				stream_options: { include_usage: true },
-			};
-			requestBody = this.prepareRequestBody(requestBody, um, options);
-
-			// debug log
-			// console.log("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(requestBody));
 
 			// send chat request
 			const BASE_URL = um?.baseUrl || config.get<string>("oaicopilot.baseUrl", "");
@@ -252,43 +241,137 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			// get retry config
 			const retryConfig = createRetryConfig();
 
-			// prepare headers with custom headers if specified
-			const defaultHeaders: Record<string, string> = {
-				Authorization: `Bearer ${modelApiKey}`,
-				"Content-Type": "application/json",
-				"User-Agent": this.userAgent,
-			};
+			// Check if using Ollama native API mode
+			const apiMode = um?.apiMode ?? "openai";
 
-			// merge custom headers if specified in model config
-			const requestHeaders = um?.headers ? { ...defaultHeaders, ...um.headers } : defaultHeaders;
+			if (apiMode === "ollama") {
+				// Ollama native API mode
+				const ollamaMessages = this.convertToOllamaMessages(messages);
+				const ollamaRequestBody: OllamaRequestBody = {
+					model: parsedModelId.baseId,
+					messages: ollamaMessages,
+					stream: true,
+				};
 
-			// send chat request with retry
-			const response = await executeWithRetry(
-				async () => {
-					const res = await fetch(`${BASE_URL.replace(/\/+$/, "")}/chat/completions`, {
-						method: "POST",
-						headers: requestHeaders,
-						body: JSON.stringify(requestBody),
-					});
+				// Add thinking mode if configured
+				if (um?.ollamaThink !== undefined) {
+					ollamaRequestBody.think = um.ollamaThink;
+				}
 
-					if (!res.ok) {
-						const errorText = await res.text();
-						console.error("[OAI Compatible Model Provider] OAI Compatible API error response", errorText);
-						throw new Error(
-							`OAI Compatible API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`
-						);
+				// Add options if configured (but NOT when think is enabled, as it breaks thinking)
+				// Ollama API bug: having 'options' field in request body disables thinking output
+				if (!um?.ollamaThink) {
+					if (um?.temperature !== undefined || um?.top_p !== undefined || um?.top_k !== undefined || um?.max_tokens !== undefined) {
+						ollamaRequestBody.options = {};
+						if (um.temperature !== undefined && um.temperature !== null) {
+							ollamaRequestBody.options.temperature = um.temperature;
+						}
+						if (um.top_p !== undefined && um.top_p !== null) {
+							ollamaRequestBody.options.top_p = um.top_p;
+						}
+						if (um.top_k !== undefined) {
+							ollamaRequestBody.options.top_k = um.top_k;
+						}
+						if (um.max_tokens !== undefined) {
+							ollamaRequestBody.options.num_predict = um.max_tokens;
+						}
 					}
+				}
 
-					return res;
-				},
-				retryConfig,
-				token
-			);
+				// prepare headers for Ollama
+				const ollamaHeaders: Record<string, string> = {
+					"Content-Type": "application/json",
+					"User-Agent": this.userAgent,
+				};
 
-			if (!response.body) {
-				throw new Error("No response body from OAI Compatible API");
+				// Add Authorization header if API key is provided (for remote Ollama servers)
+				if (modelApiKey && modelApiKey !== "ollama") {
+					ollamaHeaders["Authorization"] = `Bearer ${modelApiKey}`;
+				}
+
+				// merge custom headers if specified
+				const requestHeaders = um?.headers ? { ...ollamaHeaders, ...um.headers } : ollamaHeaders;
+
+				console.log("[Ollama Provider] URL:", `${BASE_URL.replace(/\/+$/, "")}/api/chat`, "Model:", parsedModelId.baseId, "Think:", um?.ollamaThink);
+
+				// send Ollama chat request with retry
+				const response = await executeWithRetry(
+					async () => {
+						const res = await fetch(`${BASE_URL.replace(/\/+$/, "")}/api/chat`, {
+							method: "POST",
+							headers: requestHeaders,
+							body: JSON.stringify(ollamaRequestBody),
+						});
+
+						if (!res.ok) {
+							const errorText = await res.text();
+							console.error("[Ollama Provider] Ollama API error response", errorText);
+							throw new Error(
+								`Ollama API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`
+							);
+						}
+
+						return res;
+					},
+					retryConfig,
+					token
+				);
+
+				if (!response.body) {
+					throw new Error("No response body from Ollama API");
+				}
+				await this.processOllamaStreamingResponse(response.body, trackingProgress, token);
+			} else {
+				// OpenAI compatible API mode (default)
+				const openaiMessages = convertMessages(messages, modelConfig);
+
+				// requestBody
+				requestBody = {
+					model: parsedModelId.baseId,
+					messages: openaiMessages,
+					stream: true,
+					stream_options: { include_usage: true },
+				};
+				requestBody = this.prepareRequestBody(requestBody, um, options);
+
+				// prepare headers with custom headers if specified
+				const defaultHeaders: Record<string, string> = {
+					Authorization: `Bearer ${modelApiKey}`,
+					"Content-Type": "application/json",
+					"User-Agent": this.userAgent,
+				};
+
+				// merge custom headers if specified in model config
+				const requestHeaders = um?.headers ? { ...defaultHeaders, ...um.headers } : defaultHeaders;
+
+				// send chat request with retry
+				const response = await executeWithRetry(
+					async () => {
+						const res = await fetch(`${BASE_URL.replace(/\/+$/, "")}/chat/completions`, {
+							method: "POST",
+							headers: requestHeaders,
+							body: JSON.stringify(requestBody),
+						});
+
+						if (!res.ok) {
+							const errorText = await res.text();
+							console.error("[OAI Compatible Model Provider] OAI Compatible API error response", errorText);
+							throw new Error(
+								`OAI Compatible API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`
+							);
+						}
+
+						return res;
+					},
+					retryConfig,
+					token
+				);
+
+				if (!response.body) {
+					throw new Error("No response body from OAI Compatible API");
+				}
+				await this.processStreamingResponse(response.body, trackingProgress, token);
 			}
-			await this.processStreamingResponse(response.body, trackingProgress, token);
 		} catch (err) {
 			console.error("[OAI Compatible Model Provider] Chat request failed", {
 				modelId: model.id,
@@ -950,6 +1033,173 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			const text = this._thinkingBuffer;
 			this._thinkingBuffer = "";
 			progress.report(new vscode.LanguageModelThinkingPart(text, this._currentThinkingId));
+		}
+	}
+
+	/**
+	 * Convert VS Code chat messages to Ollama native message format.
+	 * @param messages The VS Code chat messages to convert.
+	 * @returns Ollama-compatible messages array.
+	 */
+	private convertToOllamaMessages(
+		messages: readonly LanguageModelChatRequestMessage[]
+	): OllamaMessage[] {
+		const out: OllamaMessage[] = [];
+
+		for (const m of messages) {
+			const role = this.mapToOllamaRole(m);
+			const textParts: string[] = [];
+			const imageParts: string[] = [];
+			let thinkingContent = "";
+
+			for (const part of m.content ?? []) {
+				if (part instanceof vscode.LanguageModelTextPart) {
+					textParts.push(part.value);
+				} else if (part instanceof vscode.LanguageModelDataPart) {
+					// Convert image data to base64 for Ollama
+					if (part.mimeType.startsWith("image/")) {
+						const base64Data = Buffer.from(part.data).toString("base64");
+						imageParts.push(base64Data);
+					}
+				} else if (part instanceof vscode.LanguageModelThinkingPart) {
+					// Capture thinking content
+					const content = Array.isArray(part.value) ? part.value.join("") : part.value;
+					thinkingContent += content;
+				}
+				// Note: Tool calls are not supported in Ollama native API
+			}
+
+			if (textParts.length > 0 || imageParts.length > 0) {
+				const content = textParts.join("\n");
+
+				const ollamaMessage: OllamaMessage = {
+					role,
+					content,
+				};
+
+				if (imageParts.length > 0) {
+					ollamaMessage.images = imageParts;
+				}
+
+				if (thinkingContent && role === "assistant") {
+					ollamaMessage.thinking = thinkingContent;
+				}
+
+				out.push(ollamaMessage);
+			}
+		}
+
+		return out;
+	}
+
+	/**
+	 * Map VS Code message role to Ollama message role.
+	 * @param message The message whose role is mapped.
+	 */
+	private mapToOllamaRole(message: LanguageModelChatRequestMessage): "system" | "user" | "assistant" {
+		const USER = vscode.LanguageModelChatMessageRole.User as unknown as number;
+		const ASSISTANT = vscode.LanguageModelChatMessageRole.Assistant as unknown as number;
+		const r = message.role as unknown as number;
+		if (r === USER) {
+			return "user";
+		}
+		if (r === ASSISTANT) {
+			return "assistant";
+		}
+		return "system";
+	}
+
+	/**
+	 * Process Ollama native API streaming response (JSON lines format).
+	 * @param responseBody The readable stream body.
+	 * @param progress Progress reporter for streamed parts.
+	 * @param token Cancellation token.
+	 */
+	private async processOllamaStreamingResponse(
+		responseBody: ReadableStream<Uint8Array>,
+		progress: Progress<LanguageModelResponsePart2>,
+		token: CancellationToken
+	): Promise<void> {
+		const reader = responseBody.getReader();
+		const decoder = new TextDecoder();
+		let buffer = "";
+
+		try {
+			while (!token.isCancellationRequested) {
+				const { done, value } = await reader.read();
+				if (done) {
+					break;
+				}
+
+				buffer += decoder.decode(value, { stream: true });
+				const lines = buffer.split("\n");
+				buffer = lines.pop() || "";
+
+				for (const line of lines) {
+					if (!line.trim()) {
+						continue;
+					}
+
+					try {
+						const chunk: OllamaStreamChunk = JSON.parse(line);
+						await this.processOllamaDelta(chunk, progress);
+
+						// Check if this is the final chunk
+						if (chunk.done) {
+							// End any active thinking sequence
+							this.reportEndThinking(progress);
+						}
+					} catch {
+						// Silently ignore malformed JSON lines
+					}
+				}
+			}
+		} finally {
+			reader.releaseLock();
+			// Clean up state
+			this._xmlThinkActive = false;
+			this._xmlThinkDetectionAttempted = false;
+			// End any active thinking sequence
+			this.reportEndThinking(progress);
+		}
+	}
+
+	/**
+	 * Process a single Ollama streaming chunk.
+	 * @param chunk Parsed Ollama stream chunk.
+	 * @param progress Progress reporter for parts.
+	 */
+	private async processOllamaDelta(
+		chunk: OllamaStreamChunk,
+		progress: Progress<LanguageModelResponsePart2>
+	): Promise<void> {
+		const message = chunk.message;
+		if (!message) {
+			return;
+		}
+
+		// Process thinking content first
+		if (message.thinking) {
+			// Generate thinking ID if not exists
+			if (!this._currentThinkingId) {
+				this._currentThinkingId = this.generateThinkingId();
+			}
+			// Buffer and emit thinking content
+			this.bufferThinkingContent(message.thinking, progress);
+		}
+
+		// Process regular content
+		if (message.content) {
+			// If we have thinking content and now receiving regular content, end thinking first
+			if (this._currentThinkingId && message.content.trim()) {
+				this.reportEndThinking(progress);
+			}
+
+			// Emit text content
+			if (message.content) {
+				progress.report(new vscode.LanguageModelTextPart(message.content));
+				this._hasEmittedAssistantText = true;
+			}
 		}
 	}
 }
