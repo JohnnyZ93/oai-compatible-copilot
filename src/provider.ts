@@ -180,8 +180,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					stream: true,
 				};
 				ollamaRequestBody = ollamaApi.prepareRequestBody(ollamaRequestBody, um, options);
-				// console.debug("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(requestBody));
-
+				// console.debug("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(ollamaRequestBody));
 
 				// prepare headers for Ollama
 				const ollamaHeaders: Record<string, string> = {

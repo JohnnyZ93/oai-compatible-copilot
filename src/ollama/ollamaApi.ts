@@ -160,7 +160,7 @@ export class OllamaApi extends CommonApi {
 			// Add all extra parameters directly to the request body
 			for (const [key, value] of Object.entries(um.extra)) {
 				if (value !== undefined) {
-					// rb[key] = value;
+					(rb as Record<string, any>)[key] = value;
 				}
 			}
 		}

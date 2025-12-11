@@ -185,7 +185,7 @@ export async function executeWithRetry<T>(fn: () => Promise<T>, retryConfig: Ret
 		: RETRYABLE_STATUS_CODES;
 	let lastError: Error | undefined;
 
-	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+	for (let attempt = 0; attempt <= maxAttempts; attempt++) {
 		try {
 			return await fn();
 		} catch (error) {
@@ -199,7 +199,7 @@ export async function executeWithRetry<T>(fn: () => Promise<T>, retryConfig: Ret
 			}
 
 			console.error(
-				`[OAI Compatible Model Provider] Retryable error detected, retrying in ${intervalMs}ms (attempt ${attempt}/${maxAttempts})`
+				`[OAI Compatible Model Provider] Retryable error detected, retrying in ${intervalMs}ms (attempt ${attempt + 1}/${maxAttempts})`
 			);
 
 			// Wait for the specified interval before retrying
