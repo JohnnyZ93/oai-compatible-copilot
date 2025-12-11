@@ -258,23 +258,25 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					ollamaRequestBody.think = um.ollamaThink;
 				}
 
-				// Add options if configured (but NOT when think is enabled, as it breaks thinking)
-				// Ollama API bug: having 'options' field in request body disables thinking output
-				if (!um?.ollamaThink) {
-					if (um?.temperature !== undefined || um?.top_p !== undefined || um?.top_k !== undefined || um?.max_tokens !== undefined) {
-						ollamaRequestBody.options = {};
-						if (um.temperature !== undefined && um.temperature !== null) {
-							ollamaRequestBody.options.temperature = um.temperature;
-						}
-						if (um.top_p !== undefined && um.top_p !== null) {
-							ollamaRequestBody.options.top_p = um.top_p;
-						}
-						if (um.top_k !== undefined) {
-							ollamaRequestBody.options.top_k = um.top_k;
-						}
-						if (um.max_tokens !== undefined) {
-							ollamaRequestBody.options.num_predict = um.max_tokens;
-						}
+				// Add model options if configured
+				if (
+					um?.temperature !== undefined ||
+					um?.top_p !== undefined ||
+					um?.top_k !== undefined ||
+					um?.max_tokens !== undefined
+				) {
+					ollamaRequestBody.options = {};
+					if (um.temperature !== undefined && um.temperature !== null) {
+						ollamaRequestBody.options.temperature = um.temperature;
+					}
+					if (um.top_p !== undefined && um.top_p !== null) {
+						ollamaRequestBody.options.top_p = um.top_p;
+					}
+					if (um.top_k !== undefined) {
+						ollamaRequestBody.options.top_k = um.top_k;
+					}
+					if (um.max_tokens !== undefined) {
+						ollamaRequestBody.options.num_predict = um.max_tokens;
 					}
 				}
 
@@ -1196,10 +1198,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			}
 
 			// Emit text content
-			if (message.content) {
-				progress.report(new vscode.LanguageModelTextPart(message.content));
-				this._hasEmittedAssistantText = true;
-			}
+			progress.report(new vscode.LanguageModelTextPart(message.content));
+			this._hasEmittedAssistantText = true;
 		}
 	}
 }

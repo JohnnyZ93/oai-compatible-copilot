@@ -220,18 +220,29 @@ export interface OllamaMessage {
 
 /**
  * Ollama native API request body
+ * @see https://docs.ollama.com/api#generate-a-chat-message
  */
 export interface OllamaRequestBody {
 	model: string;
 	messages: OllamaMessage[];
 	stream?: boolean;
 	think?: boolean | string;
-	options?: {
-		temperature?: number;
-		top_p?: number;
-		top_k?: number;
-		num_predict?: number;
-	};
+	options?: OllamaModelOptions;
+}
+
+/**
+ * Ollama model options for controlling text generation
+ * @see https://docs.ollama.com/api#generate-a-chat-message
+ */
+export interface OllamaModelOptions {
+	seed?: number;
+	temperature?: number;
+	top_k?: number;
+	top_p?: number;
+	min_p?: number;
+	stop?: string | string[];
+	num_ctx?: number;
+	num_predict?: number;
 }
 
 /**
