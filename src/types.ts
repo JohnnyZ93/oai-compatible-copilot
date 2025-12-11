@@ -210,12 +210,15 @@ export interface RetryConfig {
 
 /**
  * Ollama native API message format
+ * @see https://docs.ollama.com/api#generate-a-chat-message
  */
 export interface OllamaMessage {
-	role: "system" | "user" | "assistant";
+	role: "system" | "user" | "assistant" | "tool";
 	content: string;
 	images?: string[];
 	thinking?: string;
+	tool_calls?: OllamaToolCall[];
+	tool_name?: string; // For tool role messages
 }
 
 /**
@@ -228,6 +231,7 @@ export interface OllamaRequestBody {
 	stream?: boolean;
 	think?: boolean | string;
 	options?: OllamaModelOptions;
+	tools?: OllamaToolDefinition[];
 }
 
 /**
@@ -246,6 +250,30 @@ export interface OllamaModelOptions {
 }
 
 /**
+ * Ollama tool call format
+ * @see https://docs.ollama.com/api#tool-calling
+ */
+export interface OllamaToolCall {
+	function: {
+		name: string;
+		arguments: Record<string, unknown>;
+	};
+}
+
+/**
+ * Ollama tool definition format
+ * @see https://docs.ollama.com/api#tool-calling
+ */
+export interface OllamaToolDefinition {
+	type: "function";
+	function: {
+		name: string;
+		description?: string;
+		parameters?: Record<string, unknown>;
+	};
+}
+
+/**
  * Ollama native API streaming response chunk
  */
 export interface OllamaStreamChunk {
@@ -255,6 +283,7 @@ export interface OllamaStreamChunk {
 		role: string;
 		content: string;
 		thinking?: string;
+		tool_calls?: OllamaToolCall[];
 	};
 	done: boolean;
 	done_reason?: string;

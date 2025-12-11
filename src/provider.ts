@@ -18,6 +18,8 @@ import type {
 	OllamaMessage,
 	OllamaRequestBody,
 	OllamaStreamChunk,
+	OllamaToolDefinition,
+	OllamaToolCall,
 } from "./types";
 
 import {
@@ -278,6 +280,11 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					if (um.max_tokens !== undefined) {
 						ollamaRequestBody.options.num_predict = um.max_tokens;
 					}
+				}
+
+				// Add tools if provided
+				if (options.tools && options.tools.length > 0) {
+					ollamaRequestBody.tools = this.convertToOllamaTools(options.tools);
 				}
 
 				// prepare headers for Ollama
@@ -1053,6 +1060,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			const textParts: string[] = [];
 			const imageParts: string[] = [];
 			let thinkingContent = "";
+			const toolCalls: OllamaToolCall[] = [];
+			const toolResults: { toolName: string; content: string }[] = [];
 
 			for (const part of m.content ?? []) {
 				if (part instanceof vscode.LanguageModelTextPart) {
@@ -1067,11 +1076,33 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					// Capture thinking content
 					const content = Array.isArray(part.value) ? part.value.join("") : part.value;
 					thinkingContent += content;
+				} else if (part instanceof vscode.LanguageModelToolCallPart) {
+					// Capture tool calls from assistant
+					toolCalls.push({
+						function: {
+							name: part.name,
+							arguments: (part.input as Record<string, unknown>) ?? {},
+						},
+					});
+				} else if (this.isToolResultPart(part)) {
+					// Capture tool results
+					const content = this.collectToolResultText(part);
+					const toolName = (part as { toolName?: string }).toolName ?? "unknown";
+					toolResults.push({ toolName, content });
 				}
-				// Note: Tool calls are not supported in Ollama native API
 			}
 
-			if (textParts.length > 0 || imageParts.length > 0) {
+			// Handle tool results as separate "tool" role messages
+			for (const tr of toolResults) {
+				out.push({
+					role: "tool",
+					content: tr.content,
+					tool_name: tr.toolName,
+				});
+			}
+
+			// Handle regular messages
+			if (textParts.length > 0 || imageParts.length > 0 || toolCalls.length > 0) {
 				const content = textParts.join("\n");
 
 				const ollamaMessage: OllamaMessage = {
@@ -1087,11 +1118,61 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					ollamaMessage.thinking = thinkingContent;
 				}
 
+				if (toolCalls.length > 0 && role === "assistant") {
+					ollamaMessage.tool_calls = toolCalls;
+				}
+
 				out.push(ollamaMessage);
 			}
 		}
 
 		return out;
+	}
+
+	/**
+	 * Type guard for LanguageModelToolResultPart-like values.
+	 */
+	private isToolResultPart(value: unknown): value is { callId: string; content?: ReadonlyArray<unknown> } {
+		if (!value || typeof value !== "object") {
+			return false;
+		}
+		const obj = value as Record<string, unknown>;
+		return typeof obj.callId === "string" && "content" in obj;
+	}
+
+	/**
+	 * Collect tool result content into a single text string.
+	 */
+	private collectToolResultText(pr: { content?: ReadonlyArray<unknown> }): string {
+		let text = "";
+		for (const c of pr.content ?? []) {
+			if (c instanceof vscode.LanguageModelTextPart) {
+				text += c.value;
+			} else if (typeof c === "string") {
+				text += c;
+			} else {
+				try {
+					text += JSON.stringify(c);
+				} catch {
+					/* ignore */
+				}
+			}
+		}
+		return text;
+	}
+
+	/**
+	 * Convert VS Code tools to Ollama tool definitions.
+	 */
+	private convertToOllamaTools(tools: readonly vscode.LanguageModelChatTool[]): OllamaToolDefinition[] {
+		return tools.map((t) => ({
+			type: "function" as const,
+			function: {
+				name: t.name,
+				description: t.description,
+				parameters: t.inputSchema as Record<string, unknown>,
+			},
+		}));
 	}
 
 	/**
@@ -1188,6 +1269,21 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			}
 			// Buffer and emit thinking content
 			this.bufferThinkingContent(message.thinking, progress);
+		}
+
+		// Process tool calls
+		if (message.tool_calls && message.tool_calls.length > 0) {
+			// End thinking if active
+			if (this._currentThinkingId) {
+				this.reportEndThinking(progress);
+			}
+
+			for (const tc of message.tool_calls) {
+				const id = `ollama_tc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+				progress.report(
+					new vscode.LanguageModelToolCallPart(id, tc.function.name, tc.function.arguments)
+				);
+			}
 		}
 
 		// Process regular content
