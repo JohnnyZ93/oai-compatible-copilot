@@ -390,6 +390,8 @@ function collectToolResultText(pr: { content?: ReadonlyArray<unknown> }): string
 			text += c.value;
 		} else if (typeof c === "string") {
 			text += c;
+		} else if (c instanceof vscode.LanguageModelDataPart && c.mimeType === "cache_control") {
+			/* ignore */
 		} else {
 			try {
 				text += JSON.stringify(c);
@@ -448,11 +450,7 @@ export function createRetryConfig(): RetryConfig {
  * @param token Cancellation token
  * @returns Result of the function execution
  */
-export async function executeWithRetry<T>(
-	fn: () => Promise<T>,
-	retryConfig: RetryConfig,
-	token: vscode.CancellationToken
-): Promise<T> {
+export async function executeWithRetry<T>(fn: () => Promise<T>, retryConfig: RetryConfig): Promise<T> {
 	if (!retryConfig.enabled) {
 		return await fn();
 	}
@@ -466,11 +464,6 @@ export async function executeWithRetry<T>(
 	let lastError: Error | undefined;
 
 	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-		// Check for cancellation before each attempt
-		if (token.isCancellationRequested) {
-			throw new Error("Request was cancelled");
-		}
-
 		try {
 			return await fn();
 		} catch (error) {
@@ -488,30 +481,7 @@ export async function executeWithRetry<T>(
 			);
 
 			// Wait for the specified interval before retrying
-			await new Promise<void>((resolve) => {
-				let isResolved = false;
-				const cleanup = () => {
-					if (!isResolved) {
-						cancellationListener.dispose();
-						isResolved = true;
-					}
-				};
-				const timeout = setTimeout(() => {
-					cleanup();
-					resolve();
-				}, intervalMs);
-
-				const cancellationListener = token.onCancellationRequested(() => {
-					clearTimeout(timeout);
-					cleanup();
-					resolve();
-				});
-			});
-
-			// Check if we were cancelled during the wait
-			if (token.isCancellationRequested) {
-				throw new Error("Request was cancelled");
-			}
+			await new Promise<void>((resolve) => setTimeout(resolve, intervalMs));
 		}
 	}
 

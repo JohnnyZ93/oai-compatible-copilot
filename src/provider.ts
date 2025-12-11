@@ -56,17 +56,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	/** Track if we emitted the begin-tool-calls whitespace flush. */
 	private _emittedBeginToolCallsHint = false;
 
-	private _textToolActive:
-		| undefined
-		| {
-				name?: string;
-				index?: number;
-				argBuffer: string;
-				emitted?: boolean;
-		  };
-	private _emittedTextToolCallKeys = new Set<string>();
-	private _emittedTextToolCallIds = new Set<string>();
-
 	// XML think block parsing state
 	private _xmlThinkActive = false;
 	private _xmlThinkDetectionAttempted = false;
@@ -147,9 +136,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		this._completedToolCallIndices.clear();
 		this._hasEmittedAssistantText = false;
 		this._emittedBeginToolCallsHint = false;
-		this._textToolActive = undefined;
-		this._emittedTextToolCallKeys.clear();
-		this._emittedTextToolCallIds.clear();
 		this._xmlThinkActive = false;
 		this._xmlThinkDetectionAttempted = false;
 		// Initialize thinking state for this request
@@ -301,30 +287,31 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				// merge custom headers if specified
 				const requestHeaders = um?.headers ? { ...ollamaHeaders, ...um.headers } : ollamaHeaders;
 
-				console.log("[Ollama Provider] URL:", `${BASE_URL.replace(/\/+$/, "")}/api/chat`, "Model:", parsedModelId.baseId, "Think:", um?.ollamaThink);
+				// console.log(
+				// 	"[Ollama Provider] URL:",
+				// 	`${BASE_URL.replace(/\/+$/, "")}/api/chat`,
+				// 	"Model:",
+				// 	parsedModelId.baseId,
+				// 	"Think:",
+				// 	um?.ollamaThink
+				// );
 
 				// send Ollama chat request with retry
-				const response = await executeWithRetry(
-					async () => {
-						const res = await fetch(`${BASE_URL.replace(/\/+$/, "")}/api/chat`, {
-							method: "POST",
-							headers: requestHeaders,
-							body: JSON.stringify(ollamaRequestBody),
-						});
+				const response = await executeWithRetry(async () => {
+					const res = await fetch(`${BASE_URL.replace(/\/+$/, "")}/api/chat`, {
+						method: "POST",
+						headers: requestHeaders,
+						body: JSON.stringify(ollamaRequestBody),
+					});
 
-						if (!res.ok) {
-							const errorText = await res.text();
-							console.error("[Ollama Provider] Ollama API error response", errorText);
-							throw new Error(
-								`Ollama API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`
-							);
-						}
+					if (!res.ok) {
+						const errorText = await res.text();
+						console.error("[Ollama Provider] Ollama API error response", errorText);
+						throw new Error(`Ollama API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`);
+					}
 
-						return res;
-					},
-					retryConfig,
-					token
-				);
+					return res;
+				}, retryConfig);
 
 				if (!response.body) {
 					throw new Error("No response body from Ollama API");
@@ -354,27 +341,23 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				const requestHeaders = um?.headers ? { ...defaultHeaders, ...um.headers } : defaultHeaders;
 
 				// send chat request with retry
-				const response = await executeWithRetry(
-					async () => {
-						const res = await fetch(`${BASE_URL.replace(/\/+$/, "")}/chat/completions`, {
-							method: "POST",
-							headers: requestHeaders,
-							body: JSON.stringify(requestBody),
-						});
+				const response = await executeWithRetry(async () => {
+					const res = await fetch(`${BASE_URL.replace(/\/+$/, "")}/chat/completions`, {
+						method: "POST",
+						headers: requestHeaders,
+						body: JSON.stringify(requestBody),
+					});
 
-						if (!res.ok) {
-							const errorText = await res.text();
-							console.error("[OAI Compatible Model Provider] OAI Compatible API error response", errorText);
-							throw new Error(
-								`OAI Compatible API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`
-							);
-						}
+					if (!res.ok) {
+						const errorText = await res.text();
+						console.error("[OAI Compatible Model Provider] OAI Compatible API error response", errorText);
+						throw new Error(
+							`OAI Compatible API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`
+						);
+					}
 
-						return res;
-					},
-					retryConfig,
-					token
-				);
+					return res;
+				}, retryConfig);
 
 				if (!response.body) {
 					throw new Error("No response body from OAI Compatible API");
@@ -597,8 +580,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					if (data === "[DONE]") {
 						// Do not throw on [DONE]; any incomplete/empty buffers are ignored.
 						await this.flushToolCallBuffers(progress, /*throwOnInvalid*/ false);
-						// Flush any in-progress text-embedded tool call (silent if incomplete)
-						await this.flushActiveTextToolCall(progress);
 						continue;
 					}
 
@@ -621,8 +602,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			this._completedToolCallIndices.clear();
 			this._hasEmittedAssistantText = false;
 			this._emittedBeginToolCallsHint = false;
-			this._textToolActive = undefined;
-			this._emittedTextToolCallKeys.clear();
 			this._xmlThinkActive = false;
 			this._xmlThinkDetectionAttempted = false;
 
@@ -823,49 +802,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		return { emittedText, emittedAny };
 	}
 
-	private emitTextToolCallIfValid(
-		progress: Progress<LanguageModelResponsePart2>,
-		call: { name?: string; index?: number; argBuffer: string; emitted?: boolean },
-		argText: string
-	): boolean {
-		const name = call.name ?? "unknown_tool";
-		const parsed = tryParseJSONObject(argText);
-		if (!parsed.ok) {
-			return false;
-		}
-		const canonical = JSON.stringify(parsed.value);
-		const key = `${name}:${canonical}`;
-		// identity-based dedupe when index is present
-		if (typeof call.index === "number") {
-			const idKey = `${name}:${call.index}`;
-			if (this._emittedTextToolCallIds.has(idKey)) {
-				return false;
-			}
-			// Mark identity as emitted
-			this._emittedTextToolCallIds.add(idKey);
-		} else if (this._emittedTextToolCallKeys.has(key)) {
-			return false;
-		}
-		this._emittedTextToolCallKeys.add(key);
-		const id = `tct_${Math.random().toString(36).slice(2, 10)}`;
-		progress.report(new vscode.LanguageModelToolCallPart(id, name, parsed.value));
-		return true;
-	}
-
-	private async flushActiveTextToolCall(progress: Progress<LanguageModelResponsePart2>): Promise<void> {
-		if (!this._textToolActive) {
-			return;
-		}
-		const argText = this._textToolActive.argBuffer;
-		const parsed = tryParseJSONObject(argText);
-		if (!parsed.ok) {
-			return;
-		}
-		// Emit (dedupe ensures we don't double-emit)
-		this.emitTextToolCallIfValid(progress, this._textToolActive, argText);
-		this._textToolActive = undefined;
-	}
-
 	/**
 	 * Try to emit a buffered tool call when a valid name and JSON arguments are available.
 	 * @param index The tool call index from the stream.
@@ -885,12 +821,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		}
 		const id = buf.id ?? `call_${Math.random().toString(36).slice(2, 10)}`;
 		const parameters = canParse.value;
-		try {
-			const canonical = JSON.stringify(parameters);
-			this._emittedTextToolCallKeys.add(`${buf.name}:${canonical}`);
-		} catch {
-			/* ignore */
-		}
 		progress.report(new vscode.LanguageModelToolCallPart(id, buf.name, parameters));
 		this._toolCallBuffers.delete(index);
 		this._completedToolCallIndices.add(index);
@@ -923,12 +853,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			}
 			const id = buf.id ?? `call_${Math.random().toString(36).slice(2, 10)}`;
 			const name = buf.name ?? "unknown_tool";
-			try {
-				const canonical = JSON.stringify(parsed.value);
-				this._emittedTextToolCallKeys.add(`${name}:${canonical}`);
-			} catch {
-				/* ignore */
-			}
 			progress.report(new vscode.LanguageModelToolCallPart(id, name, parsed.value));
 			this._toolCallBuffers.delete(idx);
 			this._completedToolCallIndices.add(idx);
@@ -1050,9 +974,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	 * @param messages The VS Code chat messages to convert.
 	 * @returns Ollama-compatible messages array.
 	 */
-	private convertToOllamaMessages(
-		messages: readonly LanguageModelChatRequestMessage[]
-	): OllamaMessage[] {
+	private convertToOllamaMessages(messages: readonly LanguageModelChatRequestMessage[]): OllamaMessage[] {
 		const out: OllamaMessage[] = [];
 
 		for (const m of messages) {
@@ -1280,9 +1202,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 			for (const tc of message.tool_calls) {
 				const id = `ollama_tc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-				progress.report(
-					new vscode.LanguageModelToolCallPart(id, tc.function.name, tc.function.arguments)
-				);
+				progress.report(new vscode.LanguageModelToolCallPart(id, tc.function.name, tc.function.arguments));
 			}
 		}
 
