@@ -1,44 +1,4 @@
 /**
- * OpenAI function-call entry emitted by assistant messages.
- */
-export interface OpenAIToolCall {
-	id: string;
-	type: "function";
-	function: { name: string; arguments: string };
-}
-
-/**
- * OpenAI function tool definition used to advertise tools.
- */
-export interface OpenAIFunctionToolDef {
-	type: "function";
-	function: { name: string; description?: string; parameters?: object };
-}
-
-/**
- * OpenAI-style chat message used for router requests.
- */
-export interface OpenAIChatMessage {
-	role: OpenAIChatRole;
-	content?: string | ChatMessageContent[];
-	name?: string;
-	tool_calls?: OpenAIToolCall[];
-	tool_call_id?: string;
-	reasoning_content?: string;
-}
-
-/**
- * 聊天消息内容接口（支持多模态）
- */
-export interface ChatMessageContent {
-	type: "text" | "image_url";
-	text?: string;
-	image_url?: {
-		url: string;
-	};
-}
-
-/**
  * A single underlying provider (e.g., together, groq) for a model.
  */
 export interface HFProvider {
@@ -120,12 +80,6 @@ export interface HFModelItem {
 	 * Default is "openai".
 	 */
 	apiMode?: "openai" | "ollama";
-
-	/**
-	 * Ollama thinking mode: true, false, or effort level like "high", "medium", "low".
-	 * Only used when apiMode is "ollama".
-	 */
-	ollamaThink?: boolean | string;
 }
 
 /**
@@ -156,42 +110,6 @@ export interface HFModelsResponse {
 }
 
 /**
- * Buffer used to accumulate streamed tool call parts until arguments are valid JSON.
- */
-export interface ToolCallBuffer {
-	id?: string;
-	name?: string;
-	args: string;
-}
-
-/** OpenAI-style chat roles. */
-export type OpenAIChatRole = "system" | "user" | "assistant" | "tool";
-
-export interface ReasoningDetailCommon {
-	id: string | null;
-	format: string; // e.g., "anthropic-claude-v1", "openai-responses-v1"
-	index?: number;
-}
-
-export interface ReasoningSummaryDetail extends ReasoningDetailCommon {
-	type: "reasoning.summary";
-	summary: string;
-}
-
-export interface ReasoningEncryptedDetail extends ReasoningDetailCommon {
-	type: "reasoning.encrypted";
-	data: string; // Base64 encoded
-}
-
-export interface ReasoningTextDetail extends ReasoningDetailCommon {
-	type: "reasoning.text";
-	text: string;
-	signature?: string | null;
-}
-
-export type ReasoningDetail = ReasoningSummaryDetail | ReasoningEncryptedDetail | ReasoningTextDetail;
-
-/**
  * Thinking configuration for Zai provider
  */
 export interface ThinkingConfig {
@@ -206,85 +124,4 @@ export interface RetryConfig {
 	max_attempts?: number;
 	interval_ms?: number;
 	status_codes?: number[];
-}
-
-/**
- * Ollama native API message format
- * @see https://docs.ollama.com/api#generate-a-chat-message
- */
-export interface OllamaMessage {
-	role: "system" | "user" | "assistant" | "tool";
-	content: string;
-	images?: string[];
-	thinking?: string;
-	tool_calls?: OllamaToolCall[];
-	tool_name?: string; // For tool role messages
-}
-
-/**
- * Ollama native API request body
- * @see https://docs.ollama.com/api#generate-a-chat-message
- */
-export interface OllamaRequestBody {
-	model: string;
-	messages: OllamaMessage[];
-	stream?: boolean;
-	think?: boolean | string;
-	options?: OllamaModelOptions;
-	tools?: OllamaToolDefinition[];
-}
-
-/**
- * Ollama model options for controlling text generation
- * @see https://docs.ollama.com/api#generate-a-chat-message
- */
-export interface OllamaModelOptions {
-	seed?: number;
-	temperature?: number;
-	top_k?: number;
-	top_p?: number;
-	min_p?: number;
-	stop?: string | string[];
-	num_ctx?: number;
-	num_predict?: number;
-}
-
-/**
- * Ollama tool call format
- * @see https://docs.ollama.com/api#tool-calling
- */
-export interface OllamaToolCall {
-	function: {
-		name: string;
-		arguments: Record<string, unknown>;
-	};
-}
-
-/**
- * Ollama tool definition format
- * @see https://docs.ollama.com/api#tool-calling
- */
-export interface OllamaToolDefinition {
-	type: "function";
-	function: {
-		name: string;
-		description?: string;
-		parameters?: Record<string, unknown>;
-	};
-}
-
-/**
- * Ollama native API streaming response chunk
- */
-export interface OllamaStreamChunk {
-	model: string;
-	created_at: string;
-	message: {
-		role: string;
-		content: string;
-		thinking?: string;
-		tool_calls?: OllamaToolCall[];
-	};
-	done: boolean;
-	done_reason?: string;
 }

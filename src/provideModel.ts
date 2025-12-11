@@ -115,8 +115,7 @@ export async function prepareLanguageModelChatInformation(
 		});
 	}
 
-	// debug log
-	// console.log("[OAI Compatible Model Provider] Loaded models:", infos);
+	// console.debug("[OAI Compatible Model Provider] Loaded models:", infos);
 	return infos;
 }
 

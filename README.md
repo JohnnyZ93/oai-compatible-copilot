@@ -198,7 +198,6 @@ All parameters support individual configuration for different models, providing 
 - `extra`: Extra request parameters that will be used in /chat/completions.
 - `include_reasoning_in_request`: Whether to include reasoning_content in assistant messages sent to the API. Support deepseek-v3.2 or others.
 - `apiMode`: API mode. Set to `"ollama"` for Ollama native API (`/api/chat`), or `"openai"` (default) for OpenAI-compatible API (`/v1/chat/completions`).
-- `ollamaThink`: Ollama thinking mode. Can be `true`, `false`, `"high"`, `"medium"`, or `"low"`. Only used when `apiMode` is `"ollama"`.
 ---
 
 ## Thanks to

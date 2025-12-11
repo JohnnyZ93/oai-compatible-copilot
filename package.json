@@ -269,22 +269,6 @@
 								],
 								"default": "openai",
 								"description": "API mode: 'openai' for OpenAI-compatible API (/v1/chat/completions), 'ollama' for Ollama native API (/api/chat). Default is 'openai'."
-							},
-							"ollamaThink": {
-								"oneOf": [
-									{
-										"type": "boolean"
-									},
-									{
-										"type": "string",
-										"enum": [
-											"high",
-											"medium",
-											"low"
-										]
-									}
-								],
-								"description": "Ollama thinking mode. Set to true/false or effort level ('high', 'medium', 'low'). Only used when apiMode is 'ollama'."
 							}
 						},
 						"required": [
