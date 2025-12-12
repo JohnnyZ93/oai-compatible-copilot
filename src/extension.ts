@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { HuggingFaceChatModelProvider } from "./provider";
 import type { HFModelItem } from "./types";
 import { initStatusBar } from "./statusBar";
+import { ConfigViewProvider } from "./configView";
 
 export function activate(context: vscode.ExtensionContext) {
 	// Build a descriptive User-Agent to help quantify API usage
@@ -13,8 +14,10 @@ export function activate(context: vscode.ExtensionContext) {
 
 	const tokenCountStatusBarItem: vscode.StatusBarItem = initStatusBar(context);
 	const provider = new HuggingFaceChatModelProvider(context.secrets, ua, tokenCountStatusBarItem);
+	const configViewProvider = new ConfigViewProvider(context, ua);
 	// Register the Hugging Face provider under the vendor id used in package.json
 	vscode.lm.registerLanguageModelChatProvider("oaicopilot", provider);
+	context.subscriptions.push(configViewProvider.register());
 
 	// Management command to configure API key
 	context.subscriptions.push(
@@ -94,6 +97,12 @@ export function activate(context: vscode.ExtensionContext) {
 
 			await context.secrets.store(providerKey, apiKey.trim());
 			vscode.window.showInformationMessage(`API key for ${selectedProvider} saved.`);
+		})
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand("oaicopilot.openConfig", async () => {
+			await vscode.commands.executeCommand("workbench.view.extension.oaicopilot");
 		})
 	);
 }
