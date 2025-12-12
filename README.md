@@ -197,6 +197,7 @@ All parameters support individual configuration for different models, providing 
 - `headers`: Custom HTTP headers to be sent with every request to this model's provider (e.g., `{"X-API-Version": "v1", "X-Custom-Header": "value"}`). These headers will be merged with the default headers (Authorization, Content-Type, User-Agent)
 - `extra`: Extra request parameters that will be used in /chat/completions.
 - `include_reasoning_in_request`: Whether to include reasoning_content in assistant messages sent to the API. Support deepseek-v3.2 or others.
+- `apiMode`: API mode. Set to `"ollama"` for Ollama native API (`/api/chat`), or `"openai"` (default) for OpenAI-compatible API (`/v1/chat/completions`).
 ---
 
 ## Thanks to

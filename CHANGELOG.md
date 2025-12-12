@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.1.7 (2025-12-10)
+
+- Feat: [Expand oaicopilot.retry to handle other type of errors](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/62)
+- Fix: [Add buffer for think content](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/61)
+- Add `oaicopilot.retry` configuration including:
+  > Retry configuration for handling api errors like [429, 500, 502, 503, 504].
+  - `status_codes`: Additional HTTP status codes that will be merged. Default is [429, 500, 502, 503, 504].
+
 ## 0.1.6 (2025-12-08)
 
 - Feat: [Сontext window state in statusBar](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/59)

@@ -5,23 +5,23 @@
 	"description": "An extension that integrates Openai Compatible Inference Providers into GitHub Copilot Chat",
 	"icon": "assets/logo.png",
 	"keywords": [
-        "ai",
-        "chat",
-        "copilot",
-        "github-copilot",
-        "language-model"
-    ],
+		"ai",
+		"chat",
+		"copilot",
+		"github-copilot",
+		"language-model"
+	],
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/JohnnyZ93/oai-compatible-copilot"
 	},
-	"version": "0.1.6",
+	"version": "0.1.7",
 	"engines": {
 		"vscode": "^1.104.0"
 	},
 	"extensionDependencies": [
-        "github.copilot-chat"
-    ],
+		"github.copilot-chat"
+	],
 	"categories": [
 		"AI",
 		"Chat"
@@ -38,10 +38,9 @@
 	},
 	"license": "MIT",
 	"enabledApiProposals": [
-        "chatProvider",
-		"languageModelDataPart",
+		"chatProvider",
 		"languageModelThinkingPart"
-    ],
+	],
 	"contributes": {
 		"languageModelChatProviders": [
 			{
@@ -283,6 +282,15 @@
 								"type": "boolean",
 								"default": false,
 								"description": "Whether to include reasoning_content in assistant messages sent to the API. Support deepseek-v3.2 or others."
+							},
+							"apiMode": {
+								"type": "string",
+								"enum": [
+									"openai",
+									"ollama"
+								],
+								"default": "openai",
+								"description": "API mode: 'openai' for OpenAI-compatible API (/v1/chat/completions), 'ollama' for Ollama native API (/api/chat). Default is 'openai'."
 							}
 						},
 						"required": [
@@ -316,6 +324,13 @@
 							"default": 1000,
 							"minimum": 1,
 							"description": "Interval between retry attempts in milliseconds. Default is 1000 (1 seconds)."
+						},
+						"status_codes": {
+							"type": "array",
+							"items": {
+								"type": "number"
+							},
+							"description": "Additional HTTP status codes that will be merged. Default is [429, 500, 502, 503, 504]."
 						}
 					},
 					"description": "Retry configuration for handling api errors like [429, 500, 502, 503, 504]."
