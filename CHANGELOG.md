@@ -1,5 +1,12 @@
 # Change Log
 
+## 0.1.8 (2025-12-17)
+
+- Feat: [Add Ollama /api/chat](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/65)
+- Feat: [Add Anthropic /v1/messages](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/60)
+- Enhanced `oaicopilot.models` configuration including:
+  - `apiMode`: API mode: 'openai' (Default) for API (/v1/chat/completions), 'ollama' for API (/api/chat), 'anthropic' for API (/v1/messages).
+
 ## 0.1.7 (2025-12-10)
 
 - Feat: [Expand oaicopilot.retry to handle other type of errors](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/62)

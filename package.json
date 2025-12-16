@@ -2,20 +2,24 @@
 	"name": "oai-compatible-copilot",
 	"publisher": "johnny-zhao",
 	"displayName": "OAI Compatible Provider for Copilot",
-	"description": "An extension that integrates Openai Compatible Inference Providers into GitHub Copilot Chat",
+	"description": "An extension that integrates OpenAI/Ollama/Anthropic API Providers into GitHub Copilot Chat",
 	"icon": "assets/logo.png",
 	"keywords": [
 		"ai",
 		"chat",
 		"copilot",
 		"github-copilot",
-		"language-model"
+		"language-model",
+		"openai",
+		"ollama",
+		"anthropic",
+		"claude"
 	],
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/JohnnyZ93/oai-compatible-copilot"
 	},
-	"version": "0.1.7",
+	"version": "0.1.8",
 	"engines": {
 		"vscode": "^1.104.0"
 	},
@@ -247,7 +251,7 @@
 							},
 							"extra": {
 								"type": "object",
-								"description": "Extra request parameters that will be used in /chat/completions."
+								"description": "Extra request body parameters."
 							},
 							"headers": {
 								"type": "object",
@@ -269,7 +273,7 @@
 									"anthropic"
 								],
 								"default": "openai",
-								"description": "API mode: 'openai' for API (/v1/chat/completions), 'ollama' for API (/api/chat), 'anthropic' for API (/v1/messages). Default is 'openai'."
+								"description": "API mode: 'openai' (Default) for API (/v1/chat/completions), 'ollama' for API (/api/chat), 'anthropic' for API (/v1/messages)."
 							}
 						},
 						"required": [

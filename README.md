@@ -49,7 +49,58 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.2, GLM 4.6 and mor
 ```
 ---
 
-## (Optional) Multi-Provider Guide
+## * Multi Api Mode
+
+The extension supports three different API protocols to work with various model providers. You can specify which API mode to use for each model via the `apiMode` parameter.
+
+### Supported API Modes
+
+1. **`openai`** (default) - OpenAI-compatible API
+   - Endpoint: `/chat/completions`
+   - Header: `Authorization: Bearer <apiKey>`
+   - Use for: Most OpenAI-compatible providers (ModelScope, SiliconFlow, etc.)
+
+2. **`ollama`** - Ollama native API
+   - Endpoint: `/api/chat`
+   - Header: `Authorization: Bearer <apiKey>` (or no header for local Ollama)
+   - Use for: Local Ollama instances
+
+3. **`anthropic`** - Anthropic Claude API
+   - Endpoint: `/v1/messages`
+   - Header: `x-api-key: <apiKey>`
+   - Use for: Anthropic Claude models
+
+### Configuration Examples
+Mixed configuration with multiple API modes:
+
+```json
+"oaicopilot.models": [
+    {
+        "id": "GLM-4.6",
+        "owned_by": "modelscope",
+    },
+    {
+        "id": "llama3.2",
+        "owned_by": "ollama",
+        "baseUrl": "http://localhost:11434",
+        "apiMode": "ollama"
+    },
+    {
+        "id": "claude-3-5-sonnet-20241022",
+        "owned_by": "anthropic",
+        "baseUrl": "https://api.anthropic.com",
+        "apiMode": "anthropic"
+    }
+]
+```
+
+### Important Notes
+- The `apiMode` parameter defaults to `"openai"` if not specified.
+- When using `ollama` mode, you can omit the API key (`ollama` by default) or set it to any string.
+- Each API mode uses different message conversion logic internally to match provider-specific formats (tools, images, thinking).
+---
+
+## * Multi-Provider Guide
 
 > `owned_by` in model config is used for group apiKey. The storage key is `oaicopilot.apiKey.${owned_by}`.
 
@@ -87,7 +138,7 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.2, GLM 4.6 and mor
 
 ---
 
-## (Optional) Multi-config for the same model
+## * Multi-config for the same model
 
 You can define multiple configurations for the same model ID by using the `configId` field. This allows you to have the same base model with different settings for different use cases.
 
@@ -130,7 +181,7 @@ In this example, you'll have three different configurations of the glm-4.6 model
 
 ---
 
-## Custom Headers
+## * Custom Headers
 
 You can specify custom HTTP headers that will be sent with every request to a specific model's provider. This is useful for:
 
@@ -161,6 +212,65 @@ You can specify custom HTTP headers that will be sent with every request to a sp
 - If a custom header conflicts with a default header, the custom header takes precedence
 - Headers are applied on a per-model basis, allowing different headers for different providers
 - Header values must be strings
+---
+
+## * Custom Request body parameters
+
+The `extra` field allows you to add arbitrary parameters to the API request body. This is useful for provider-specific features that aren't covered by the standard parameters.
+
+### How it works
+- Parameters in `extra` are merged directly into the request body
+- Works with all API modes (`openai`, `ollama`, `anthropic`)
+- Values can be any valid JSON type (string, number, boolean, object, array)
+
+### Common use cases
+- **OpenAI-specific parameters**: `seed`, `logprobs`, `top_logprobs`, `suffix`, `presence_penalty` (if not using standard parameter)
+- **Provider-specific features**: Custom sampling methods, debugging flags
+- **Experimental parameters**: Beta features from API providers
+
+### Configuration Example
+
+```json
+"oaicopilot.models": [
+    {
+        "id": "custom-model",
+        "owned_by": "openai",
+        "extra": {
+            "seed": 42,
+            "logprobs": true,
+            "top_logprobs": 5,
+            "suffix": "###",
+            "presence_penalty": 0.1
+        }
+    },
+    {
+        "id": "local-model",
+        "owned_by": "ollama",
+        "baseUrl": "http://localhost:11434",
+        "apiMode": "ollama",
+        "extra": {
+            "keep_alive": "5m",
+            "raw": true
+        }
+    },
+    {
+        "id": "claude-model",
+        "owned_by": "anthropic",
+        "baseUrl": "https://api.anthropic.com",
+        "apiMode": "anthropic",
+        "extra": {
+            "service_tier": "standard_only"
+        }
+    }
+]
+```
+
+### Important Notes
+- Parameters in `extra` are added after standard parameters
+- If an `extra` parameter conflicts with a standard parameter, the `extra` value takes precedence
+- Use this for provider-specific features only
+- Standard parameters (temperature, top_p, etc.) should use their dedicated fields when possible
+- API provider must support the parameters you specify
 
 ---
 
@@ -195,9 +305,9 @@ All parameters support individual configuration for different models, providing 
   - `type`: Set to 'enabled' to enable thinking, 'disabled' to disable thinking
 - `reasoning_effort`: Reasoning effort level (OpenAI reasoning configuration)
 - `headers`: Custom HTTP headers to be sent with every request to this model's provider (e.g., `{"X-API-Version": "v1", "X-Custom-Header": "value"}`). These headers will be merged with the default headers (Authorization, Content-Type, User-Agent)
-- `extra`: Extra request parameters that will be used in /chat/completions.
+- `extra`: Extra request body parameters.
 - `include_reasoning_in_request`: Whether to include reasoning_content in assistant messages sent to the API. Support deepseek-v3.2 or others.
-- `apiMode`: API mode. Set to `"ollama"` for Ollama native API (`/api/chat`), or `"openai"` (default) for OpenAI-compatible API (`/v1/chat/completions`).
+- `apiMode`: API mode: 'openai' (Default) for API (/v1/chat/completions), 'ollama' for API (/api/chat), 'anthropic' for API (/v1/messages).
 ---
 
 ## Thanks to
