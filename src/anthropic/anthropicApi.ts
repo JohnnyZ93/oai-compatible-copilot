@@ -159,9 +159,12 @@ export class AnthropicApi extends CommonApi {
 			rb.system = this._systemContent;
 		}
 
-		// Add temperature if configured
-		if (um?.temperature !== undefined && um.temperature !== null) {
-			rb.temperature = um.temperature;
+		// Add temperature
+		const oTemperature = options.modelOptions?.temperature ?? 0;
+		const temperature = um?.temperature ?? oTemperature;
+		rb.temperature = temperature;
+		if (um && um.temperature === null) {
+			delete rb.temperature;
 		}
 
 		// Add top_p if configured

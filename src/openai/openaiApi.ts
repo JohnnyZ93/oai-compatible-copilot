@@ -149,18 +149,13 @@ export class OpenaiApi extends CommonApi {
 		const oTemperature = options.modelOptions?.temperature ?? 0;
 		const temperature = um?.temperature ?? oTemperature;
 		rb.temperature = temperature;
-
-		// top_p
-		const oTopP = options.modelOptions?.top_p ?? 1;
-		const topP = um?.top_p ?? oTopP;
-		rb.top_p = topP;
-
-		// If user model config explicitly sets sampling params to null, remove them so provider defaults apply
 		if (um && um.temperature === null) {
 			delete rb.temperature;
 		}
-		if (um && um.top_p === null) {
-			delete rb.top_p;
+
+		// top_p
+		if (um?.top_p !== undefined && um.top_p !== null) {
+			rb.top_p = um.top_p;
 		}
 
 		// max_tokens

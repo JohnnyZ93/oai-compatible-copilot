@@ -288,7 +288,7 @@ All parameters support individual configuration for different models, providing 
 - `max_completion_tokens`: Maximum number of tokens to generate (OpenAI new standard parameter)
 - `vision`: Whether the model supports vision capabilities. Defaults to false
 - `temperature`: Sampling temperature (range: [0, 2]). Lower values make the output more deterministic, higher values more creative. Default value is 0
-- `top_p`: Top-p sampling value (range: (0, 1]). Default value is 1
+- `top_p`: Top-p sampling value (range: (0, 1]). Optional parameter
 - `top_k`: Top-k sampling value (range: [1, ∞)). Optional parameter
 - `min_p`: Minimum probability threshold (range: [0, 1]). Optional parameter
 - `frequency_penalty`: Frequency penalty (range: [-2, 2]). Optional parameter
