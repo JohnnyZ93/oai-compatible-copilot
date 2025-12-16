@@ -92,7 +92,10 @@ export interface AnthropicStreamChunk {
 		| "content_block_delta"
 		| "content_block_stop"
 		| "message_delta"
-		| "message_stop";
+		| "message_stop"
+		| "ping"
+		| "error";
+	index?: number;
 	message?: {
 		id: string;
 		type: "message";
@@ -106,20 +109,23 @@ export interface AnthropicStreamChunk {
 		type: "text" | "thinking" | "tool_use";
 		text?: string;
 		thinking?: string;
-		tool_use?: {
-			id: string;
-			name: string;
-			input: Record<string, unknown>;
-		};
+		id?: string;
+		name?: string;
+		input?: Record<string, unknown>;
 	};
 	delta?: {
-		type: "text_delta" | "thinking_delta" | "input_json_delta";
+		type: "text_delta" | "thinking_delta" | "input_json_delta" | "signature_delta";
 		text?: string;
 		thinking?: string;
 		partial_json?: string;
+		signature?: string;
 	};
 	usage?: {
 		input_tokens: number;
 		output_tokens: number;
+	};
+	error?: {
+		type: string;
+		message: string;
 	};
 }

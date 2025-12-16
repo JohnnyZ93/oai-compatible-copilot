@@ -247,13 +247,15 @@ export class AnthropicApi extends CommonApi {
 
 					const data = line.slice(6);
 					if (data === "[DONE]") {
-						// Flush any remaining thinking content
-						this.reportEndThinking(progress);
-						return;
+						// Do not throw on [DONE]; any incomplete/empty buffers are ignored.
+						await this.flushToolCallBuffers(progress, /*throwOnInvalid*/ false);
+						continue;
 					}
 
 					try {
 						const chunk: AnthropicStreamChunk = JSON.parse(data);
+						// console.debug("[OAI Compatible Model Provider] data:", JSON.stringify(chunk));
+
 						await this.processAnthropicChunk(chunk, progress);
 					} catch (e) {
 						console.error("[Anthropic Provider] Failed to parse SSE chunk:", e, "data:", data);
@@ -262,6 +264,8 @@ export class AnthropicApi extends CommonApi {
 			}
 		} finally {
 			reader.releaseLock();
+			// If there's an active thinking sequence, end it first
+			this.reportEndThinking(progress);
 		}
 	}
 
@@ -274,6 +278,32 @@ export class AnthropicApi extends CommonApi {
 		chunk: AnthropicStreamChunk,
 		progress: Progress<LanguageModelResponsePart2>
 	): Promise<void> {
+		// Handle ping events (ignore)
+		if (chunk.type === "ping") {
+			return;
+		}
+
+		// Handle error events
+		if (chunk.type === "error") {
+			const errorType = chunk.error?.type || "unknown_error";
+			const errorMessage = chunk.error?.message || "Anthropic API streaming error";
+			console.error(`[Anthropic Provider] Streaming error: ${errorType} - ${errorMessage}`);
+			// We could throw here, but for now just log and continue
+			return;
+		}
+
+		if (chunk.type === "message_start" && chunk.message) {
+			// Extract message metadata (id, model, etc.)
+			// Could store for later use, but not required for basic streaming
+			return;
+		}
+
+		if (chunk.type === "message_delta" && chunk.delta) {
+			// Extract stop_reason and usage information
+			// We're not processing usage per user request, but could log if needed
+			return;
+		}
+
 		if (chunk.type === "content_block_start" && chunk.content_block) {
 			// Start of a content block
 			if (chunk.content_block.type === "thinking") {
@@ -281,47 +311,51 @@ export class AnthropicApi extends CommonApi {
 				if (chunk.content_block.thinking) {
 					this.bufferThinkingContent(chunk.content_block.thinking, progress);
 				}
-			} else if (chunk.content_block.type === "tool_use" && chunk.content_block.tool_use) {
+			} else if (chunk.content_block.type === "tool_use") {
 				// Start tool call block
-				const toolUse = chunk.content_block.tool_use;
-				this._toolCallBuffers.set(this._toolCallBuffers.size, {
-					id: toolUse.id,
-					name: toolUse.name,
-					args: JSON.stringify(toolUse.input),
+				// SSEProcessor-like: if first tool call appears after text, emit a whitespace
+				// to ensure any UI buffers/linkifiers are flushed without adding visible noise.
+				if (!this._emittedBeginToolCallsHint && this._hasEmittedAssistantText) {
+					progress.report(new vscode.LanguageModelTextPart(" "));
+					this._emittedBeginToolCallsHint = true;
+				}
+				const idx = (chunk.index as number) ?? 0;
+				this._toolCallBuffers.set(idx, {
+					id: chunk.content_block.id,
+					name: chunk.content_block.name,
+					args: "",
 				});
+			} else if (chunk.content_block.type === "text") {
+				// Text block start - nothing special to do
+				// The text content will come via content_block_delta events
 			}
 		} else if (chunk.type === "content_block_delta" && chunk.delta) {
 			if (chunk.delta.type === "text_delta" && chunk.delta.text) {
 				// Emit text content
 				progress.report(new vscode.LanguageModelTextPart(chunk.delta.text));
+				this._hasEmittedAssistantText = true;
 			} else if (chunk.delta.type === "thinking_delta" && chunk.delta.thinking) {
 				// Buffer thinking content
 				this.bufferThinkingContent(chunk.delta.thinking, progress);
 			} else if (chunk.delta.type === "input_json_delta" && chunk.delta.partial_json) {
 				// Handle tool call argument streaming
 				// Find the latest tool call buffer and append partial JSON
-				const lastIndex = this._toolCallBuffers.size - 1;
-				const buf = this._toolCallBuffers.get(lastIndex);
+				const idx = (chunk.index as number) ?? 0;
+				const buf = this._toolCallBuffers.get(idx);
 				if (buf) {
 					buf.args += chunk.delta.partial_json;
-					this._toolCallBuffers.set(lastIndex, buf);
+					this._toolCallBuffers.set(idx, buf);
 					// Try to emit if we have valid JSON
-					await this.tryEmitBufferedToolCall(lastIndex, progress);
+					await this.tryEmitBufferedToolCall(idx, progress);
 				}
+			} else if (chunk.delta.type === "signature_delta" && chunk.delta.signature) {
+				// Signature for thinking block - ignore for now
+				// Could store for verification if needed later
 			}
-		} else if (chunk.type === "content_block_stop") {
-			// End of a content block - flush thinking if active
-			if (this._currentThinkingId) {
-				this.flushThinkingBuffer(progress);
-			}
-			// Try to emit any pending tool calls
-			for (const [idx] of Array.from(this._toolCallBuffers.entries())) {
-				await this.tryEmitBufferedToolCall(idx, progress);
-			}
-		} else if (chunk.type === "message_stop") {
+		} else if (chunk.type === "content_block_stop" || chunk.type === "message_stop") {
 			// End of message - ensure thinking is ended and flush all tool calls
-			this.reportEndThinking(progress);
 			await this.flushToolCallBuffers(progress, false);
+			this.reportEndThinking(progress);
 		}
 	}
 }
