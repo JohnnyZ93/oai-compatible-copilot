@@ -170,6 +170,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			// Check if using Ollama native API mode
 			const apiMode = um?.apiMode ?? "openai";
 
+			// prepare headers with custom headers if specified
+			const requestHeaders = this.prepareHeaders(modelApiKey, apiMode, um?.headers);
+
 			// console.debug("[OAI Compatible Model Provider] messages:", JSON.stringify(messages));
 			if (apiMode === "ollama") {
 				// Ollama native API mode
@@ -183,20 +186,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				};
 				ollamaRequestBody = ollamaApi.prepareRequestBody(ollamaRequestBody, um, options);
 				// console.debug("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(ollamaRequestBody));
-
-				// prepare headers for Ollama
-				const ollamaHeaders: Record<string, string> = {
-					"Content-Type": "application/json",
-					"User-Agent": this.userAgent,
-				};
-
-				// Add Authorization header if API key is provided (for remote Ollama servers)
-				if (modelApiKey && modelApiKey !== "ollama") {
-					ollamaHeaders["Authorization"] = `Bearer ${modelApiKey}`;
-				}
-
-				// merge custom headers if specified
-				const requestHeaders = um?.headers ? { ...ollamaHeaders, ...um.headers } : ollamaHeaders;
 
 				// send Ollama chat request with retry
 				const response = await executeWithRetry(async () => {
@@ -232,16 +221,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				};
 				requestBody = anthropicApi.prepareRequestBody(requestBody, um, options);
 				// console.debug("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(requestBody));
-
-				// prepare headers for Anthropic (x-api-key instead of Authorization)
-				const anthropicHeaders: Record<string, string> = {
-					"Content-Type": "application/json",
-					"User-Agent": this.userAgent,
-					"x-api-key": modelApiKey,
-				};
-
-				// merge custom headers if specified
-				const requestHeaders = um?.headers ? { ...anthropicHeaders, ...um.headers } : anthropicHeaders;
 
 				// send Anthropic chat request with retry
 				const response = await executeWithRetry(async () => {
@@ -281,16 +260,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				requestBody = openaiApi.prepareRequestBody(requestBody, um, options);
 				// console.debug("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(requestBody));
 
-				// prepare headers with custom headers if specified
-				const defaultHeaders: Record<string, string> = {
-					Authorization: `Bearer ${modelApiKey}`,
-					"Content-Type": "application/json",
-					"User-Agent": this.userAgent,
-				};
-
-				// merge custom headers if specified in model config
-				const requestHeaders = um?.headers ? { ...defaultHeaders, ...um.headers } : defaultHeaders;
-
 				// send chat request with retry
 				const response = await executeWithRetry(async () => {
 					const res = await fetch(`${BASE_URL.replace(/\/+$/, "")}/chat/completions`, {
@@ -326,6 +295,40 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			// Update last request time after successful completion
 			this._lastRequestTime = Date.now();
 		}
+	}
+
+	/**
+	 * Prepare headers for API request.
+	 * @param apiKey The API key to use.
+	 * @param apiMode The apiMode (affects header format).
+	 * @param customHeaders Optional custom headers from model config.
+	 * @returns Headers object.
+	 */
+	private prepareHeaders(
+		apiKey: string,
+		apiMode: string,
+		customHeaders?: Record<string, string>
+	): Record<string, string> {
+		const headers: Record<string, string> = {
+			"Content-Type": "application/json",
+			"User-Agent": this.userAgent,
+		};
+
+		// Provider-specific header formats
+		if (apiMode === "anthropic") {
+			headers["x-api-key"] = apiKey;
+		} else if (apiMode === "ollama" && apiKey !== "ollama") {
+			headers["Authorization"] = `Bearer ${apiKey}`;
+		} else {
+			headers["Authorization"] = `Bearer ${apiKey}`;
+		}
+
+		// Merge custom headers
+		if (customHeaders) {
+			return { ...headers, ...customHeaders };
+		}
+
+		return headers;
 	}
 
 	/**
