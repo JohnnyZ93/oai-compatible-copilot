@@ -11,7 +11,7 @@ import type { HFModelItem } from "../types";
 
 import type { OllamaMessage, OllamaRequestBody, OllamaStreamChunk, OllamaToolCall } from "./ollamaTypes";
 
-import { isToolResultPart, collectToolResultText, convertToolsToOpenAI } from "../utils";
+import { isToolResultPart, collectToolResultText, convertToolsToOpenAI, mapRole } from "../utils";
 
 import { CommonApi } from "../commonApi";
 
@@ -27,12 +27,12 @@ export class OllamaApi extends CommonApi {
 	 */
 	convertMessages(
 		messages: readonly LanguageModelChatRequestMessage[],
-		modelConfig: { includeReasoningInRequest: boolean }
+		_modelConfig: { includeReasoningInRequest: boolean }
 	): OllamaMessage[] {
 		const out: OllamaMessage[] = [];
 
 		for (const m of messages) {
-			const role = this.mapToOllamaRole(m);
+			const role = mapRole(m);
 			const textParts: string[] = [];
 			const imageParts: string[] = [];
 			let thinkingContent = "";
@@ -105,23 +105,6 @@ export class OllamaApi extends CommonApi {
 		return out;
 	}
 
-	/**
-	 * Map VS Code message role to Ollama message role.
-	 * @param message The message whose role is mapped.
-	 */
-	private mapToOllamaRole(message: LanguageModelChatRequestMessage): "system" | "user" | "assistant" {
-		const USER = vscode.LanguageModelChatMessageRole.User as unknown as number;
-		const ASSISTANT = vscode.LanguageModelChatMessageRole.Assistant as unknown as number;
-		const r = message.role as unknown as number;
-		if (r === USER) {
-			return "user";
-		}
-		if (r === ASSISTANT) {
-			return "assistant";
-		}
-		return "system";
-	}
-
 	prepareRequestBody(
 		rb: OllamaRequestBody,
 		um: HFModelItem | undefined,
@@ -160,7 +143,7 @@ export class OllamaApi extends CommonApi {
 			// Add all extra parameters directly to the request body
 			for (const [key, value] of Object.entries(um.extra)) {
 				if (value !== undefined) {
-					(rb as Record<string, any>)[key] = value;
+					(rb as unknown as Record<string, unknown>)[key] = value;
 				}
 			}
 		}
@@ -184,7 +167,11 @@ export class OllamaApi extends CommonApi {
 		let buffer = "";
 
 		try {
-			while (!token.isCancellationRequested) {
+			while (true) {
+				if (token.isCancellationRequested) {
+					break;
+				}
+
 				const { done, value } = await reader.read();
 				if (done) {
 					break;

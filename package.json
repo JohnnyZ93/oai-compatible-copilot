@@ -265,10 +265,11 @@
 								"type": "string",
 								"enum": [
 									"openai",
-									"ollama"
+									"ollama",
+									"anthropic"
 								],
 								"default": "openai",
-								"description": "API mode: 'openai' for OpenAI-compatible API (/v1/chat/completions), 'ollama' for Ollama native API (/api/chat). Default is 'openai'."
+								"description": "API mode: 'openai' for API (/v1/chat/completions), 'ollama' for API (/api/chat), 'anthropic' for API (/v1/messages). Default is 'openai'."
 							}
 						},
 						"required": [

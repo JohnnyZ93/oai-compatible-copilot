@@ -79,7 +79,7 @@ export interface HFModelItem {
 	 * API mode: "openai" for OpenAI-compatible API, "ollama" for Ollama native API.
 	 * Default is "openai".
 	 */
-	apiMode?: "openai" | "ollama";
+	apiMode?: "openai" | "ollama" | "anthropic";
 }
 
 /**

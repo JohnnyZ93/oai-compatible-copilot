@@ -20,6 +20,8 @@ import { prepareTokenCount } from "./provideToken";
 import { updateContextStatusBar } from "./statusBar";
 import { OllamaApi } from "./ollama/ollamaApi";
 import { OpenaiApi } from "./openai/openaiApi";
+import { AnthropicApi } from "./anthropic/anthropicApi";
+import { AnthropicRequestBody } from "./anthropic/anthropicTypes";
 
 /**
  * VS Code Chat provider backed by Hugging Face Inference Providers.
@@ -217,6 +219,53 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					throw new Error("No response body from Ollama API");
 				}
 				await ollamaApi.processStreamingResponse(response.body, trackingProgress, token);
+			} else if (apiMode === "anthropic") {
+				// Anthropic API mode
+				const anthropicApi = new AnthropicApi();
+				const anthropicMessages = anthropicApi.convertMessages(messages, modelConfig);
+
+				// requestBody
+				let requestBody: AnthropicRequestBody = {
+					model: parsedModelId.baseId,
+					messages: anthropicMessages,
+					stream: true,
+				};
+				requestBody = anthropicApi.prepareRequestBody(requestBody, um, options);
+				// console.debug("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(requestBody));
+
+				// prepare headers for Anthropic (x-api-key instead of Authorization)
+				const anthropicHeaders: Record<string, string> = {
+					"Content-Type": "application/json",
+					"User-Agent": this.userAgent,
+					"x-api-key": modelApiKey,
+				};
+
+				// merge custom headers if specified
+				const requestHeaders = um?.headers ? { ...anthropicHeaders, ...um.headers } : anthropicHeaders;
+
+				// send Anthropic chat request with retry
+				const response = await executeWithRetry(async () => {
+					const res = await fetch(`${BASE_URL.replace(/\/+$/, "")}/v1/messages`, {
+						method: "POST",
+						headers: requestHeaders,
+						body: JSON.stringify(requestBody),
+					});
+
+					if (!res.ok) {
+						const errorText = await res.text();
+						console.error("[Anthropic Provider] Anthropic API error response", errorText);
+						throw new Error(
+							`Anthropic API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`
+						);
+					}
+
+					return res;
+				}, retryConfig);
+
+				if (!response.body) {
+					throw new Error("No response body from Anthropic API");
+				}
+				await anthropicApi.processStreamingResponse(response.body, trackingProgress, token);
 			} else {
 				// OpenAI compatible API mode (default)
 				const openaiApi = new OpenaiApi();

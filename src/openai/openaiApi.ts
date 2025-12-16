@@ -11,7 +11,6 @@ import type { HFModelItem, ReasoningConfig } from "../types";
 
 import type {
 	OpenAIChatMessage,
-	OpenAIChatRole,
 	OpenAIToolCall,
 	ChatMessageContent,
 	ReasoningDetail,
@@ -25,6 +24,7 @@ import {
 	isToolResultPart,
 	collectToolResultText,
 	convertToolsToOpenAI,
+	mapRole,
 } from "../utils";
 
 import { CommonApi } from "../commonApi";
@@ -46,7 +46,7 @@ export class OpenaiApi extends CommonApi {
 	): OpenAIChatMessage[] {
 		const out: OpenAIChatMessage[] = [];
 		for (const m of messages) {
-			const role = this.mapRole(m);
+			const role = mapRole(m);
 			const textParts: string[] = [];
 			const imageParts: vscode.LanguageModelDataPart[] = [];
 			const toolCalls: OpenAIToolCall[] = [];
@@ -138,23 +138,6 @@ export class OpenaiApi extends CommonApi {
 			}
 		}
 		return out;
-	}
-
-	/**
-	 * Map VS Code message role to OpenAI message role string.
-	 * @param message The message whose role is mapped.
-	 */
-	private mapRole(message: vscode.LanguageModelChatRequestMessage): Exclude<OpenAIChatRole, "tool"> {
-		const USER = vscode.LanguageModelChatMessageRole.User as unknown as number;
-		const ASSISTANT = vscode.LanguageModelChatMessageRole.Assistant as unknown as number;
-		const r = message.role as unknown as number;
-		if (r === USER) {
-			return "user";
-		}
-		if (r === ASSISTANT) {
-			return "assistant";
-		}
-		return "system";
 	}
 
 	prepareRequestBody(
@@ -295,7 +278,11 @@ export class OpenaiApi extends CommonApi {
 		let buffer = "";
 
 		try {
-			while (!token.isCancellationRequested) {
+			while (true) {
+				if (token.isCancellationRequested) {
+					break;
+				}
+
 				const { done, value } = await reader.read();
 				if (done) {
 					break;
