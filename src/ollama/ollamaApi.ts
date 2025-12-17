@@ -225,10 +225,6 @@ export class OllamaApi extends CommonApi {
 
 		// Process thinking content first
 		if (message.thinking) {
-			// Generate thinking ID if not exists
-			if (!this._currentThinkingId) {
-				this._currentThinkingId = this.generateThinkingId();
-			}
 			// Buffer and emit thinking content
 			this.bufferThinkingContent(message.thinking, progress);
 		}
@@ -236,9 +232,7 @@ export class OllamaApi extends CommonApi {
 		// Process tool calls
 		if (message.tool_calls && message.tool_calls.length > 0) {
 			// End thinking if active
-			if (this._currentThinkingId) {
-				this.reportEndThinking(progress);
-			}
+			this.reportEndThinking(progress);
 
 			for (const tc of message.tool_calls) {
 				const id = `ollama_tc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -249,9 +243,7 @@ export class OllamaApi extends CommonApi {
 		// Process regular content
 		if (message.content) {
 			// If we have thinking content and now receiving regular content, end thinking first
-			if (this._currentThinkingId && message.content.trim()) {
-				this.reportEndThinking(progress);
-			}
+			this.reportEndThinking(progress);
 
 			// Emit text content
 			progress.report(new vscode.LanguageModelTextPart(message.content));

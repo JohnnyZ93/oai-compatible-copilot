@@ -397,10 +397,8 @@ export class OpenaiApi extends CommonApi {
 			if (xmlRes.emittedAny) {
 				emitted = true;
 			} else {
-				// If we have visible content and there's an active thinking sequence, end it first
-				if (this._currentThinkingId && content.trim()) {
-					this.reportEndThinking(progress);
-				}
+				// If there's an active thinking sequence, end it first
+				this.reportEndThinking(progress);
 
 				// Only process text content if no XML think blocks were emitted
 				const res = this.processTextContent(content, progress);
@@ -415,9 +413,7 @@ export class OpenaiApi extends CommonApi {
 
 		if (deltaObj?.tool_calls) {
 			// If there's an active thinking sequence, end it first
-			if (this._currentThinkingId) {
-				this.reportEndThinking(progress);
-			}
+			this.reportEndThinking(progress);
 
 			const toolCalls = deltaObj.tool_calls as Array<Record<string, unknown>>;
 

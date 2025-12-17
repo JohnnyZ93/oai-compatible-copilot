@@ -146,16 +146,17 @@ export abstract class CommonApi {
 	 * @param progress Progress reporter for parts
 	 */
 	protected reportEndThinking(progress: Progress<LanguageModelResponsePart2>) {
-		if (this._currentThinkingId) {
-			try {
-				this.flushThinkingBuffer(progress);
-				// End the current thinking sequence with empty content and same ID
-				progress.report(new LanguageModelThinkingPart("", this._currentThinkingId));
-			} catch (e) {
-				console.error("[OAI Compatible Model Provider] Failed to end thinking sequence:", e);
-			}
+		if (!this._currentThinkingId) {
+			return;
 		}
 		// Always clean up state after attempting to end the thinking sequence
+		try {
+			this.flushThinkingBuffer(progress);
+			// End the current thinking sequence with empty content and same ID
+			progress.report(new LanguageModelThinkingPart("", this._currentThinkingId));
+		} catch (e) {
+			console.error("[OAI Compatible Model Provider] Failed to end thinking sequence:", e);
+		}
 		this._currentThinkingId = null;
 		// Clear thinking buffer and timer since sequence ended
 		this._thinkingBuffer = "";
