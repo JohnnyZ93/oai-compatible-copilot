@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="UTF-8" />
+		<meta http-equiv="Content-Security-Policy" content="%CSP_SOURCE%" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>OAI Copilot Configuration</title>
+		<link rel="stylesheet" href="%CSS_URI%" />
+	</head>
+	<body>
+		<section>
+			<h2>基础配置</h2>
+			<label for="baseUrl">Base URL</label>
+			<input id="baseUrl" type="text" placeholder="https://api.openai.com/v1" />
+			<label for="apiKey">主 API Key</label>
+			<div class="row">
+				<input id="apiKey" type="password" placeholder="sk-..." />
+				<button id="toggleMainKey" class="secondary">显示</button>
+			</div>
+			<div class="block-gap">
+				<button id="saveBase">保存基础配置</button>
+			</div>
+		</section>
+
+		<section>
+			<h2>模型管理</h2>
+			<p class="muted">点击“拉取模型”将调用 Base URL 的 /models 接口，可批量选择后删除。</p>
+			<div class="actions">
+				<button id="fetchModels">拉取模型</button>
+				<button id="saveModels" class="secondary">保存模型</button>
+				<button id="deleteModels" class="danger">删除选中模型</button>
+				<button id="selectAllModels" class="secondary">全选/全不选</button>
+			</div>
+			<div id="modelsContainer" class="models-container"></div>
+		</section>
+
+		<section>
+			<h2>按提供商配置 API Key</h2>
+			<div id="providerKeys"></div>
+		</section>
+
+		<script src="%SCRIPT_URI%" nonce="%NONCE%"></script>
+	</body>
+</html>

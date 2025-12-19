@@ -13,7 +13,8 @@ export default tseslint.config(
 		ignores: [
 			'.vscode-test',
 			'out',
-			'**/*.d.ts'
+			'**/*.d.ts',
+			"assets"
 		]
 	},
 	{

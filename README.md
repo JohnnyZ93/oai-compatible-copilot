@@ -10,12 +10,10 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.2, GLM 4.6 and mor
 - Supports vision models.
 - Offers additional configuration options for chat requests.
 - Supports control model thinking and reasoning content show in chat interface.
-  > ![thinkingPartDemo](./assets/thinkingPartDemo.png)
 - Supports configuring models from multiple providers simultaneously, automatically managing API keys without switch them repeatedly.
 - Supports defining multiple configurations for the same model ID with different settings (e.g. thinking enable/disable for GLM-4.6).
 - Support auto retry mechanism for handling api errors like [429, 500, 502, 503, 504].
 - Support token usage count and set provider api keys in status bar.
-  > ![statusBar](./assets/statusBar.png)
 ---
 
 ## Requirements
