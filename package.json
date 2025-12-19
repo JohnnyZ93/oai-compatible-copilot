@@ -1,6 +1,6 @@
 {
-	"name": "oai-compatible-copilot",
-	"publisher": "johnny-zhao",
+	"name": "oai-compatible-copilot-myself",
+	"publisher": "ttcc",
 	"displayName": "OAI Compatible Provider for Copilot",
 	"description": "An extension that integrates OpenAI/Ollama/Anthropic API Providers into GitHub Copilot Chat",
 	"icon": "assets/logo.png",
@@ -61,8 +61,30 @@
 			{
 				"command": "oaicopilot.setProviderApikey",
 				"title": "OAICopilot: Set OAI Compatible Multi-Provider Apikey"
+			},
+			{
+				"command": "oaicopilot.openConfig",
+				"title": "OAICopilot: Open Configuration"
 			}
 		],
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "oaicopilot",
+					"title": "OAI Copilot",
+					"icon": "assets/logo.png"
+				}
+			]
+		},
+		"views": {
+			"oaicopilot": [
+				{
+					"id": "oaicopilot.configView",
+					"name": "Configuration",
+					"type": "webview"
+				}
+			]
+		},
 		"configuration": {
 			"title": "OAI Compatible Copilot",
 			"properties": {
