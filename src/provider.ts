@@ -93,23 +93,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		// Update Token Usage
 		updateContextStatusBar(messages, model, this.statusBarItem);
 
-		// Apply delay between consecutive requests
-		const config = vscode.workspace.getConfiguration();
-		const delayMs = config.get<number>("oaicopilot.delay", 0);
-
-		if (delayMs > 0 && this._lastRequestTime !== null) {
-			const elapsed = Date.now() - this._lastRequestTime;
-			if (elapsed < delayMs) {
-				const remainingDelay = delayMs - elapsed;
-				await new Promise<void>((resolve) => {
-					const timeout = setTimeout(() => {
-						clearTimeout(timeout);
-						resolve();
-					}, remainingDelay);
-				});
-			}
-		}
-
 		const trackingProgress: Progress<LanguageModelResponsePart2> = {
 			report: (part) => {
 				try {
@@ -143,6 +126,26 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			// 如果仍然没有找到模型，尝试查找任何匹配基础ID的模型（最宽松的匹配，用于向后兼容）
 			if (!um) {
 				um = userModels.find((um) => um.id === parsedModelId.baseId);
+			}
+
+			// Apply delay between consecutive requests
+			const modelDelay = um?.delay;
+			const globalDelay = config.get<number>("oaicopilot.delay", 0);
+			const delayMs = modelDelay !== undefined ? modelDelay : globalDelay;
+
+			console.debug(`[OAI Compatible Model Provider] Applying delay of ${delayMs} ms`);
+
+			if (delayMs > 0 && this._lastRequestTime !== null) {
+				const elapsed = Date.now() - this._lastRequestTime;
+				if (elapsed < delayMs) {
+					const remainingDelay = delayMs - elapsed;
+					await new Promise<void>((resolve) => {
+						const timeout = setTimeout(() => {
+							clearTimeout(timeout);
+							resolve();
+						}, remainingDelay);
+					});
+				}
 			}
 
 			// Prepare model configuration for message conversion

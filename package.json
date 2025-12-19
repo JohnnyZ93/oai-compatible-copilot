@@ -274,6 +274,12 @@
 								],
 								"default": "openai",
 								"description": "API mode: 'openai' (Default) for API (/v1/chat/completions), 'ollama' for API (/api/chat), 'anthropic' for API (/v1/messages)."
+							},
+							"delay": {
+								"type": "number",
+								"default": 0,
+								"minimum": 0,
+								"description": "Model-specific delay in milliseconds between consecutive requests. If not specified, falls back to global oaicopilot.delay configuration."
 							}
 						},
 						"required": [
