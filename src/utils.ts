@@ -32,6 +32,23 @@ export function parseModelId(modelId: string): ParsedModelId {
 }
 
 /**
+ * Map VS Code message role to OpenAI message role string.
+ * @param message The message whose role is mapped.
+ */
+export function mapRole(message: vscode.LanguageModelChatRequestMessage): "user" | "assistant" | "system" {
+	const USER = vscode.LanguageModelChatMessageRole.User as unknown as number;
+	const ASSISTANT = vscode.LanguageModelChatMessageRole.Assistant as unknown as number;
+	const r = message.role as unknown as number;
+	if (r === USER) {
+		return "user";
+	}
+	if (r === ASSISTANT) {
+		return "assistant";
+	}
+	return "system";
+}
+
+/**
  * Convert VS Code tool definitions to OpenAI function tool definitions.
  * @param options Request options containing tools and toolMode.
  */

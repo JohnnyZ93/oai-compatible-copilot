@@ -79,7 +79,13 @@ export interface HFModelItem {
 	 * API mode: "openai" for OpenAI-compatible API, "ollama" for Ollama native API.
 	 * Default is "openai".
 	 */
-	apiMode?: "openai" | "ollama";
+	apiMode?: "openai" | "ollama" | "anthropic";
+
+	/**
+	 * Model-specific delay in milliseconds between consecutive requests.
+	 * If not specified, falls back to global `oaicopilot.delay` configuration.
+	 */
+	delay?: number;
 }
 
 /**

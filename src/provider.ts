@@ -20,6 +20,8 @@ import { prepareTokenCount } from "./provideToken";
 import { updateContextStatusBar } from "./statusBar";
 import { OllamaApi } from "./ollama/ollamaApi";
 import { OpenaiApi } from "./openai/openaiApi";
+import { AnthropicApi } from "./anthropic/anthropicApi";
+import { AnthropicRequestBody } from "./anthropic/anthropicTypes";
 
 /**
  * VS Code Chat provider backed by Hugging Face Inference Providers.
@@ -91,23 +93,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		// Update Token Usage
 		updateContextStatusBar(messages, model, this.statusBarItem);
 
-		// Apply delay between consecutive requests
-		const config = vscode.workspace.getConfiguration();
-		const delayMs = config.get<number>("oaicopilot.delay", 0);
-
-		if (delayMs > 0 && this._lastRequestTime !== null) {
-			const elapsed = Date.now() - this._lastRequestTime;
-			if (elapsed < delayMs) {
-				const remainingDelay = delayMs - elapsed;
-				await new Promise<void>((resolve) => {
-					const timeout = setTimeout(() => {
-						clearTimeout(timeout);
-						resolve();
-					}, remainingDelay);
-				});
-			}
-		}
-
 		const trackingProgress: Progress<LanguageModelResponsePart2> = {
 			report: (part) => {
 				try {
@@ -143,6 +128,26 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				um = userModels.find((um) => um.id === parsedModelId.baseId);
 			}
 
+			// Apply delay between consecutive requests
+			const modelDelay = um?.delay;
+			const globalDelay = config.get<number>("oaicopilot.delay", 0);
+			const delayMs = modelDelay !== undefined ? modelDelay : globalDelay;
+
+			console.debug(`[OAI Compatible Model Provider] Applying delay of ${delayMs} ms`);
+
+			if (delayMs > 0 && this._lastRequestTime !== null) {
+				const elapsed = Date.now() - this._lastRequestTime;
+				if (elapsed < delayMs) {
+					const remainingDelay = delayMs - elapsed;
+					await new Promise<void>((resolve) => {
+						const timeout = setTimeout(() => {
+							clearTimeout(timeout);
+							resolve();
+						}, remainingDelay);
+					});
+				}
+			}
+
 			// Prepare model configuration for message conversion
 			const modelConfig = {
 				includeReasoningInRequest: um?.include_reasoning_in_request ?? false,
@@ -168,6 +173,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			// Check if using Ollama native API mode
 			const apiMode = um?.apiMode ?? "openai";
 
+			// prepare headers with custom headers if specified
+			const requestHeaders = this.prepareHeaders(modelApiKey, apiMode, um?.headers);
+
 			// console.debug("[OAI Compatible Model Provider] messages:", JSON.stringify(messages));
 			if (apiMode === "ollama") {
 				// Ollama native API mode
@@ -181,20 +189,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				};
 				ollamaRequestBody = ollamaApi.prepareRequestBody(ollamaRequestBody, um, options);
 				// console.debug("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(ollamaRequestBody));
-
-				// prepare headers for Ollama
-				const ollamaHeaders: Record<string, string> = {
-					"Content-Type": "application/json",
-					"User-Agent": this.userAgent,
-				};
-
-				// Add Authorization header if API key is provided (for remote Ollama servers)
-				if (modelApiKey && modelApiKey !== "ollama") {
-					ollamaHeaders["Authorization"] = `Bearer ${modelApiKey}`;
-				}
-
-				// merge custom headers if specified
-				const requestHeaders = um?.headers ? { ...ollamaHeaders, ...um.headers } : ollamaHeaders;
 
 				// send Ollama chat request with retry
 				const response = await executeWithRetry(async () => {
@@ -217,6 +211,43 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					throw new Error("No response body from Ollama API");
 				}
 				await ollamaApi.processStreamingResponse(response.body, trackingProgress, token);
+			} else if (apiMode === "anthropic") {
+				// Anthropic API mode
+				const anthropicApi = new AnthropicApi();
+				const anthropicMessages = anthropicApi.convertMessages(messages, modelConfig);
+
+				// requestBody
+				let requestBody: AnthropicRequestBody = {
+					model: parsedModelId.baseId,
+					messages: anthropicMessages,
+					stream: true,
+				};
+				requestBody = anthropicApi.prepareRequestBody(requestBody, um, options);
+				// console.debug("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(requestBody));
+
+				// send Anthropic chat request with retry
+				const response = await executeWithRetry(async () => {
+					const res = await fetch(`${BASE_URL.replace(/\/+$/, "")}/v1/messages`, {
+						method: "POST",
+						headers: requestHeaders,
+						body: JSON.stringify(requestBody),
+					});
+
+					if (!res.ok) {
+						const errorText = await res.text();
+						console.error("[Anthropic Provider] Anthropic API error response", errorText);
+						throw new Error(
+							`Anthropic API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`
+						);
+					}
+
+					return res;
+				}, retryConfig);
+
+				if (!response.body) {
+					throw new Error("No response body from Anthropic API");
+				}
+				await anthropicApi.processStreamingResponse(response.body, trackingProgress, token);
 			} else {
 				// OpenAI compatible API mode (default)
 				const openaiApi = new OpenaiApi();
@@ -231,16 +262,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				};
 				requestBody = openaiApi.prepareRequestBody(requestBody, um, options);
 				// console.debug("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(requestBody));
-
-				// prepare headers with custom headers if specified
-				const defaultHeaders: Record<string, string> = {
-					Authorization: `Bearer ${modelApiKey}`,
-					"Content-Type": "application/json",
-					"User-Agent": this.userAgent,
-				};
-
-				// merge custom headers if specified in model config
-				const requestHeaders = um?.headers ? { ...defaultHeaders, ...um.headers } : defaultHeaders;
 
 				// send chat request with retry
 				const response = await executeWithRetry(async () => {
@@ -277,6 +298,40 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			// Update last request time after successful completion
 			this._lastRequestTime = Date.now();
 		}
+	}
+
+	/**
+	 * Prepare headers for API request.
+	 * @param apiKey The API key to use.
+	 * @param apiMode The apiMode (affects header format).
+	 * @param customHeaders Optional custom headers from model config.
+	 * @returns Headers object.
+	 */
+	private prepareHeaders(
+		apiKey: string,
+		apiMode: string,
+		customHeaders?: Record<string, string>
+	): Record<string, string> {
+		const headers: Record<string, string> = {
+			"Content-Type": "application/json",
+			"User-Agent": this.userAgent,
+		};
+
+		// Provider-specific header formats
+		if (apiMode === "anthropic") {
+			headers["x-api-key"] = apiKey;
+		} else if (apiMode === "ollama" && apiKey !== "ollama") {
+			headers["Authorization"] = `Bearer ${apiKey}`;
+		} else {
+			headers["Authorization"] = `Bearer ${apiKey}`;
+		}
+
+		// Merge custom headers
+		if (customHeaders) {
+			return { ...headers, ...customHeaders };
+		}
+
+		return headers;
 	}
 
 	/**

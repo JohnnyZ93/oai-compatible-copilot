@@ -2,20 +2,24 @@
 	"name": "oai-compatible-copilot-myself",
 	"publisher": "ttcc",
 	"displayName": "OAI Compatible Provider for Copilot",
-	"description": "An extension that integrates Openai Compatible Inference Providers into GitHub Copilot Chat",
+	"description": "An extension that integrates OpenAI/Ollama/Anthropic API Providers into GitHub Copilot Chat",
 	"icon": "assets/logo.png",
 	"keywords": [
 		"ai",
 		"chat",
 		"copilot",
 		"github-copilot",
-		"language-model"
+		"language-model",
+		"openai",
+		"ollama",
+		"anthropic",
+		"claude"
 	],
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/JohnnyZ93/oai-compatible-copilot"
 	},
-	"version": "0.1.7",
+	"version": "0.1.8",
 	"engines": {
 		"vscode": "^1.104.0"
 	},
@@ -194,7 +198,7 @@
 								"default": 1,
 								"minimum": 0,
 								"maximum": 1,
-								"description": "Top-p sampling value (range: (0, 1]). Default is 1."
+								"description": "Top-p sampling value (range: (0, 1]). Not required."
 							},
 							"top_k": {
 								"type": "number",
@@ -269,7 +273,7 @@
 							},
 							"extra": {
 								"type": "object",
-								"description": "Extra request parameters that will be used in /chat/completions."
+								"description": "Extra request body parameters."
 							},
 							"headers": {
 								"type": "object",
@@ -287,10 +291,17 @@
 								"type": "string",
 								"enum": [
 									"openai",
-									"ollama"
+									"ollama",
+									"anthropic"
 								],
 								"default": "openai",
-								"description": "API mode: 'openai' for OpenAI-compatible API (/v1/chat/completions), 'ollama' for Ollama native API (/api/chat). Default is 'openai'."
+								"description": "API mode: 'openai' (Default) for API (/v1/chat/completions), 'ollama' for API (/api/chat), 'anthropic' for API (/v1/messages)."
+							},
+							"delay": {
+								"type": "number",
+								"default": 0,
+								"minimum": 0,
+								"description": "Model-specific delay in milliseconds between consecutive requests. If not specified, falls back to global oaicopilot.delay configuration."
 							}
 						},
 						"required": [

@@ -11,7 +11,6 @@ import type { HFModelItem, ReasoningConfig } from "../types";
 
 import type {
 	OpenAIChatMessage,
-	OpenAIChatRole,
 	OpenAIToolCall,
 	ChatMessageContent,
 	ReasoningDetail,
@@ -25,6 +24,7 @@ import {
 	isToolResultPart,
 	collectToolResultText,
 	convertToolsToOpenAI,
+	mapRole,
 } from "../utils";
 
 import { CommonApi } from "../commonApi";
@@ -46,7 +46,7 @@ export class OpenaiApi extends CommonApi {
 	): OpenAIChatMessage[] {
 		const out: OpenAIChatMessage[] = [];
 		for (const m of messages) {
-			const role = this.mapRole(m);
+			const role = mapRole(m);
 			const textParts: string[] = [];
 			const imageParts: vscode.LanguageModelDataPart[] = [];
 			const toolCalls: OpenAIToolCall[] = [];
@@ -140,23 +140,6 @@ export class OpenaiApi extends CommonApi {
 		return out;
 	}
 
-	/**
-	 * Map VS Code message role to OpenAI message role string.
-	 * @param message The message whose role is mapped.
-	 */
-	private mapRole(message: vscode.LanguageModelChatRequestMessage): Exclude<OpenAIChatRole, "tool"> {
-		const USER = vscode.LanguageModelChatMessageRole.User as unknown as number;
-		const ASSISTANT = vscode.LanguageModelChatMessageRole.Assistant as unknown as number;
-		const r = message.role as unknown as number;
-		if (r === USER) {
-			return "user";
-		}
-		if (r === ASSISTANT) {
-			return "assistant";
-		}
-		return "system";
-	}
-
 	prepareRequestBody(
 		rb: Record<string, unknown>,
 		um: HFModelItem | undefined,
@@ -166,18 +149,13 @@ export class OpenaiApi extends CommonApi {
 		const oTemperature = options.modelOptions?.temperature ?? 0;
 		const temperature = um?.temperature ?? oTemperature;
 		rb.temperature = temperature;
-
-		// top_p
-		const oTopP = options.modelOptions?.top_p ?? 1;
-		const topP = um?.top_p ?? oTopP;
-		rb.top_p = topP;
-
-		// If user model config explicitly sets sampling params to null, remove them so provider defaults apply
 		if (um && um.temperature === null) {
 			delete rb.temperature;
 		}
-		if (um && um.top_p === null) {
-			delete rb.top_p;
+
+		// top_p
+		if (um?.top_p !== undefined && um.top_p !== null) {
+			rb.top_p = um.top_p;
 		}
 
 		// max_tokens
@@ -295,7 +273,11 @@ export class OpenaiApi extends CommonApi {
 		let buffer = "";
 
 		try {
-			while (!token.isCancellationRequested) {
+			while (true) {
+				if (token.isCancellationRequested) {
+					break;
+				}
+
 				const { done, value } = await reader.read();
 				if (done) {
 					break;
@@ -415,10 +397,8 @@ export class OpenaiApi extends CommonApi {
 			if (xmlRes.emittedAny) {
 				emitted = true;
 			} else {
-				// If we have visible content and there's an active thinking sequence, end it first
-				if (this._currentThinkingId && content.trim()) {
-					this.reportEndThinking(progress);
-				}
+				// If there's an active thinking sequence, end it first
+				this.reportEndThinking(progress);
 
 				// Only process text content if no XML think blocks were emitted
 				const res = this.processTextContent(content, progress);
@@ -433,9 +413,7 @@ export class OpenaiApi extends CommonApi {
 
 		if (deltaObj?.tool_calls) {
 			// If there's an active thinking sequence, end it first
-			if (this._currentThinkingId) {
-				this.reportEndThinking(progress);
-			}
+			this.reportEndThinking(progress);
 
 			const toolCalls = deltaObj.tool_calls as Array<Record<string, unknown>>;
 
