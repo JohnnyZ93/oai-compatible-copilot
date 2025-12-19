@@ -8,35 +8,101 @@
 		<link rel="stylesheet" href="%CSS_URI%" />
 	</head>
 	<body>
-		<section>
-			<h2>基础配置</h2>
-			<label for="baseUrl">Base URL</label>
+		<section id="globalConfigSection">
+			<div class="section-header">
+				<h2>Global Configuration</h2>
+				<div class="section-actions">
+					<button id="refreshGlobalConfig" class="secondary">Refresh</button>
+				</div>
+			</div>
+			<label for="baseUrl">Global Base URL</label>
 			<input id="baseUrl" type="text" placeholder="https://api.openai.com/v1" />
-			<label for="apiKey">主 API Key</label>
-			<div class="row">
-				<input id="apiKey" type="password" placeholder="sk-..." />
-				<button id="toggleMainKey" class="secondary">显示</button>
+			<label for="apiKey">Global API Key</label>
+			<input id="apiKey" type="password" placeholder="sk-..." />
+			<label for="delay">Delay (ms)</label>
+			<input id="delay" type="number" min="0" placeholder="0" />
+			<div class="retry-config">
+				<h3>Retry Configuration</h3>
+				<div class="row">
+					<div class="field">
+						<label for="retryEnabled">Enable Retry</label>
+						<input id="retryEnabled" type="checkbox" />
+					</div>
+					<div class="field">
+						<label for="maxAttempts">Max Attempts</label>
+						<input id="maxAttempts" type="number" min="1" placeholder="3" />
+					</div>
+					<div class="field">
+						<label for="intervalMs">Retry Interval (ms)</label>
+						<input id="intervalMs" type="number" min="1" placeholder="1000" />
+					</div>
+				</div>
+				<div class="field">
+					<label for="statusCodes">Retry Status Codes (comma separated)</label>
+					<input id="statusCodes" type="text" placeholder="429,500,502,503,504" />
+				</div>
 			</div>
 			<div class="block-gap">
-				<button id="saveBase">保存基础配置</button>
+				<button id="saveBase">Save Global Configuration</button>
 			</div>
 		</section>
 
-		<section>
-			<h2>模型管理</h2>
-			<p class="muted">点击“拉取模型”将调用 Base URL 的 /models 接口，可批量选择后删除。</p>
-			<div class="actions">
-				<button id="fetchModels">拉取模型</button>
-				<button id="saveModels" class="secondary">保存模型</button>
-				<button id="deleteModels" class="danger">删除选中模型</button>
-				<button id="selectAllModels" class="secondary">全选/全不选</button>
+		<section id="providerManagementSection">
+			<div class="section-header">
+				<h2>Provider Management</h2>
+				<div class="section-actions">
+					<button id="addProvider">Add Provider</button>
+					<button id="refreshProviders" class="secondary">Refresh</button>
+				</div>
 			</div>
-			<div id="modelsContainer" class="models-container"></div>
+			<div class="table-container">
+				<table id="providerTable">
+					<thead>
+						<tr>
+							<th>Provider ID</th>
+							<th>Base URL</th>
+							<th>API Key</th>
+							<th>API Mode</th>
+							<th>Actions</th>
+						</tr>
+					</thead>
+					<tbody id="providerTableBody">
+						<!-- Provider rows will be inserted here -->
+					</tbody>
+				</table>
+			</div>
 		</section>
 
-		<section>
-			<h2>按提供商配置 API Key</h2>
-			<div id="providerKeys"></div>
+		<section id="modelManagementSection">
+			<div class="section-header">
+				<h2>Model Management</h2>
+				<div class="section-actions">
+					<button id="addModel">Add Model</button>
+					<button id="refreshModels" class="secondary">Refresh</button>
+				</div>
+			</div>
+			<div class="table-container">
+				<table id="modelTable">
+					<thead>
+						<tr>
+							<th>Model ID</th>
+							<th>Provider ID</th>
+							<th>Display Name</th>
+							<th>Config ID</th>
+							<th>Context Length</th>
+							<th>Max Tokens</th>
+							<th>Supports Vision</th>
+							<th>Temperature</th>
+							<th>TopP</th>
+							<th>Delay (ms)</th>
+							<th>Actions</th>
+						</tr>
+					</thead>
+					<tbody id="modelTableBody">
+						<!-- Model rows will be inserted here -->
+					</tbody>
+				</table>
+			</div>
 		</section>
 
 		<script src="%SCRIPT_URI%" nonce="%NONCE%"></script>

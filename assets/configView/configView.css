@@ -24,7 +24,8 @@ label {
 }
 input[type="text"],
 input[type="password"],
-input[type="number"] {
+input[type="number"],
+select {
 	width: 100%;
 	padding: 10px 12px;
 	box-sizing: border-box;
@@ -34,7 +35,8 @@ input[type="number"] {
 	background: var(--vscode-editor-background);
 	color: var(--vscode-foreground);
 }
-input:focus {
+input:focus,
+select:focus {
 	outline: 2px solid var(--vscode-focusBorder);
 	border-color: var(--vscode-focusBorder);
 }
@@ -75,6 +77,12 @@ button:active {
 	display: flex;
 	gap: 10px;
 	align-items: center;
+	flex-wrap: wrap;
+}
+.row .field {
+	flex: 1;
+	min-width: 150px;
+	margin-bottom: 0;
 }
 .row input {
 	flex: 1;
@@ -165,4 +173,89 @@ button:active {
 }
 .models-container {
 	margin-top: 12px;
+}
+
+.section-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 12px;
+}
+
+.section-actions {
+	display: flex;
+	gap: 8px;
+}
+
+.retry-config {
+	margin: 15px 0;
+	padding: 12px;
+	border: 1px solid var(--vscode-editorWidget-border);
+	border-radius: 8px;
+	background: rgba(0, 0, 0, 0.03);
+}
+
+.retry-config h3 {
+	margin-top: 0;
+	margin-bottom: 10px;
+	font-size: 16px;
+}
+
+.table-container {
+	overflow-x: auto;
+}
+
+table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+th,
+td {
+	padding: 8px 12px;
+	text-align: left;
+	border-bottom: 1px solid var(--vscode-editorWidget-border);
+}
+
+th {
+	background: rgba(0, 0, 0, 0.1);
+	font-weight: 600;
+}
+
+tr:hover {
+	background: rgba(255, 255, 255, 0.05);
+}
+
+.no-data {
+	text-align: center;
+	padding: 20px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.model-input,
+.provider-input {
+	width: 100%;
+	padding: 6px 8px;
+	border: 1px solid var(--vscode-editorWidget-border);
+	border-radius: 4px;
+	background: var(--vscode-editor-background);
+	color: var(--vscode-foreground);
+	box-sizing: border-box;
+}
+
+.model-input:focus,
+.provider-input:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+}
+
+.action-buttons {
+	display: flex;
+	gap: 8px;
+	white-space: nowrap;
+}
+
+button:not(.secondary):not(.danger) {
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+	border: 1px solid var(--vscode-button-border, transparent);
 }
