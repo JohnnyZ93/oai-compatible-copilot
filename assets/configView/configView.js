@@ -8,10 +8,10 @@ const state = {
 	providerKeys: {},
 };
 
-// 存储待处理的确认操作
+// Store the action to be performed after confirmation
 const pendingConfirmations = new Map();
 
-// 基础配置元素
+// Global Configuration elements
 const baseUrlInput = document.getElementById("baseUrl");
 const apiKeyInput = document.getElementById("apiKey");
 const delayInput = document.getElementById("delay");
@@ -20,13 +20,13 @@ const maxAttemptsInput = document.getElementById("maxAttempts");
 const intervalMsInput = document.getElementById("intervalMs");
 const statusCodesInput = document.getElementById("statusCodes");
 
-// 提供商管理元素
+// Provider management elements
 const providerTableBody = document.getElementById("providerTableBody");
 
-// 模型管理元素
+// Model management elements
 const modelTableBody = document.getElementById("modelTableBody");
 
-// 基础配置事件监听
+// Global Configuration save button event listener
 document.getElementById("saveBase").addEventListener("click", () => {
 	const retry = {
 		enabled: retryEnabledInput.checked,
@@ -49,7 +49,7 @@ document.getElementById("saveBase").addEventListener("click", () => {
 	});
 });
 
-// 刷新按钮事件监听
+// Refresh buttons event listeners
 document.getElementById("refreshGlobalConfig").addEventListener("click", () => {
 	vscode.postMessage({ type: "requestInit" });
 });
@@ -62,7 +62,7 @@ document.getElementById("refreshModels").addEventListener("click", () => {
 	vscode.postMessage({ type: "requestInit" });
 });
 
-// 提供商管理事件监听
+// Add Provider button event listener
 document.getElementById("addProvider").addEventListener("click", () => {
 	// Add new provider row to the table
 	const newRow = document.createElement("tr");
@@ -112,7 +112,7 @@ document.getElementById("addProvider").addEventListener("click", () => {
 	});
 });
 
-// Model management event listeners
+// Add Model button event listeners
 document.getElementById("addModel").addEventListener("click", () => {
 	// Navigate to the new model page, temporarily show a prompt
 	alert("Navigate to new model page");
@@ -260,7 +260,7 @@ function renderModels() {
 	const rows = state.models
 		.map((model) => {
 			return `
-			<tr data-model-id="${model.id}::${model.configId || ""}">
+			<tr data-model-id="${model.id}${model.configId ? "::" + model.configId : ""}">
 				<td>${model.id}</td>
 				<td>${model.owned_by}</td>
 				<td>${model.displayName || ""}</td>
@@ -272,8 +272,8 @@ function renderModels() {
 				<td>${model.top_p !== undefined && model.top_p !== null ? model.top_p : ""}</td>
 				<td>${model.delay || ""}</td>
 				<td class="action-buttons">
-					<button class="update-model-btn" data-model-id="${model.id}::${model.configId || ""}">Edit</button>
-					<button class="delete-model-btn danger" data-model-id="${model.id}::${model.configId || ""}">Delete</button>
+					<button class="update-model-btn" data-model-id="${model.id}${model.configId ? "::" + model.configId : ""}">Edit</button>
+					<button class="delete-model-btn danger" data-model-id="${model.id}${model.configId ? "::" + model.configId : ""}">Delete</button>
 				</td>
 			</tr>`;
 		})

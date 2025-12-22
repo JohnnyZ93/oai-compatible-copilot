@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import type { HFModelItem, HFModelsResponse } from "../types";
+import { parseModelId } from "../utils";
 
 interface InitPayload {
 	baseUrl: string;
@@ -438,7 +439,15 @@ export class ConfigViewPanel {
 	private async deleteModel(modelId: string) {
 		const config = vscode.workspace.getConfiguration();
 		const models = config.get<HFModelItem[]>("oaicopilot.models", []);
-		const filteredModels = models.filter((model) => model.id !== modelId);
+		const parsedModelId = parseModelId(modelId);
+
+		const filteredModels = models.filter((model) => {
+			return !(
+				model.id === parsedModelId.baseId &&
+				((parsedModelId.configId && model.configId === parsedModelId.configId) ||
+					(!parsedModelId.configId && !model.configId))
+			);
+		});
 
 		await config.update("oaicopilot.models", filteredModels, vscode.ConfigurationTarget.Global);
 		vscode.window.showInformationMessage(`Model ${modelId} has been deleted.`);
