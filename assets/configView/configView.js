@@ -8,6 +8,9 @@ const state = {
 	providerKeys: {},
 };
 
+// 存储待处理的确认操作
+const pendingConfirmations = new Map();
+
 // 基础配置元素
 const baseUrlInput = document.getElementById("baseUrl");
 const apiKeyInput = document.getElementById("apiKey");
@@ -100,6 +103,8 @@ document.getElementById("addProvider").addEventListener("click", () => {
 			apiKey: providerData.apiKey || undefined,
 			apiMode: providerData.apiMode || undefined,
 		});
+
+		newRow.remove();
 	});
 
 	cancelBtn.addEventListener("click", () => {
@@ -115,37 +120,54 @@ document.getElementById("addModel").addEventListener("click", () => {
 
 window.addEventListener("message", (event) => {
 	const message = event.data;
-	if (message.type === "init") {
-		const { baseUrl, apiKey, delay, retry, models, providerKeys } = message.payload;
-		state.baseUrl = baseUrl;
-		state.apiKey = apiKey;
-		state.delay = delay || 0;
-		state.retry = retry || {
-			enabled: true,
-			max_attempts: 3,
-			interval_ms: 1000,
-			status_codes: [429, 500, 502, 503, 504],
-		};
-		state.models = models || [];
-		state.providerKeys = providerKeys || {};
 
-		// Update base configuration
-		baseUrlInput.value = baseUrl || "";
-		apiKeyInput.value = apiKey || "";
-		delayInput.value = state.delay;
-		retryEnabledInput.checked = state.retry.enabled !== false;
-		maxAttemptsInput.value = state.retry.max_attempts || 3;
-		intervalMsInput.value = state.retry.interval_ms || 1000;
-		statusCodesInput.value = state.retry.status_codes ? state.retry.status_codes.join(",") : "429,500,502,503,504";
+	switch (message.type) {
+		case "init":
+			const { baseUrl, apiKey, delay, retry, models, providerKeys } = message.payload;
+			state.baseUrl = baseUrl;
+			state.apiKey = apiKey;
+			state.delay = delay || 0;
+			state.retry = retry || {
+				enabled: true,
+				max_attempts: 3,
+				interval_ms: 1000,
+				status_codes: [429, 500, 502, 503, 504],
+			};
+			state.models = models || [];
+			state.providerKeys = providerKeys || {};
 
-		// Render provider and model management
-		renderProviders();
-		renderModels();
-	}
-	if (message.type === "modelsFetched") {
-		state.models = message.models || [];
-		renderProviders();
-		renderModels();
+			// Update base configuration
+			baseUrlInput.value = baseUrl || "";
+			apiKeyInput.value = apiKey || "";
+			delayInput.value = state.delay;
+			retryEnabledInput.checked = state.retry.enabled !== false;
+			maxAttemptsInput.value = state.retry.max_attempts || 3;
+			intervalMsInput.value = state.retry.interval_ms || 1000;
+			statusCodesInput.value = state.retry.status_codes ? state.retry.status_codes.join(",") : "429,500,502,503,504";
+
+			// Render provider and model management
+			renderProviders();
+			renderModels();
+			break;
+		case "modelsFetched":
+			state.models = message.models || [];
+			renderProviders();
+			renderModels();
+			break;
+		case "confirmResponse":
+			// Handle confirmation responses
+			const pendingAction = pendingConfirmations.get(message.id);
+			if (pendingAction && message.confirmed) {
+				if (pendingAction.action) {
+					pendingAction.action();
+				}
+				// Clean up the pending confirmation
+				pendingConfirmations.delete(message.id);
+			} else if (pendingAction) {
+				// Clean up the pending confirmation even if not confirmed
+				pendingConfirmations.delete(message.id);
+			}
+			break;
 	}
 });
 
@@ -210,10 +232,21 @@ function renderProviders() {
 
 	document.querySelectorAll(".delete-provider-btn").forEach((btn) => {
 		btn.addEventListener("click", (event) => {
-			const provider = event.target.getAttribute("data-field");
-			if (confirm(`Are you sure you want to delete provider ${provider} and all its models?`)) {
-				vscode.postMessage({ type: "deleteProvider", provider: provider });
-			}
+			console.log("Delete provider clicked", event);
+			const provider = event.target.getAttribute("data-provider");
+			const confirmId = "deleteProvider_" + Date.now();
+
+			// Store the action to be performed after confirmation
+			pendingConfirmations.set(confirmId, {
+				action: () => vscode.postMessage({ type: "deleteProvider", provider: provider }),
+			});
+
+			vscode.postMessage({
+				type: "requestConfirm",
+				id: confirmId,
+				message: `Are you sure you want to delete provider ${provider} and all its models?`,
+				action: "deleteProvider",
+			});
 		});
 	});
 }
@@ -260,9 +293,19 @@ function renderModels() {
 	document.querySelectorAll(".delete-model-btn").forEach((btn) => {
 		btn.addEventListener("click", (event) => {
 			const modelId = event.target.getAttribute("data-model-id");
-			if (confirm(`Are you sure you want to delete model ${modelId}?`)) {
-				vscode.postMessage({ type: "deleteModel", modelId: modelId });
-			}
+			const confirmId = "deleteModel_" + Date.now();
+
+			// Store the action to be performed after confirmation
+			pendingConfirmations.set(confirmId, {
+				action: () => vscode.postMessage({ type: "deleteModel", modelId: modelId }),
+			});
+
+			vscode.postMessage({
+				type: "requestConfirm",
+				id: confirmId,
+				message: `Are you sure you want to delete model ${modelId}?`,
+				action: "deleteModel",
+			});
 		});
 	});
 }

@@ -32,7 +32,13 @@ type IncomingMessage =
 	| { type: "deleteProvider"; provider: string }
 	| { type: "addModel"; model: HFModelItem }
 	| { type: "updateModel"; model: HFModelItem }
-	| { type: "deleteModel"; modelId: string };
+	| { type: "deleteModel"; modelId: string }
+	| { type: "requestConfirm"; id: string; message: string; action: string };
+
+type OutgoingMessage =
+	| { type: "init"; payload: InitPayload }
+	| { type: "modelsFetched"; models: HFModelItem[] }
+	| { type: "confirmResponse"; id: string; confirmed: boolean };
 
 export class ConfigViewPanel {
 	public static currentPanel: ConfigViewPanel | undefined;
@@ -145,12 +151,35 @@ export class ConfigViewPanel {
 			case "updateModel":
 				await this.updateModel(message.model);
 				break;
+			case "requestConfirm":
+				await this.handleConfirmRequest(message.id, message.message, message.action);
+				break;
 			case "deleteModel":
 				await this.deleteModel(message.modelId);
 				break;
 			default:
 				break;
 		}
+	}
+
+	private async handleConfirmRequest(id: string, message: string, action: string) {
+		let confirmed: boolean | string | undefined;
+
+		if (action === "showInfo") {
+			// For informational messages, just show the message without confirmation
+			await vscode.window.showInformationMessage(message);
+			confirmed = true;
+		} else {
+			// For confirmation requests, show Yes/No dialog
+			confirmed = await vscode.window.showInformationMessage(message, { modal: true }, "Yes", "No");
+		}
+
+		// Send response back to webview
+		this.panel.webview.postMessage({
+			type: "confirmResponse",
+			id: id,
+			confirmed: action === "showInfo" ? true : confirmed === "Yes",
+		} as OutgoingMessage);
 	}
 
 	private async sendInit() {
@@ -201,13 +230,19 @@ export class ConfigViewPanel {
 		} else {
 			await this.secrets.delete("oaicopilot.apiKey");
 		}
-		vscode.window.showInformationMessage("OAI Compatible base URL, Delay, Retry and API Key have been saved to global settings.");
+		vscode.window.showInformationMessage(
+			"OAI Compatible base URL, Delay, Retry and API Key have been saved to global settings."
+		);
+		// Send refresh signal to frontend
+		await this.sendInit();
 	}
 
 	private async saveModels(models: HFModelItem[]) {
 		const config = vscode.workspace.getConfiguration();
 		await config.update("oaicopilot.models", models, vscode.ConfigurationTarget.Global);
 		vscode.window.showInformationMessage("Model configurations have been saved to global settings.");
+		// Send refresh signal to frontend
+		await this.sendInit();
 	}
 
 	private async saveProviderKey(provider: string, apiKey: string | null) {
@@ -219,6 +254,8 @@ export class ConfigViewPanel {
 			await this.secrets.delete(keyId);
 			vscode.window.showInformationMessage(`API Key for ${provider} has been cleared.`);
 		}
+		// Send refresh signal to frontend to update API key display
+		await this.sendInit();
 	}
 
 	private async fetchModelsFromApi(rawBaseUrl: string, apiKey: string): Promise<HFModelItem[]> {
@@ -305,7 +342,7 @@ export class ConfigViewPanel {
 		const hasProviderModels = models.some((model) => model.owned_by === provider);
 		if (!hasProviderModels) {
 			const defaultModel: HFModelItem = {
-				id: `default-${provider}`,
+				id: `placeholder-${provider}`,
 				owned_by: provider,
 				baseUrl: baseUrl,
 				apiMode: (apiMode as "openai" | "ollama" | "anthropic") || "openai",
@@ -315,6 +352,8 @@ export class ConfigViewPanel {
 
 		await config.update("oaicopilot.models", models, vscode.ConfigurationTarget.Global);
 		vscode.window.showInformationMessage(`Provider ${provider} has been added.`);
+		// Send refresh signal to frontend
+		await this.sendInit();
 	}
 
 	private async updateProvider(provider: string, baseUrl?: string, apiKey?: string, apiMode?: string) {
@@ -342,6 +381,8 @@ export class ConfigViewPanel {
 
 		await config.update("oaicopilot.models", updatedModels, vscode.ConfigurationTarget.Global);
 		vscode.window.showInformationMessage(`Provider ${provider} has been updated.`);
+		// Send refresh signal to frontend
+		await this.sendInit();
 	}
 
 	private async deleteProvider(provider: string) {
@@ -355,6 +396,8 @@ export class ConfigViewPanel {
 
 		await config.update("oaicopilot.models", filteredModels, vscode.ConfigurationTarget.Global);
 		vscode.window.showInformationMessage(`Provider ${provider} and all its models have been deleted.`);
+		// Send refresh signal to frontend
+		await this.sendInit();
 	}
 
 	private async addModel(model: HFModelItem) {
@@ -371,6 +414,8 @@ export class ConfigViewPanel {
 		models.push(model);
 		await config.update("oaicopilot.models", models, vscode.ConfigurationTarget.Global);
 		vscode.window.showInformationMessage(`Model ${model.id} has been added.`);
+		// Send refresh signal to frontend
+		await this.sendInit();
 	}
 
 	private async updateModel(model: HFModelItem) {
@@ -386,6 +431,8 @@ export class ConfigViewPanel {
 
 		await config.update("oaicopilot.models", updatedModels, vscode.ConfigurationTarget.Global);
 		vscode.window.showInformationMessage(`Model ${model.id} has been updated.`);
+		// Send refresh signal to frontend
+		await this.sendInit();
 	}
 
 	private async deleteModel(modelId: string) {
@@ -395,5 +442,7 @@ export class ConfigViewPanel {
 
 		await config.update("oaicopilot.models", filteredModels, vscode.ConfigurationTarget.Global);
 		vscode.window.showInformationMessage(`Model ${modelId} has been deleted.`);
+		// Send refresh signal to frontend
+		await this.sendInit();
 	}
 }
