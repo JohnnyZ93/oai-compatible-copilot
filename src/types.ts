@@ -79,7 +79,7 @@ export interface HFModelItem {
 	 * API mode: "openai" for OpenAI-compatible API, "ollama" for Ollama native API.
 	 * Default is "openai".
 	 */
-	apiMode?: "openai" | "ollama" | "anthropic";
+	apiMode?: HFApiMode;
 
 	/**
 	 * Model-specific delay in milliseconds between consecutive requests.
@@ -131,3 +131,6 @@ export interface RetryConfig {
 	interval_ms?: number;
 	status_codes?: number[];
 }
+
+/** Supports API mode. */
+export type HFApiMode = "openai" | "ollama" | "anthropic";

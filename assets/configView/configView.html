@@ -182,7 +182,7 @@
 								id="modelTemperature"
 								type="number"
 								class="model-input"
-								placeholder="1"
+								placeholder="0"
 								min="0"
 								max="2"
 								step="0.01"
@@ -206,7 +206,7 @@
 							<div class="row">
 								<div class="field">
 									<label for="modelTopK">Top K</label>
-									<input id="modelTopK" type="number" class="model-input" placeholder="1" min="1" />
+									<input id="modelTopK" type="number" class="model-input" min="1" />
 								</div>
 								<div class="field">
 									<label for="modelMinP">Min P</label>
@@ -214,7 +214,6 @@
 										id="modelMinP"
 										type="number"
 										class="model-input"
-										placeholder="0.1"
 										min="0"
 										max="1"
 										step="0.01"
@@ -228,7 +227,6 @@
 										id="modelFrequencyPenalty"
 										type="number"
 										class="model-input"
-										placeholder="0"
 										min="-2"
 										max="2"
 										step="0.01"
@@ -240,7 +238,6 @@
 										id="modelPresencePenalty"
 										type="number"
 										class="model-input"
-										placeholder="0"
 										min="-2"
 										max="2"
 										step="0.01"
@@ -254,7 +251,6 @@
 										id="modelRepetitionPenalty"
 										type="number"
 										class="model-input"
-										placeholder="1"
 										min="0"
 										step="0.01"
 									/>
@@ -262,7 +258,7 @@
 								<div class="field">
 									<label for="modelReasoningEffort">Reasoning Effort</label>
 									<select id="modelReasoningEffort" class="model-input">
-										<option value="">Default</option>
+										<option value="">Default (Null)</option>
 										<option value="high">High</option>
 										<option value="medium">Medium</option>
 										<option value="low">Low</option>
@@ -274,21 +270,21 @@
 								<div class="field">
 									<label for="modelEnableThinking">Enable Thinking</label>
 									<select id="modelEnableThinking" class="model-input">
-										<option value="">Default</option>
+										<option value="">Default (Null)</option>
 										<option value="true">True</option>
 										<option value="false">False</option>
 									</select>
 								</div>
 								<div class="field">
 									<label for="modelThinkingBudget">Thinking Budget</label>
-									<input id="modelThinkingBudget" type="number" class="model-input" placeholder="2000" min="1" />
+									<input id="modelThinkingBudget" type="number" class="model-input" min="1" />
 								</div>
 							</div>
 							<div class="row">
 								<div class="field">
 									<label for="modelIncludeReasoning">Include Reasoning</label>
 									<select id="modelIncludeReasoning" class="model-input">
-										<option value="">Default</option>
+										<option value="">Default (Null)</option>
 										<option value="true">True</option>
 										<option value="false">False</option>
 									</select>

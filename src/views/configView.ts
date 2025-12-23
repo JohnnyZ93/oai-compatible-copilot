@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { HFModelItem } from "../types";
+import type { HFApiMode, HFModelItem } from "../types";
 import { parseModelId } from "../utils";
 import { fetchModels } from "../provideModel";
 
@@ -27,8 +27,6 @@ type IncomingMessage =
 			retry: { enabled?: boolean; max_attempts?: number; interval_ms?: number; status_codes?: number[] };
 	  }
 	| { type: "fetchModels"; baseUrl: string; apiKey: string }
-	| { type: "saveModels"; models: HFModelItem[] }
-	| { type: "saveProviderKey"; provider: string; apiKey: string | null }
 	| { type: "addProvider"; provider: string; baseUrl?: string; apiKey?: string; apiMode?: string }
 	| { type: "updateProvider"; provider: string; baseUrl?: string; apiKey?: string; apiMode?: string }
 	| { type: "deleteProvider"; provider: string }
@@ -284,7 +282,7 @@ export class ConfigViewPanel {
 				id: `placeholder-${provider}`,
 				owned_by: provider,
 				baseUrl: baseUrl,
-				apiMode: (apiMode as "openai" | "ollama" | "anthropic") || "openai",
+				apiMode: (apiMode as HFApiMode) || "openai",
 			};
 			models.push(defaultModel);
 		}
@@ -312,7 +310,7 @@ export class ConfigViewPanel {
 				return {
 					...model,
 					baseUrl: baseUrl || model.baseUrl,
-					apiMode: (apiMode as "openai" | "ollama" | "anthropic") || model.apiMode,
+					apiMode: (apiMode as HFApiMode) || model.apiMode,
 				};
 			}
 			return model;
