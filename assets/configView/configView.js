@@ -485,11 +485,11 @@ function resetModelForm() {
 	modelConfigIdInput.value = "";
 	modelBaseUrlInput.value = "";
 	modelFamilyInput.value = "";
-	modelContextLengthInput.value = "";
-	modelMaxTokensInput.value = "";
+	modelContextLengthInput.value = 128000;
+	modelMaxTokensInput.value = 4096;
 	modelVisionInput.value = "";
 	modelApiModeInput.value = "openai";
-	modelTemperatureInput.value = "";
+	modelTemperatureInput.value = 0;
 	modelTopPInput.value = "";
 	modelDelayInput.value = "";
 	modelTopKInput.value = "";

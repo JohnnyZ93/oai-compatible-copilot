@@ -12,8 +12,9 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.2, GLM 4.6 and mor
 - Supports control model thinking and reasoning content show in chat interface.
 - Supports configuring models from multiple providers simultaneously, automatically managing API keys without switch them repeatedly.
 - Supports defining multiple configurations for the same model ID with different settings (e.g. thinking enable/disable for GLM-4.6).
-- Support auto retry mechanism for handling api errors like [429, 500, 502, 503, 504].
-- Support token usage count and set provider api keys in status bar.
+- Supports auto retry mechanism for handling api errors like [429, 500, 502, 503, 504].
+- Supports token usage count and set provider api keys in status bar.
+- Supports provider and model visual configuration ui.
 ---
 
 ## Requirements
@@ -45,6 +46,59 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.2, GLM 4.6 and mor
     }
 ]
 ```
+---
+
+## * Configuration UI
+
+The extension provides a visual configuration interface that makes it easy to manage global settings, providers, and models without editing JSON files manually.
+
+### Opening the Configuration UI
+
+There are two ways to open the configuration interface:
+
+1. **From the Command Palette**:
+   - Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS)
+   - Search for "OAICopilot: Open Configuration UI"
+   - Select the command to open the configuration panel
+
+2. **From the Status Bar**:
+   - Click on the "OAICopilot" status bar item in the bottom-right corner of VS Code
+
+### Workflow Example
+
+1. **Add a Provider**:
+   - Click "Add Provider" in the Provider Management section
+   - Enter Provider ID: "modelscope"
+   - Enter Base URL: "https://api-inference.modelscope.cn/v1"
+   - Enter API Key: Your ModelScope API key
+   - Select API Mode: "openai"
+   - Click "Save"
+
+2. **Add a Model**:
+   - Click "Add Model" in the Model Management section
+   - Select Provider: "modelscope"
+   - Enter Model ID: "Qwen/Qwen3-Coder-480B-A35B-Instruct"
+   - Configure basic parameters (context length, max tokens, etc.)
+   - Click "Save Model"
+
+3. **Use the Model in VS Code**:
+   - Open GitHub Copilot Chat (`Ctrl+Shift+I` or `Cmd+Shift+I`)
+   - Click the model picker in the chat input
+   - Select "Manage Models..."
+   - Choose "OAI Compatible" provider
+   - Select your configured models
+   - Start chatting with the model!
+
+### Tips & Best Practices
+
+- **Important**: If use configuration ui, then the global baseURL, APIKey is invalid.
+- **Provider IDs**: Use descriptive names that match the service (e.g., "modelscope", "iflow", "anthropic")
+- **Model IDs**: Use the exact model identifier from the provider's documentation
+- **Config IDs**: Use meaningful names like "thinking", "no-thinking", "fast", "accurate" for multiple configurations
+- **Base URL Overrides**: Set model-specific base URLs when using models from different endpoints of the same provider
+- **Save Frequently**: Changes are saved to VS Code settings immediately
+- **Refresh**: Use the "Refresh" buttons to reload current configuration from VS Code settings
+
 ---
 
 ## * Multi Api Mode

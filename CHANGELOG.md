@@ -1,5 +1,14 @@
 # Change Log
 
+## 0.1.9 (2025-12-24)
+
+- Feat: [Make top_p optional in request body.](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/81)
+- Feat: [Add Model-specific delay configuration.](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/74)
+- Feat: [Add Model Configuration UI](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/68)
+- Enhanced `oaicopilot.models` configuration including:
+  - `delay`: Model-specific delay in milliseconds between consecutive requests. If not specified, falls back to global `oaicopilot.delay` configuration.
+- New Command `OAICopilot: Open Configuration UI`.
+
 ## 0.1.8 (2025-12-17)
 
 - Feat: [Add Ollama /api/chat](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/65)

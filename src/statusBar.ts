@@ -7,8 +7,8 @@ export function initStatusBar(context: vscode.ExtensionContext): vscode.StatusBa
 	const tokenCountStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
 	tokenCountStatusBarItem.name = "Token Count";
 	tokenCountStatusBarItem.text = "$(symbol-numeric) Ready";
-	tokenCountStatusBarItem.tooltip = "Current model token usage - Click to Manage ApiKeys";
-	tokenCountStatusBarItem.command = "oaicopilot.setProviderApikey";
+	tokenCountStatusBarItem.tooltip = "Current model token usage - Click to Open Configuration UI";
+	tokenCountStatusBarItem.command = "oaicopilot.openConfig";
 	context.subscriptions.push(tokenCountStatusBarItem);
 	// Show the status bar item initially
 	tokenCountStatusBarItem.show();
@@ -75,7 +75,7 @@ export async function updateContextStatusBar(
 	const progressBar = createProgressBar(totalTokenCount, maxTokens);
 	const displayText = `$(symbol-parameter) ${progressBar}`;
 	statusBarItem.text = displayText;
-	statusBarItem.tooltip = `Token Usage: ${formatTokenCount(totalTokenCount)} / ${formatTokenCount(maxTokens)}\n\n${progressBar}\n\nClick to Manage ApiKeys`;
+	statusBarItem.tooltip = `Token Usage: ${formatTokenCount(totalTokenCount)} / ${formatTokenCount(maxTokens)}\n\n${progressBar}\n\nClick to Open Configuration UI`;
 
 	// Add color coding based on token usage
 	const usagePercentage = (totalTokenCount / maxTokens) * 100;

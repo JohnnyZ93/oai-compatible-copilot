@@ -14,6 +14,7 @@ This is a VS Code extension that integrates OpenAI-compatible inference provider
    - `src/anthropic/anthropicApi.ts` - Anthropic Claude API
 4. **Type System** (`src/types.ts`): Centralized type definitions for model configurations
 5. **Utility Functions** (`src/utils.ts`): Shared helpers for retry logic, tool conversion, etc.
+6. **Config View** (`src/views/configView.ts`): Provider and models configuration View.
 
 ### Key Design Decisions
 - **Multi-provider support**: Users can configure models from multiple providers simultaneously
