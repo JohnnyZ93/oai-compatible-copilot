@@ -51,10 +51,21 @@ const modelReasoningEffortInput = document.getElementById("modelReasoningEffort"
 const modelEnableThinkingInput = document.getElementById("modelEnableThinking");
 const modelThinkingBudgetInput = document.getElementById("modelThinkingBudget");
 const modelIncludeReasoningInput = document.getElementById("modelIncludeReasoning");
+const modelMaxCompletionTokensInput = document.getElementById("modelMaxCompletionTokens");
+const modelReasoningEnabledInput = document.getElementById("modelReasoningEnabled");
+const modelReasoningExcludeInput = document.getElementById("modelReasoningExclude");
+const modelReasoningEffortORInput = document.getElementById("modelReasoningEffortOR");
+const modelReasoningMaxTokensInput = document.getElementById("modelReasoningMaxTokens");
+const modelThinkingTypeInput = document.getElementById("modelThinkingType");
+const modelHeadersInput = document.getElementById("modelHeaders");
+const modelExtraInput = document.getElementById("modelExtra");
 const saveModelBtn = document.getElementById("saveModel");
 const cancelModelBtn = document.getElementById("cancelModel");
 const toggleAdvancedSettingsBtn = document.getElementById("toggleAdvancedSettings");
 const advancedSettingsContent = document.getElementById("advancedSettingsContent");
+
+// Error message element
+const modelErrorElement = document.getElementById("modelError");
 
 // Dropdown elements
 const dropdownContent = modelIdDropdown.querySelector(".dropdown-content");
@@ -369,7 +380,6 @@ function renderProviders() {
 
 	document.querySelectorAll(".delete-provider-btn").forEach((btn) => {
 		btn.addEventListener("click", (event) => {
-			console.log("Delete provider clicked", event);
 			const provider = event.target.getAttribute("data-provider");
 			const confirmId = "deleteProvider_" + Date.now();
 
@@ -439,8 +449,6 @@ function renderModels() {
 				modelFormSection.style.display = "block";
 				modelFormTitle.textContent = `Edit Model: ${modelId}`;
 				populateModelForm(model);
-			} else {
-				alert(`Model ${modelId} not found.`);
 			}
 		});
 	});
@@ -467,6 +475,9 @@ function renderModels() {
 
 // Reset model form
 function resetModelForm() {
+	// Clear any error message
+	showModelError("");
+
 	modelIdInput.value = "";
 	modelProviderInput.value = ""; // Only reset the selected value, options remain
 	modelDisplayNameInput.value = "";
@@ -489,6 +500,14 @@ function resetModelForm() {
 	modelEnableThinkingInput.value = "";
 	modelThinkingBudgetInput.value = "";
 	modelIncludeReasoningInput.value = "";
+	modelMaxCompletionTokensInput.value = "";
+	modelReasoningEnabledInput.value = "";
+	modelReasoningExcludeInput.value = "";
+	modelReasoningEffortORInput.value = "";
+	modelReasoningMaxTokensInput.value = "";
+	modelThinkingTypeInput.value = "";
+	modelHeadersInput.value = "";
+	modelExtraInput.value = "";
 	advancedSettingsContent.style.display = "none";
 	toggleAdvancedSettingsBtn.textContent = "Show Advanced Settings";
 	// Remove editing attribute
@@ -531,83 +550,125 @@ function collectModelFormData() {
 		include_reasoning_in_request: modelIncludeReasoningInput.value
 			? modelIncludeReasoningInput.value === "true"
 			: undefined,
+		max_completion_tokens: modelMaxCompletionTokensInput.value ? parseInt(modelMaxCompletionTokensInput.value) : undefined,
+		// Build reasoning configuration object
+		reasoning: buildReasoningConfig(),
+		// Build thinking configuration object
+		thinking: buildThinkingConfig(),
+		// Parse headers and extra JSON
+		headers: parseJsonField(modelHeadersInput.value),
+		extra: parseJsonField(modelExtraInput.value),
 		// Include original configId for update operations
 		originalConfigId: isEditing ? modelIdInput.getAttribute("data-original-configId") : undefined,
 	};
 }
 
+// Build reasoning configuration object from form fields
+function buildReasoningConfig() {
+	const enabled = modelReasoningEnabledInput.value ? modelReasoningEnabledInput.value === "true" : undefined;
+	const effort = modelReasoningEffortORInput.value || undefined;
+	const exclude = modelReasoningExcludeInput.value ? modelReasoningExcludeInput.value === "true" : undefined;
+	const maxTokens = modelReasoningMaxTokensInput.value ? parseInt(modelReasoningMaxTokensInput.value) : undefined;
+
+	// Only return an object if at least one field has a value
+	if (enabled !== undefined || effort !== undefined || exclude !== undefined || maxTokens !== undefined) {
+		return {
+			enabled,
+			effort,
+			exclude,
+			max_tokens: maxTokens,
+		};
+	}
+	return undefined;
+}
+
+// Build thinking configuration object from form fields
+function buildThinkingConfig() {
+	const type = modelThinkingTypeInput.value || undefined;
+
+	if (type !== undefined) {
+		return { type };
+	}
+	return undefined;
+}
+
+// Parse JSON field, return undefined if empty or invalid
+function parseJsonField(value) {
+	if (!value || value.trim() === "") {
+		return undefined;
+	}
+	try {
+		return JSON.parse(value.trim());
+	} catch (error) {
+		// Return the raw value if JSON parsing fails
+		// This allows the backend to handle validation
+		return value.trim();
+	}
+}
+
+// Show error message in the UI
+function showModelError(message) {
+	if (modelErrorElement) {
+		modelErrorElement.textContent = message;
+		modelErrorElement.style.display = message ? "block" : "none";
+
+		// Scroll to error message if it's visible
+		if (message) {
+			modelErrorElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+		}
+	}
+}
+
 // Validate model data
 function validateModelData(modelData) {
+	// Clear any previous error
+	showModelError("");
+
 	if (!modelData.id) {
-		alert("Model ID is required.");
+		showModelError("Model ID is required.");
 		return false;
 	}
 	if (!modelData.owned_by) {
-		alert("Provider ID is required.");
+		showModelError("Provider ID is required.");
 		return false;
 	}
 
 	// Validate numeric fields if provided
 	if (modelData.context_length !== undefined && (isNaN(modelData.context_length) || modelData.context_length <= 0)) {
-		alert("Context Length must be a positive number.");
+		showModelError("Context Length must be a positive number.");
 		return false;
 	}
 	if (modelData.max_tokens !== undefined && (isNaN(modelData.max_tokens) || modelData.max_tokens <= 0)) {
-		alert("Max Tokens must be a positive number.");
+		showModelError("Max Tokens must be a positive number.");
+		return false;
+	}
+	if (modelData.max_completion_tokens !== undefined && (isNaN(modelData.max_completion_tokens) || modelData.max_completion_tokens <= 0)) {
+		showModelError("Max Completion Tokens must be a positive number.");
 		return false;
 	}
 	if (
 		modelData.temperature !== undefined &&
 		(isNaN(modelData.temperature) || modelData.temperature < 0 || modelData.temperature > 2)
 	) {
-		alert("Temperature must be between 0 and 2.");
+		showModelError("Temperature must be between 0 and 2.");
 		return false;
 	}
 	if (modelData.top_p !== undefined && (isNaN(modelData.top_p) || modelData.top_p < 0 || modelData.top_p > 1)) {
-		alert("Top P must be between 0 and 1.");
+		showModelError("Top P must be between 0 and 1.");
 		return false;
 	}
 	if (modelData.delay !== undefined && (isNaN(modelData.delay) || modelData.delay < 0)) {
-		alert("Delay must be a non-negative number.");
-		return false;
-	}
-	if (modelData.top_k !== undefined && (isNaN(modelData.top_k) || modelData.top_k < 1)) {
-		alert("Top K must be a positive number.");
-		return false;
-	}
-	if (modelData.min_p !== undefined && (isNaN(modelData.min_p) || modelData.min_p < 0 || modelData.min_p > 1)) {
-		alert("Min P must be between 0 and 1.");
-		return false;
-	}
-	if (
-		modelData.frequency_penalty !== undefined &&
-		(isNaN(modelData.frequency_penalty) || modelData.frequency_penalty < -2 || modelData.frequency_penalty > 2)
-	) {
-		alert("Frequency Penalty must be between -2 and 2.");
-		return false;
-	}
-	if (
-		modelData.presence_penalty !== undefined &&
-		(isNaN(modelData.presence_penalty) || modelData.presence_penalty < -2 || modelData.presence_penalty > 2)
-	) {
-		alert("Presence Penalty must be between -2 and 2.");
-		return false;
-	}
-	if (
-		modelData.repetition_penalty !== undefined &&
-		(isNaN(modelData.repetition_penalty) || modelData.repetition_penalty < 0)
-	) {
-		alert("Repetition Penalty must be a non-negative number.");
-		return false;
-	}
-	if (modelData.thinking_budget !== undefined && (isNaN(modelData.thinking_budget) || modelData.thinking_budget <= 0)) {
-		alert("Thinking Budget must be a positive number.");
+		showModelError("Delay must be a non-negative number.");
 		return false;
 	}
 
-	// Validate URL format if baseUrl is provided
-	if (modelData.baseUrl && !isValidUrl(modelData.baseUrl)) {
-		alert("Base URL must be a valid URL format (e.g., https://api.example.com/v1).");
+	// Validate JSON fields
+	if (modelData.headers && typeof modelData.headers !== "object") {
+		showModelError("Custom Headers must be a valid JSON object.");
+		return false;
+	}
+	if (modelData.extra && typeof modelData.extra !== "object") {
+		showModelError("Extra Parameters must be a valid JSON object.");
 		return false;
 	}
 
@@ -684,6 +745,9 @@ function toggleDropdown() {
 
 // Populate model form with existing data
 function populateModelForm(model) {
+	// Clear any error message
+	showModelError("");
+
 	// Store the original model configId for update operations
 	modelIdInput.setAttribute("data-original-configId", model.configId || "");
 
@@ -723,6 +787,21 @@ function populateModelForm(model) {
 	modelThinkingBudgetInput.value = model.thinking_budget || "";
 	modelIncludeReasoningInput.value =
 		model.include_reasoning_in_request !== undefined ? String(model.include_reasoning_in_request) : "";
+	modelMaxCompletionTokensInput.value = model.max_completion_tokens || "";
+	// Populate reasoning configuration
+	if (model.reasoning) {
+		modelReasoningEnabledInput.value = model.reasoning.enabled !== undefined ? String(model.reasoning.enabled) : "";
+		modelReasoningEffortORInput.value = model.reasoning.effort || "";
+		modelReasoningExcludeInput.value = model.reasoning.exclude !== undefined ? String(model.reasoning.exclude) : "";
+		modelReasoningMaxTokensInput.value = model.reasoning.max_tokens || "";
+	}
+	// Populate thinking configuration
+	if (model.thinking) {
+		modelThinkingTypeInput.value = model.thinking.type || "";
+	}
+	// Populate headers and extra
+	modelHeadersInput.value = model.headers ? JSON.stringify(model.headers, null, 2) : "";
+	modelExtraInput.value = model.extra ? JSON.stringify(model.extra, null, 2) : "";
 	// Mark that we're in editing mode by setting an attribute
 	modelIdInput.setAttribute("data-editing", "true");
 	modelIdInput.disabled = true;

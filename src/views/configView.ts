@@ -81,14 +81,12 @@ export class ConfigViewPanel {
 		this.secrets = secrets;
 		this.userAgent = userAgent;
 
-		console.log("[ConfigurationPanel] Initializing configuration panel");
 		this.update();
 
 		this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
 
 		this.panel.webview.onDidReceiveMessage(
 			async (message) => {
-				console.log("[ConfigurationPanel] Received message from webview:", message);
 				this.handleMessage(message).catch((err) => {
 					console.error("[oaicopilot] handleMessage failed", err);
 					vscode.window.showErrorMessage(

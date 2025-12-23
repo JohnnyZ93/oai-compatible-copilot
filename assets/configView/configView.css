@@ -356,3 +356,18 @@ button:not(.secondary):not(.danger) {
 .dropdown-content::-webkit-scrollbar-thumb:hover {
 	background: var(--vscode-scrollbarSlider-activeBackground);
 }
+/* Error message styling */
+.error-message {
+	padding: 10px 12px;
+	margin-bottom: 12px;
+	border-radius: 8px;
+	border: 1px solid var(--vscode-inputValidation-errorBorder);
+	background: var(--vscode-inputValidation-errorBackground);
+	color: var(--vscode-inputValidation-errorForeground);
+	font-size: 13px;
+	line-height: 1.4;
+}
+
+.error-message:empty {
+	display: none;
+}

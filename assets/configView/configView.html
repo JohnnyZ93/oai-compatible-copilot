@@ -15,12 +15,20 @@
 					<button id="refreshGlobalConfig" class="secondary">Refresh</button>
 				</div>
 			</div>
-			<label for="baseUrl">Global Base URL</label>
-			<input id="baseUrl" type="text" placeholder="https://api.openai.com/v1" />
-			<label for="apiKey">Global API Key</label>
-			<input id="apiKey" type="password" placeholder="sk-..." />
-			<label for="delay">Delay (ms)</label>
-			<input id="delay" type="number" min="0" placeholder="0" />
+			<div class="row">
+				<div class="field">
+					<label for="baseUrl">Global Base URL</label>
+					<input id="baseUrl" type="text" placeholder="https://api.openai.com/v1" />
+				</div>
+				<div class="field">
+					<label for="apiKey">Global API Key</label>
+					<input id="apiKey" type="password" placeholder="sk-..." />
+				</div>
+				<div class="field">
+					<label for="delay">Delay (ms)</label>
+					<input id="delay" type="number" min="0" placeholder="0" />
+				</div>
+			</div>
 			<div class="retry-config">
 				<h3>Retry Configuration</h3>
 				<div class="row">
@@ -36,10 +44,10 @@
 						<label for="intervalMs">Retry Interval (ms)</label>
 						<input id="intervalMs" type="number" min="1" placeholder="1000" />
 					</div>
-				</div>
-				<div class="field">
-					<label for="statusCodes">Retry Status Codes (comma separated)</label>
-					<input id="statusCodes" type="text" placeholder="429,500,502,503,504" />
+					<div class="field">
+						<label for="statusCodes">Retry Status Codes (comma separated)</label>
+						<input id="statusCodes" type="text" placeholder="429,500,502,503,504" />
+					</div>
 				</div>
 			</div>
 			<div class="block-gap">
@@ -109,55 +117,11 @@
 				<div class="form-container">
 					<div class="row">
 						<div class="field">
-							<label for="modelIdInput">Model ID *</label>
-							<div class="input-with-dropdown">
-								<input id="modelIdInput" type="text" class="model-input" placeholder="e.g., gpt-4, claude-3" required />
-								<div id="modelIdDropdown" class="model-input-dropdown">
-									<div class="dropdown-header">Select Model</div>
-									<div class="dropdown-content">
-										<!-- Model options will be inserted here -->
-									</div>
-								</div>
-							</div>
-						</div>
-						<div class="field">
 							<label for="modelProvider">Provider ID *</label>
 							<select id="modelProvider" class="model-input" required>
 								<option value="">Select Provider</option>
 							</select>
 						</div>
-					</div>
-					<div class="row">
-						<div class="field">
-							<label for="modelDisplayName">Display Name</label>
-							<input id="modelDisplayName" type="text" class="model-input" placeholder="e.g., GPT-4 Turbo" />
-						</div>
-						<div class="field">
-							<label for="modelConfigId">Config ID</label>
-							<input id="modelConfigId" type="text" class="model-input" placeholder="e.g., thinking, no-thinking" />
-						</div>
-					</div>
-					<div class="row">
-						<div class="field">
-							<label for="modelBaseUrl">Base URL</label>
-							<input id="modelBaseUrl" type="text" class="model-input" placeholder="https://api.openai.com/v1" />
-						</div>
-						<div class="field">
-							<label for="modelFamily">Model Family</label>
-							<input id="modelFamily" type="text" class="model-input" placeholder="e.g., gpt-4, claude-3" />
-						</div>
-					</div>
-					<div class="row">
-						<div class="field">
-							<label for="modelContextLength">Context Length</label>
-							<input id="modelContextLength" type="number" class="model-input" placeholder="128000" min="1" />
-						</div>
-						<div class="field">
-							<label for="modelMaxTokens">Max Tokens</label>
-							<input id="modelMaxTokens" type="number" class="model-input" placeholder="4096" min="1" />
-						</div>
-					</div>
-					<div class="row">
 						<div class="field">
 							<label for="modelVision">Supports Vision</label>
 							<select id="modelVision" class="model-input">
@@ -177,6 +141,42 @@
 					</div>
 					<div class="row">
 						<div class="field">
+							<label for="modelIdInput">Model ID *</label>
+							<div class="input-with-dropdown">
+								<input id="modelIdInput" type="text" class="model-input" placeholder="e.g., gpt-4, claude-3" required />
+								<div id="modelIdDropdown" class="model-input-dropdown">
+									<div class="dropdown-header">Select Model</div>
+									<div class="dropdown-content">
+										<!-- Model options will be inserted here -->
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="field">
+							<label for="modelConfigId">Config ID</label>
+							<input id="modelConfigId" type="text" class="model-input" placeholder="e.g., thinking, no-thinking" />
+						</div>
+						<div class="field">
+							<label for="modelBaseUrl">Base URL</label>
+							<input id="modelBaseUrl" type="text" class="model-input" placeholder="https://api.openai.com/v1" />
+						</div>
+					</div>
+					<div class="row">
+						<div class="field">
+							<label for="modelContextLength">Context Length</label>
+							<input id="modelContextLength" type="number" class="model-input" placeholder="128000" min="1" />
+						</div>
+						<div class="field">
+							<label for="modelMaxTokens">Max Tokens</label>
+							<input id="modelMaxTokens" type="number" class="model-input" placeholder="4096" min="1" />
+						</div>
+						<div class="field">
+							<label for="modelMaxCompletionTokens">Max Completion Tokens</label>
+							<input id="modelMaxCompletionTokens" type="number" class="model-input" placeholder="4096" min="1" />
+						</div>
+					</div>
+					<div class="row">
+						<div class="field">
 							<label for="modelTemperature">Temperature</label>
 							<input
 								id="modelTemperature"
@@ -192,8 +192,6 @@
 							<label for="modelTopP">Top P</label>
 							<input id="modelTopP" type="number" class="model-input" placeholder="1" min="0" max="1" step="0.01" />
 						</div>
-					</div>
-					<div class="row">
 						<div class="field">
 							<label for="modelDelay">Delay (ms)</label>
 							<input id="modelDelay" type="number" class="model-input" placeholder="0" min="0" />
@@ -204,6 +202,14 @@
 						<button type="button" id="toggleAdvancedSettings" class="secondary">Show Advanced Settings</button>
 						<div id="advancedSettingsContent" style="display: none; margin-top: 15px">
 							<div class="row">
+								<div class="field">
+									<label for="modelDisplayName">Display Name</label>
+									<input id="modelDisplayName" type="text" class="model-input" placeholder="e.g., GPT-4 Turbo" />
+								</div>
+								<div class="field">
+									<label for="modelFamily">Model Family</label>
+									<input id="modelFamily" type="text" class="model-input" placeholder="e.g., gpt-4, claude-3" />
+								</div>
 								<div class="field">
 									<label for="modelTopK">Top K</label>
 									<input id="modelTopK" type="number" class="model-input" min="1" />
@@ -221,6 +227,10 @@
 								</div>
 							</div>
 							<div class="row">
+								<div class="field">
+									<label for="modelThinkingBudget">Thinking Budget</label>
+									<input id="modelThinkingBudget" type="number" class="model-input" min="128" />
+								</div>
 								<div class="field">
 									<label for="modelFrequencyPenalty">Frequency Penalty</label>
 									<input
@@ -243,8 +253,6 @@
 										step="0.01"
 									/>
 								</div>
-							</div>
-							<div class="row">
 								<div class="field">
 									<label for="modelRepetitionPenalty">Repetition Penalty</label>
 									<input
@@ -255,10 +263,37 @@
 										step="0.01"
 									/>
 								</div>
+							</div>
+							<!-- Thinking Configuration -->
+							<div class="row">
+								<div class="field">
+									<label for="modelIncludeReasoning">Include Reasoning</label>
+									<select id="modelIncludeReasoning" class="model-input">
+										<option value="">Default (False)</option>
+										<option value="true">True</option>
+										<option value="false">False</option>
+									</select>
+								</div>
+								<div class="field">
+									<label for="modelThinkingType">Thinking Type</label>
+									<select id="modelThinkingType" class="model-input">
+										<option value=""></option>
+										<option value="enabled">Enabled</option>
+										<option value="disabled">Disabled</option>
+									</select>
+								</div>
+								<div class="field">
+									<label for="modelEnableThinking">Enable Thinking</label>
+									<select id="modelEnableThinking" class="model-input">
+										<option value=""></option>
+										<option value="true">True</option>
+										<option value="false">False</option>
+									</select>
+								</div>
 								<div class="field">
 									<label for="modelReasoningEffort">Reasoning Effort</label>
 									<select id="modelReasoningEffort" class="model-input">
-										<option value="">Default (Null)</option>
+										<option value=""></option>
 										<option value="high">High</option>
 										<option value="medium">Medium</option>
 										<option value="low">Low</option>
@@ -266,32 +301,57 @@
 									</select>
 								</div>
 							</div>
-							<div class="row">
-								<div class="field">
-									<label for="modelEnableThinking">Enable Thinking</label>
-									<select id="modelEnableThinking" class="model-input">
-										<option value="">Default (Null)</option>
-										<option value="true">True</option>
-										<option value="false">False</option>
-									</select>
-								</div>
-								<div class="field">
-									<label for="modelThinkingBudget">Thinking Budget</label>
-									<input id="modelThinkingBudget" type="number" class="model-input" min="1" />
+							<!-- Reasoning Configuration -->
+							<div class="retry-config">
+								<h3>Reasoning Configuration (OpenRouter)</h3>
+								<div class="row">
+									<div class="field">
+										<label for="modelReasoningEnabled">Reasoning Enabled</label>
+										<select id="modelReasoningEnabled" class="model-input">
+											<option value=""></option>
+											<option value="true">True</option>
+											<option value="false">False</option>
+										</select>
+									</div>
+									<div class="field">
+										<label for="modelReasoningEffortOR">Reasoning Effort</label>
+										<select id="modelReasoningEffortOR" class="model-input">
+											<option value=""></option>
+											<option value="high">High</option>
+											<option value="medium">Medium</option>
+											<option value="low">Low</option>
+											<option value="minimal">Minimal</option>
+											<option value="auto">Auto</option>
+										</select>
+									</div>
+									<div class="field">
+										<label for="modelReasoningExclude">Reasoning Exclude</label>
+										<select id="modelReasoningExclude" class="model-input">
+											<option value=""></option>
+											<option value="true">True</option>
+											<option value="false">False</option>
+										</select>
+									</div>
+									<div class="field">
+										<label for="modelReasoningMaxTokens">Reasoning Max Tokens</label>
+										<input id="modelReasoningMaxTokens" type="number" class="model-input" min="1" />
+									</div>
 								</div>
 							</div>
+							<!-- Custom Headers and Extra Parameters -->
 							<div class="row">
 								<div class="field">
-									<label for="modelIncludeReasoning">Include Reasoning</label>
-									<select id="modelIncludeReasoning" class="model-input">
-										<option value="">Default (Null)</option>
-										<option value="true">True</option>
-										<option value="false">False</option>
-									</select>
+									<label for="modelHeaders">Custom Headers (JSON)</label>
+									<textarea id="modelHeaders" class="model-input" rows="3" placeholder='{"X-API-Version": "v1", "X-Custom-Header": "value"}'></textarea>
+								</div>
+								<div class="field">
+									<label for="modelExtra">Extra Parameters (JSON)</label>
+									<textarea id="modelExtra" class="model-input" rows="3" placeholder='{"key1": "value", "key2": "value"}'></textarea>
 								</div>
 							</div>
 						</div>
 					</div>
+					<div id="modelError" class="error-message" style="display: none;"></div>
 					<div class="actions">
 						<button id="saveModel" class="primary">Save Model</button>
 						<button id="cancelModel" class="secondary">Cancel</button>
