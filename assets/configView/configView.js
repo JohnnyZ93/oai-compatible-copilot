@@ -513,11 +513,12 @@ function resetModelForm() {
 	toggleAdvancedSettingsBtn.textContent = "Show Advanced Settings";
 	// Remove editing attribute
 	modelIdInput.removeAttribute("data-editing");
-	// Re-enable BaseURL and apiMode fields when form is reset
+	// disbale fields when form is reset
 	modelBaseUrlInput.disabled = true;
 	modelApiModeInput.disabled = true;
-	// Re-enable model ID field when form is reset
+	// Re-enable fields when form is reset
 	modelIdInput.disabled = false;
+	modelProviderInput.disabled = false;
 }
 
 // Collect model form data
