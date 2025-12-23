@@ -82,7 +82,7 @@ document.getElementById("saveBase").addEventListener("click", () => {
 					.split(",")
 					.map((s) => parseInt(s.trim()))
 					.filter((n) => !isNaN(n))
-			: [429, 500, 502, 503, 504],
+			: [],
 	};
 
 	vscode.postMessage({
@@ -258,7 +258,7 @@ window.addEventListener("message", (event) => {
 				enabled: true,
 				max_attempts: 3,
 				interval_ms: 1000,
-				status_codes: [429, 500, 502, 503, 504],
+				status_codes: [],
 			};
 			state.models = models || [];
 			state.providerKeys = providerKeys || {};
@@ -270,7 +270,7 @@ window.addEventListener("message", (event) => {
 			retryEnabledInput.checked = state.retry.enabled !== false;
 			maxAttemptsInput.value = state.retry.max_attempts || 3;
 			intervalMsInput.value = state.retry.interval_ms || 1000;
-			statusCodesInput.value = state.retry.status_codes ? state.retry.status_codes.join(",") : "429,500,502,503,504";
+			statusCodesInput.value = state.retry.status_codes ? state.retry.status_codes.join(",") : "";
 
 			// Render provider and model management
 			renderProviders();
@@ -399,12 +399,13 @@ function renderProviders() {
 }
 
 function renderModels() {
-	if (!state.models.length) {
+	const models = state.models.filter((m) => !m.id.startsWith("__provider__"));
+	if (!models.length) {
 		modelTableBody.innerHTML = '<tr><td colspan="11" class="no-data">No models</td></tr>';
 		return;
 	}
 
-	const rows = state.models
+	const rows = models
 		.map((model) => {
 			return `
 			<tr data-model-id="${model.id}${model.configId ? "::" + model.configId : ""}">
@@ -550,7 +551,9 @@ function collectModelFormData() {
 		include_reasoning_in_request: modelIncludeReasoningInput.value
 			? modelIncludeReasoningInput.value === "true"
 			: undefined,
-		max_completion_tokens: modelMaxCompletionTokensInput.value ? parseInt(modelMaxCompletionTokensInput.value) : undefined,
+		max_completion_tokens: modelMaxCompletionTokensInput.value
+			? parseInt(modelMaxCompletionTokensInput.value)
+			: undefined,
 		// Build reasoning configuration object
 		reasoning: buildReasoningConfig(),
 		// Build thinking configuration object
@@ -614,7 +617,7 @@ function showModelError(message) {
 
 		// Scroll to error message if it's visible
 		if (message) {
-			modelErrorElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+			modelErrorElement.scrollIntoView({ behavior: "smooth", block: "nearest" });
 		}
 	}
 }
@@ -642,7 +645,10 @@ function validateModelData(modelData) {
 		showModelError("Max Tokens must be a positive number.");
 		return false;
 	}
-	if (modelData.max_completion_tokens !== undefined && (isNaN(modelData.max_completion_tokens) || modelData.max_completion_tokens <= 0)) {
+	if (
+		modelData.max_completion_tokens !== undefined &&
+		(isNaN(modelData.max_completion_tokens) || modelData.max_completion_tokens <= 0)
+	) {
 		showModelError("Max Completion Tokens must be a positive number.");
 		return false;
 	}

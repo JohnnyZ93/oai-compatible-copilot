@@ -25,32 +25,34 @@ export async function prepareLanguageModelChatInformation(
 	let infos: LanguageModelChatInformation[];
 	if (userModels && userModels.length > 0) {
 		// Return user-provided models directly
-		infos = userModels.map((m) => {
-			const contextLen = m?.context_length ?? DEFAULT_CONTEXT_LENGTH;
-			const maxOutput = m?.max_completion_tokens ?? m?.max_tokens ?? DEFAULT_MAX_TOKENS;
-			const maxInput = Math.max(1, contextLen - maxOutput);
+		infos = userModels
+			.filter((m) => !m.id.startsWith("__provider__"))
+			.map((m) => {
+				const contextLen = m?.context_length ?? DEFAULT_CONTEXT_LENGTH;
+				const maxOutput = m?.max_completion_tokens ?? m?.max_tokens ?? DEFAULT_MAX_TOKENS;
+				const maxInput = Math.max(1, contextLen - maxOutput);
 
-			// 使用配置ID（如果存在）来生成唯一的模型ID
-			const modelId = m.configId ? `${m.id}::${m.configId}` : m.id;
-			const modelName =
-				m.displayName || (m.configId ? `${m.id}::${m.configId} via ${m.owned_by}` : `${m.id} via ${m.owned_by}`);
+				// 使用配置ID（如果存在）来生成唯一的模型ID
+				const modelId = m.configId ? `${m.id}::${m.configId}` : m.id;
+				const modelName =
+					m.displayName || (m.configId ? `${m.id}::${m.configId} via ${m.owned_by}` : `${m.id} via ${m.owned_by}`);
 
-			return {
-				id: modelId,
-				name: modelName,
-				tooltip: m.configId
-					? `OAI Compatible ${m.id} (config: ${m.configId}) via ${m.owned_by}`
-					: `OAI Compatible via ${m.owned_by}`,
-				family: m.family ?? "oai-compatible",
-				version: "1.0.0",
-				maxInputTokens: maxInput,
-				maxOutputTokens: maxOutput,
-				capabilities: {
-					toolCalling: true,
-					imageInput: m?.vision ?? false,
-				},
-			} satisfies LanguageModelChatInformation;
-		});
+				return {
+					id: modelId,
+					name: modelName,
+					tooltip: m.configId
+						? `OAI Compatible ${m.id} (config: ${m.configId}) via ${m.owned_by}`
+						: `OAI Compatible via ${m.owned_by}`,
+					family: m.family ?? "oai-compatible",
+					version: "1.0.0",
+					maxInputTokens: maxInput,
+					maxOutputTokens: maxOutput,
+					capabilities: {
+						toolCalling: true,
+						imageInput: m?.vision ?? false,
+					},
+				} satisfies LanguageModelChatInformation;
+			});
 	} else {
 		// Fallback: Fetch models from API
 		const apiKey = await ensureApiKey(options.silent, secrets);

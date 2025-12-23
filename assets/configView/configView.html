@@ -142,8 +142,7 @@
 						<div class="field">
 							<label for="modelApiMode">API Mode</label>
 							<div class="field-description">
-								'openai'for API (/chat/completions), 'ollama' for API (/api/chat), 'anthropic'
-								for API (/v1/messages).
+								'openai'for API (/chat/completions), 'ollama' for API (/api/chat), 'anthropic' for API (/v1/messages).
 							</div>
 							<select id="modelApiMode" class="model-input">
 								<option value="openai">OpenAI</option>
@@ -218,9 +217,7 @@
 						</div>
 						<div class="field">
 							<label for="modelDelay">Delay (ms)</label>
-							<div class="field-description">
-								Model-specific delay in milliseconds between consecutive requests.
-							</div>
+							<div class="field-description">Model-specific delay in milliseconds between consecutive requests.</div>
 							<input id="modelDelay" type="number" class="model-input" placeholder="0" min="0" />
 						</div>
 					</div>
@@ -231,7 +228,9 @@
 							<div class="row">
 								<div class="field">
 									<label for="modelDisplayName">Display Name</label>
-									<div class="field-description">Display name for the model that will be shown in the Copilot interface.</div>
+									<div class="field-description">
+										Display name for the model that will be shown in the Copilot interface.
+									</div>
 									<input id="modelDisplayName" type="text" class="model-input" placeholder="e.g., GPT-4 Turbo" />
 								</div>
 								<div class="field">
@@ -361,9 +360,7 @@
 							<div class="row">
 								<div class="field">
 									<label for="modelHeaders">Custom Headers (JSON)</label>
-									<div class="field-description">
-										Custom HTTP headers to be sent with every request to this model.
-									</div>
+									<div class="field-description">Custom HTTP headers to be sent with every request to this model.</div>
 									<textarea
 										id="modelHeaders"
 										class="model-input"

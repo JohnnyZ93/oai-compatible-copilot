@@ -277,7 +277,7 @@ export class ConfigViewPanel {
 		const hasProviderModels = models.some((model) => model.owned_by === provider);
 		if (!hasProviderModels) {
 			const defaultModel: HFModelItem = {
-				id: `placeholder-${provider}`,
+				id: `__provider__${provider}`,
 				owned_by: provider,
 				baseUrl: baseUrl,
 				apiMode: (apiMode as HFApiMode) || "openai",
