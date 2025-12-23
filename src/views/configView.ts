@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
-import type { HFModelItem, HFModelsResponse } from "../types";
+import type { HFModelItem } from "../types";
 import { parseModelId } from "../utils";
+import { fetchModels } from "../provideModel";
 
 interface InitPayload {
 	baseUrl: string;
@@ -32,7 +33,7 @@ type IncomingMessage =
 	| { type: "updateProvider"; provider: string; baseUrl?: string; apiKey?: string; apiMode?: string }
 	| { type: "deleteProvider"; provider: string }
 	| { type: "addModel"; model: HFModelItem }
-	| { type: "updateModel"; model: HFModelItem }
+	| { type: "updateModel"; model: HFModelItem; originalConfigId?: string }
 	| { type: "deleteModel"; modelId: string }
 	| { type: "requestConfirm"; id: string; message: string; action: string };
 
@@ -46,9 +47,10 @@ export class ConfigViewPanel {
 	private readonly panel: vscode.WebviewPanel;
 	private readonly extensionUri: vscode.Uri;
 	private readonly secrets: vscode.SecretStorage;
+	private readonly userAgent: string;
 	private disposables: vscode.Disposable[] = [];
 
-	public static openPanel(extensionUri: vscode.Uri, secrets: vscode.SecretStorage) {
+	public static openPanel(extensionUri: vscode.Uri, secrets: vscode.SecretStorage, userAgent: string) {
 		const column = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.viewColumn : undefined;
 
 		if (ConfigViewPanel.currentPanel) {
@@ -67,13 +69,19 @@ export class ConfigViewPanel {
 			}
 		);
 
-		ConfigViewPanel.currentPanel = new ConfigViewPanel(panel, extensionUri, secrets);
+		ConfigViewPanel.currentPanel = new ConfigViewPanel(panel, extensionUri, secrets, userAgent);
 	}
 
-	private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, secrets: vscode.SecretStorage) {
+	private constructor(
+		panel: vscode.WebviewPanel,
+		extensionUri: vscode.Uri,
+		secrets: vscode.SecretStorage,
+		userAgent: string
+	) {
 		this.panel = panel;
 		this.extensionUri = extensionUri;
 		this.secrets = secrets;
+		this.userAgent = userAgent;
 
 		console.log("[ConfigurationPanel] Initializing configuration panel");
 		this.update();
@@ -127,16 +135,10 @@ export class ConfigViewPanel {
 				await this.saveGlobalConfig(message.baseUrl, message.apiKey, message.delay, message.retry);
 				break;
 			case "fetchModels": {
-				const models = await this.fetchModelsFromApi(message.baseUrl, message.apiKey);
+				const { models } = await fetchModels(message.baseUrl, message.apiKey, this.userAgent);
 				this.panel.webview.postMessage({ type: "modelsFetched", models });
 				break;
 			}
-			case "saveModels":
-				await this.saveModels(message.models);
-				break;
-			case "saveProviderKey":
-				await this.saveProviderKey(message.provider, message.apiKey);
-				break;
 			case "addProvider":
 				await this.addProvider(message.provider, message.baseUrl, message.apiKey, message.apiMode);
 				break;
@@ -150,7 +152,7 @@ export class ConfigViewPanel {
 				await this.addModel(message.model);
 				break;
 			case "updateModel":
-				await this.updateModel(message.model);
+				await this.updateModel(message.model, message.originalConfigId);
 				break;
 			case "requestConfirm":
 				await this.handleConfirmRequest(message.id, message.message, message.action);
@@ -236,70 +238,6 @@ export class ConfigViewPanel {
 		);
 		// Send refresh signal to frontend
 		await this.sendInit();
-	}
-
-	private async saveModels(models: HFModelItem[]) {
-		const config = vscode.workspace.getConfiguration();
-		await config.update("oaicopilot.models", models, vscode.ConfigurationTarget.Global);
-		vscode.window.showInformationMessage("Model configurations have been saved to global settings.");
-		// Send refresh signal to frontend
-		await this.sendInit();
-	}
-
-	private async saveProviderKey(provider: string, apiKey: string | null) {
-		const keyId = `oaicopilot.apiKey.${provider}`;
-		if (apiKey && apiKey.trim()) {
-			await this.secrets.store(keyId, apiKey.trim());
-			vscode.window.showInformationMessage(`API Key for ${provider} has been saved.`);
-		} else {
-			await this.secrets.delete(keyId);
-			vscode.window.showInformationMessage(`API Key for ${provider} has been cleared.`);
-		}
-		// Send refresh signal to frontend to update API key display
-		await this.sendInit();
-	}
-
-	private async fetchModelsFromApi(rawBaseUrl: string, apiKey: string): Promise<HFModelItem[]> {
-		const baseUrl = rawBaseUrl.trim().replace(/\/+$/, "");
-		if (!baseUrl) {
-			throw new Error("Please fill in Base URL first.");
-		}
-		if (!apiKey.trim()) {
-			throw new Error("Please fill in API Key first.");
-		}
-
-		const modelsUrl = baseUrl.endsWith("/models") ? baseUrl : `${baseUrl}/models`;
-		const headers: Record<string, string> = {
-			// "User-Agent": this.userAgent,
-		};
-		if (apiKey.trim()) {
-			headers.Authorization = `Bearer ${apiKey.trim()}`;
-		}
-
-		const res = await fetch(modelsUrl, { headers });
-		if (!res.ok) {
-			const text = await res.text();
-			throw new Error(`Failed to fetch model list (${res.status}): ${text || "Unknown error"}`);
-		}
-
-		const json = (await res.json()) as HFModelsResponse | { data?: unknown };
-		if (!json || !Array.isArray((json as HFModelsResponse).data)) {
-			throw new Error("Model list response format does not comply with OpenAI /models specification.");
-		}
-
-		const data = (json as HFModelsResponse).data;
-		return data
-			.map((item) => ({
-				id: item.id,
-				owned_by: item.owned_by ?? "openai",
-				object: item.object,
-				created: item.created,
-				context_length: item.context_length ?? 256000,
-				max_tokens: item.max_tokens ?? 8192,
-				temperature: item.temperature ?? 0,
-				top_p: item.top_p ?? 1,
-			}))
-			.filter((m) => m.id && m.owned_by);
 	}
 
 	private async getHtml(webview: vscode.Webview) {
@@ -405,33 +343,49 @@ export class ConfigViewPanel {
 		const config = vscode.workspace.getConfiguration();
 		const models = config.get<HFModelItem[]>("oaicopilot.models", []);
 
-		// Check if model ID already exists
-		const existingIndex = models.findIndex((m) => m.id === model.id);
+		// Check if model with same id and configId already exists
+		const existingIndex = models.findIndex(
+			(m) =>
+				m.id === model.id && ((model.configId && m.configId === model.configId) || (!model.configId && !m.configId))
+		);
 		if (existingIndex !== -1) {
-			vscode.window.showErrorMessage(`Model ${model.id} already exists.`);
+			vscode.window.showErrorMessage(`Model ${model.id}${model.configId ? "::" + model.configId : ""} already exists.`);
 			return;
 		}
 
 		models.push(model);
 		await config.update("oaicopilot.models", models, vscode.ConfigurationTarget.Global);
-		vscode.window.showInformationMessage(`Model ${model.id} has been added.`);
+		vscode.window.showInformationMessage(
+			`Model ${model.id}${model.configId ? "::" + model.configId : ""} has been added.`
+		);
 		// Send refresh signal to frontend
 		await this.sendInit();
 	}
 
-	private async updateModel(model: HFModelItem) {
+	private async updateModel(model: HFModelItem, originalConfigId?: string) {
 		const config = vscode.workspace.getConfiguration();
 		const models = config.get<HFModelItem[]>("oaicopilot.models", []);
 
+		// Find the model to update based on original id and configId
 		const updatedModels = models.map((m) => {
-			if (m.id === model.id) {
+			// Check if this is the model we want to update
+			// If originalConfigId is undefined (meaning it was originally null/undefined),
+			// then look for a model with no configId
+			const isTargetModel =
+				m.id === model.id &&
+				((originalConfigId && m.configId === originalConfigId) || (!originalConfigId && !m.configId));
+
+			if (isTargetModel) {
+				// Update with new values but preserve the original ID
 				return model;
 			}
 			return m;
 		});
 
 		await config.update("oaicopilot.models", updatedModels, vscode.ConfigurationTarget.Global);
-		vscode.window.showInformationMessage(`Model ${model.id} has been updated.`);
+		vscode.window.showInformationMessage(
+			`Model ${model.id}${model.configId ? "::" + model.configId : ""} has been updated.`
+		);
 		// Send refresh signal to frontend
 		await this.sendInit();
 	}

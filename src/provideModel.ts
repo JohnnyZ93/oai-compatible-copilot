@@ -61,7 +61,13 @@ export async function prepareLanguageModelChatInformation(
 				throw new Error("OAI Compatible API key not found");
 			}
 		}
-		const { models } = await fetchModels(apiKey, userAgent);
+
+		const config = vscode.workspace.getConfiguration();
+		const BASE_URL = config.get<string>("oaicopilot.baseUrl", "");
+		if (!BASE_URL || !BASE_URL.startsWith("http")) {
+			throw new Error(`Invalid base URL configuration.`);
+		}
+		const { models } = await fetchModels(BASE_URL, apiKey, userAgent);
 
 		infos = models.flatMap((m) => {
 			const providers = m?.providers ?? [];
@@ -120,17 +126,15 @@ export async function prepareLanguageModelChatInformation(
 }
 
 /**
- * Fetch the list of models and supplementary metadata from Hugging Face.
- * @param apiKey The HF API key used to authenticate.
+ * Fetch the list of models and supplementary metadata from Provider.
  */
-async function fetchModels(apiKey: string, userAgent: string): Promise<{ models: HFModelItem[] }> {
-	const config = vscode.workspace.getConfiguration();
-	const BASE_URL = config.get<string>("oaicopilot.baseUrl", "");
-	if (!BASE_URL || !BASE_URL.startsWith("http")) {
-		throw new Error(`Invalid base URL configuration.`);
-	}
+export async function fetchModels(
+	baseUrl: string,
+	apiKey: string,
+	userAgent: string
+): Promise<{ models: HFModelItem[] }> {
 	const modelsList = (async () => {
-		const resp = await fetch(`${BASE_URL.replace(/\/+$/, "")}/models`, {
+		const resp = await fetch(`${baseUrl.replace(/\/+$/, "")}/models`, {
 			method: "GET",
 			headers: { Authorization: `Bearer ${apiKey}`, "User-Agent": userAgent },
 		});

@@ -100,7 +100,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand("oaicopilot.openConfig", async () => {
-			ConfigViewPanel.openPanel(context.extensionUri, context.secrets);
+			ConfigViewPanel.openPanel(context.extensionUri, context.secrets, ua);
 		})
 	);
 }

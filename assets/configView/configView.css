@@ -259,3 +259,100 @@ button:not(.secondary):not(.danger) {
 	color: var(--vscode-button-foreground);
 	border: 1px solid var(--vscode-button-border, transparent);
 }
+
+.advanced-settings {
+	margin: 15px 0;
+}
+
+.advanced-settings button {
+	background: transparent;
+	border: 1px solid var(--vscode-editorWidget-border);
+	color: var(--vscode-foreground);
+	padding: 6px 10px;
+	font-size: 13px;
+}
+
+.form-container {
+	padding: 15px;
+	border: 1px solid var(--vscode-editorWidget-border);
+	border-radius: 8px;
+	background: rgba(0, 0, 0, 0.03);
+	margin-top: 10px;
+}
+
+/* Model ID dropdown styles */
+.input-with-dropdown {
+	position: relative;
+	width: 100%;
+}
+
+.model-input-dropdown {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	right: 0;
+	z-index: 1000;
+	background: var(--vscode-editor-background);
+	border: 1px solid var(--vscode-editorWidget-border);
+	border-radius: 4px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	margin-top: 2px;
+	display: none;
+	max-height: 300px;
+	overflow: hidden;
+}
+
+.model-input-dropdown.show {
+	display: block;
+}
+
+.dropdown-header {
+	padding: 8px 12px;
+	font-weight: 600;
+	color: var(--vscode-descriptionForeground);
+	border-bottom: 1px solid var(--vscode-editorWidget-border);
+	background: rgba(0, 0, 0, 0.03);
+}
+
+.dropdown-content {
+	max-height: 250px;
+	overflow-y: auto;
+}
+
+.dropdown-option {
+	padding: 8px 12px;
+	cursor: pointer;
+	transition: background-color 0.1s ease;
+}
+
+.dropdown-option:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.dropdown-option.selected {
+	background: var(--vscode-list-activeSelectionBackground);
+	color: var(--vscode-list-activeSelectionForeground);
+}
+
+.dropdown-option:not(:last-child) {
+	border-bottom: 1px solid var(--vscode-editorWidget-border);
+}
+
+/* Scrollbar styling for dropdown */
+.dropdown-content::-webkit-scrollbar {
+	width: 8px;
+}
+
+.dropdown-content::-webkit-scrollbar-track {
+	background: var(--vscode-scrollbarSlider-background);
+	border-radius: 4px;
+}
+
+.dropdown-content::-webkit-scrollbar-thumb {
+	background: var(--vscode-scrollbarSlider-hoverBackground);
+	border-radius: 4px;
+}
+
+.dropdown-content::-webkit-scrollbar-thumb:hover {
+	background: var(--vscode-scrollbarSlider-activeBackground);
+}

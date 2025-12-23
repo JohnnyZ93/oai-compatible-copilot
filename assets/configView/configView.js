@@ -6,6 +6,7 @@ const state = {
 	retry: { enabled: true, max_attempts: 3, interval_ms: 1000, status_codes: [429, 500, 502, 503, 504] },
 	models: [],
 	providerKeys: {},
+	providerInfo: {},
 };
 
 // Store the action to be performed after confirmation
@@ -25,6 +26,39 @@ const providerTableBody = document.getElementById("providerTableBody");
 
 // Model management elements
 const modelTableBody = document.getElementById("modelTableBody");
+const modelFormSection = document.getElementById("modelFormSection");
+const modelFormTitle = document.getElementById("modelFormTitle");
+const modelIdInput = document.getElementById("modelIdInput");
+const modelIdDropdown = document.getElementById("modelIdDropdown");
+const modelProviderInput = document.getElementById("modelProvider");
+const modelDisplayNameInput = document.getElementById("modelDisplayName");
+const modelConfigIdInput = document.getElementById("modelConfigId");
+const modelBaseUrlInput = document.getElementById("modelBaseUrl");
+const modelFamilyInput = document.getElementById("modelFamily");
+const modelContextLengthInput = document.getElementById("modelContextLength");
+const modelMaxTokensInput = document.getElementById("modelMaxTokens");
+const modelVisionInput = document.getElementById("modelVision");
+const modelApiModeInput = document.getElementById("modelApiMode");
+const modelTemperatureInput = document.getElementById("modelTemperature");
+const modelTopPInput = document.getElementById("modelTopP");
+const modelDelayInput = document.getElementById("modelDelay");
+const modelTopKInput = document.getElementById("modelTopK");
+const modelMinPInput = document.getElementById("modelMinP");
+const modelFrequencyPenaltyInput = document.getElementById("modelFrequencyPenalty");
+const modelPresencePenaltyInput = document.getElementById("modelPresencePenalty");
+const modelRepetitionPenaltyInput = document.getElementById("modelRepetitionPenalty");
+const modelReasoningEffortInput = document.getElementById("modelReasoningEffort");
+const modelEnableThinkingInput = document.getElementById("modelEnableThinking");
+const modelThinkingBudgetInput = document.getElementById("modelThinkingBudget");
+const modelIncludeReasoningInput = document.getElementById("modelIncludeReasoning");
+const saveModelBtn = document.getElementById("saveModel");
+const cancelModelBtn = document.getElementById("cancelModel");
+const toggleAdvancedSettingsBtn = document.getElementById("toggleAdvancedSettings");
+const advancedSettingsContent = document.getElementById("advancedSettingsContent");
+
+// Dropdown elements
+const dropdownContent = modelIdDropdown.querySelector(".dropdown-content");
+const dropdownHeader = modelIdDropdown.querySelector(".dropdown-header");
 
 // Global Configuration save button event listener
 document.getElementById("saveBase").addEventListener("click", () => {
@@ -51,14 +85,29 @@ document.getElementById("saveBase").addEventListener("click", () => {
 
 // Refresh buttons event listeners
 document.getElementById("refreshGlobalConfig").addEventListener("click", () => {
+	// Hide the model form if it's visible
+	if (modelFormSection.style.display !== "none") {
+		modelFormSection.style.display = "none";
+		resetModelForm();
+	}
 	vscode.postMessage({ type: "requestInit" });
 });
 
 document.getElementById("refreshProviders").addEventListener("click", () => {
+	// Hide the model form if it's visible
+	if (modelFormSection.style.display !== "none") {
+		modelFormSection.style.display = "none";
+		resetModelForm();
+	}
 	vscode.postMessage({ type: "requestInit" });
 });
 
 document.getElementById("refreshModels").addEventListener("click", () => {
+	// Hide the model form if it's visible
+	if (modelFormSection.style.display !== "none") {
+		modelFormSection.style.display = "none";
+		resetModelForm();
+	}
 	vscode.postMessage({ type: "requestInit" });
 });
 
@@ -114,8 +163,75 @@ document.getElementById("addProvider").addEventListener("click", () => {
 
 // Add Model button event listeners
 document.getElementById("addModel").addEventListener("click", () => {
-	// Navigate to the new model page, temporarily show a prompt
-	alert("Navigate to new model page");
+	// Show the model form
+	modelFormSection.style.display = "block";
+	modelFormTitle.textContent = "Add New Model";
+	// Reset form
+	resetModelForm();
+});
+
+// Provider dropdown change event listener for auto-fill
+modelProviderInput.addEventListener("change", () => {
+	const selectedProvider = modelProviderInput.value;
+	if (selectedProvider && state.providerInfo[selectedProvider]) {
+		// Auto-fill BaseURL and apiMode from provider info
+		modelBaseUrlInput.value = state.providerInfo[selectedProvider].baseUrl;
+		modelApiModeInput.value = state.providerInfo[selectedProvider].apiMode;
+
+		// Request to fetch remote models for the selected provider
+		vscode.postMessage({
+			type: "fetchModels",
+			baseUrl: state.providerInfo[selectedProvider].baseUrl || state.baseUrl,
+			apiKey: state.providerKeys[selectedProvider] || state.apiKey,
+		});
+	}
+});
+
+// Toggle advanced settings
+toggleAdvancedSettingsBtn.addEventListener("click", () => {
+	const isCurrentlyVisible = advancedSettingsContent.style.display !== "none";
+	advancedSettingsContent.style.display = isCurrentlyVisible ? "none" : "block";
+	toggleAdvancedSettingsBtn.textContent = isCurrentlyVisible ? "Show Advanced Settings" : "Hide Advanced Settings";
+});
+
+// Save Model button event listener
+saveModelBtn.addEventListener("click", () => {
+	const modelData = collectModelFormData();
+	if (!validateModelData(modelData)) {
+		return;
+	}
+
+	// Determine if this is an update or add operation
+	const isUpdate = modelFormTitle.textContent.startsWith("Edit");
+
+	// For updates, ensure the model ID remains unchanged
+	if (isUpdate) {
+		// Remove helper attributes from the model data before sending
+		let originalConfigId = modelData.originalConfigId;
+		delete modelData.originalConfigId;
+
+		vscode.postMessage({
+			type: "updateModel",
+			model: modelData,
+			originalConfigId: originalConfigId,
+		});
+	} else {
+		vscode.postMessage({
+			type: "addModel",
+			model: modelData,
+		});
+	}
+
+	// Hide the form and reset it
+	modelFormSection.style.display = "none";
+	resetModelForm();
+});
+
+// Cancel Model button event listener
+cancelModelBtn.addEventListener("click", () => {
+	// Hide the form and reset it
+	modelFormSection.style.display = "none";
+	resetModelForm();
 });
 
 window.addEventListener("message", (event) => {
@@ -150,9 +266,8 @@ window.addEventListener("message", (event) => {
 			renderModels();
 			break;
 		case "modelsFetched":
-			state.models = message.models || [];
-			renderProviders();
-			renderModels();
+			// Handle the response from fetchModels
+			populateModelIdDropdown(message.models);
 			break;
 		case "confirmResponse":
 			// Handle confirmation responses
@@ -177,6 +292,8 @@ function renderProviders() {
 
 	if (!providers.length) {
 		providerTableBody.innerHTML = '<tr><td colspan="5" class="no-data">No providers</td></tr>';
+		// Clear the provider dropdown as well
+		modelProviderInput.innerHTML = '<option value="">Select Provider</option>';
 		return;
 	}
 
@@ -207,6 +324,26 @@ function renderProviders() {
 		.join("");
 
 	providerTableBody.innerHTML = rows;
+
+	// Populate the provider dropdown in the model form and provider info
+	state.providerInfo = {}; // Reset provider info
+	const providerOptions = providers
+		.map((provider) => {
+			// Get the provider's configuration information
+			const providerModels = state.models.filter((m) => m.owned_by === provider);
+			const firstModel = providerModels[0];
+
+			// Store provider info for auto-fill
+			state.providerInfo[provider] = {
+				baseUrl: firstModel.baseUrl || state.baseUrl,
+				apiMode: firstModel.apiMode || "openai",
+				apiKey: state.providerKeys[provider] || state.apiKey,
+			};
+
+			return `<option value="${provider}">${provider}</option>`;
+		})
+		.join("");
+	modelProviderInput.innerHTML = '<option value="">Select Provider</option>' + providerOptions;
 
 	// Add event listeners for provider rows
 	document.querySelectorAll(".update-provider-btn").forEach((btn) => {
@@ -285,8 +422,26 @@ function renderModels() {
 	document.querySelectorAll(".update-model-btn").forEach((btn) => {
 		btn.addEventListener("click", (event) => {
 			const modelId = event.target.getAttribute("data-model-id");
-			// Navigate to the edit model page
-			alert(`Navigate to edit model page: ${modelId}`);
+			// Find the model in state
+			const parsedModelId = modelId.includes("::")
+				? { baseId: modelId.split("::")[0], configId: modelId.split("::")[1] }
+				: { baseId: modelId, configId: null };
+
+			const model = state.models.find(
+				(m) =>
+					m.id === parsedModelId.baseId &&
+					((parsedModelId.configId && m.configId === parsedModelId.configId) ||
+						(!parsedModelId.configId && !m.configId))
+			);
+
+			if (model) {
+				// Show the model form in edit mode
+				modelFormSection.style.display = "block";
+				modelFormTitle.textContent = `Edit Model: ${modelId}`;
+				populateModelForm(model);
+			} else {
+				alert(`Model ${modelId} not found.`);
+			}
 		});
 	});
 
@@ -309,5 +464,332 @@ function renderModels() {
 		});
 	});
 }
+
+// Reset model form
+function resetModelForm() {
+	modelIdInput.value = "";
+	modelProviderInput.value = ""; // Only reset the selected value, options remain
+	modelDisplayNameInput.value = "";
+	modelConfigIdInput.value = "";
+	modelBaseUrlInput.value = "";
+	modelFamilyInput.value = "";
+	modelContextLengthInput.value = "";
+	modelMaxTokensInput.value = "";
+	modelVisionInput.value = "";
+	modelApiModeInput.value = "openai";
+	modelTemperatureInput.value = "";
+	modelTopPInput.value = "";
+	modelDelayInput.value = "";
+	modelTopKInput.value = "";
+	modelMinPInput.value = "";
+	modelFrequencyPenaltyInput.value = "";
+	modelPresencePenaltyInput.value = "";
+	modelRepetitionPenaltyInput.value = "";
+	modelReasoningEffortInput.value = "";
+	modelEnableThinkingInput.value = "";
+	modelThinkingBudgetInput.value = "";
+	modelIncludeReasoningInput.value = "";
+	advancedSettingsContent.style.display = "none";
+	toggleAdvancedSettingsBtn.textContent = "Show Advanced Settings";
+	// Remove editing attribute
+	modelIdInput.removeAttribute("data-editing");
+	// Re-enable BaseURL and apiMode fields when form is reset
+	modelBaseUrlInput.disabled = true;
+	modelApiModeInput.disabled = true;
+	// Re-enable model ID field when form is reset
+	modelIdInput.disabled = false;
+}
+
+// Collect model form data
+function collectModelFormData() {
+	const isEditing = modelIdInput.hasAttribute("data-editing");
+
+	return {
+		id: modelIdInput.value.trim(),
+		owned_by: modelProviderInput.value.trim(),
+		displayName: modelDisplayNameInput.value.trim() || undefined,
+		configId: modelConfigIdInput.value.trim() || undefined,
+		baseUrl: modelBaseUrlInput.value.trim() || undefined,
+		family: modelFamilyInput.value.trim() || undefined,
+		context_length: modelContextLengthInput.value ? parseInt(modelContextLengthInput.value) : undefined,
+		max_tokens: modelMaxTokensInput.value ? parseInt(modelMaxTokensInput.value) : undefined,
+		vision: modelVisionInput.value ? modelVisionInput.value === "true" : undefined,
+		apiMode: modelApiModeInput.value || undefined,
+		temperature: modelTemperatureInput.value !== "" ? parseFloat(modelTemperatureInput.value) : undefined,
+		top_p: modelTopPInput.value !== "" ? parseFloat(modelTopPInput.value) : undefined,
+		delay: modelDelayInput.value ? parseInt(modelDelayInput.value) : undefined,
+		top_k: modelTopKInput.value ? parseInt(modelTopKInput.value) : undefined,
+		min_p: modelMinPInput.value !== "" ? parseFloat(modelMinPInput.value) : undefined,
+		frequency_penalty:
+			modelFrequencyPenaltyInput.value !== "" ? parseFloat(modelFrequencyPenaltyInput.value) : undefined,
+		presence_penalty: modelPresencePenaltyInput.value !== "" ? parseFloat(modelPresencePenaltyInput.value) : undefined,
+		repetition_penalty:
+			modelRepetitionPenaltyInput.value !== "" ? parseFloat(modelRepetitionPenaltyInput.value) : undefined,
+		reasoning_effort: modelReasoningEffortInput.value || undefined,
+		enable_thinking: modelEnableThinkingInput.value ? modelEnableThinkingInput.value === "true" : undefined,
+		thinking_budget: modelThinkingBudgetInput.value ? parseInt(modelThinkingBudgetInput.value) : undefined,
+		include_reasoning_in_request: modelIncludeReasoningInput.value
+			? modelIncludeReasoningInput.value === "true"
+			: undefined,
+		// Include original configId for update operations
+		originalConfigId: isEditing ? modelIdInput.getAttribute("data-original-configId") : undefined,
+	};
+}
+
+// Validate model data
+function validateModelData(modelData) {
+	if (!modelData.id) {
+		alert("Model ID is required.");
+		return false;
+	}
+	if (!modelData.owned_by) {
+		alert("Provider ID is required.");
+		return false;
+	}
+
+	// Validate numeric fields if provided
+	if (modelData.context_length !== undefined && (isNaN(modelData.context_length) || modelData.context_length <= 0)) {
+		alert("Context Length must be a positive number.");
+		return false;
+	}
+	if (modelData.max_tokens !== undefined && (isNaN(modelData.max_tokens) || modelData.max_tokens <= 0)) {
+		alert("Max Tokens must be a positive number.");
+		return false;
+	}
+	if (
+		modelData.temperature !== undefined &&
+		(isNaN(modelData.temperature) || modelData.temperature < 0 || modelData.temperature > 2)
+	) {
+		alert("Temperature must be between 0 and 2.");
+		return false;
+	}
+	if (modelData.top_p !== undefined && (isNaN(modelData.top_p) || modelData.top_p < 0 || modelData.top_p > 1)) {
+		alert("Top P must be between 0 and 1.");
+		return false;
+	}
+	if (modelData.delay !== undefined && (isNaN(modelData.delay) || modelData.delay < 0)) {
+		alert("Delay must be a non-negative number.");
+		return false;
+	}
+	if (modelData.top_k !== undefined && (isNaN(modelData.top_k) || modelData.top_k < 1)) {
+		alert("Top K must be a positive number.");
+		return false;
+	}
+	if (modelData.min_p !== undefined && (isNaN(modelData.min_p) || modelData.min_p < 0 || modelData.min_p > 1)) {
+		alert("Min P must be between 0 and 1.");
+		return false;
+	}
+	if (
+		modelData.frequency_penalty !== undefined &&
+		(isNaN(modelData.frequency_penalty) || modelData.frequency_penalty < -2 || modelData.frequency_penalty > 2)
+	) {
+		alert("Frequency Penalty must be between -2 and 2.");
+		return false;
+	}
+	if (
+		modelData.presence_penalty !== undefined &&
+		(isNaN(modelData.presence_penalty) || modelData.presence_penalty < -2 || modelData.presence_penalty > 2)
+	) {
+		alert("Presence Penalty must be between -2 and 2.");
+		return false;
+	}
+	if (
+		modelData.repetition_penalty !== undefined &&
+		(isNaN(modelData.repetition_penalty) || modelData.repetition_penalty < 0)
+	) {
+		alert("Repetition Penalty must be a non-negative number.");
+		return false;
+	}
+	if (modelData.thinking_budget !== undefined && (isNaN(modelData.thinking_budget) || modelData.thinking_budget <= 0)) {
+		alert("Thinking Budget must be a positive number.");
+		return false;
+	}
+
+	// Validate URL format if baseUrl is provided
+	if (modelData.baseUrl && !isValidUrl(modelData.baseUrl)) {
+		alert("Base URL must be a valid URL format (e.g., https://api.example.com/v1).");
+		return false;
+	}
+
+	return true;
+}
+
+// Helper function to validate URL format
+function isValidUrl(string) {
+	try {
+		new URL(string);
+		return true;
+	} catch (_) {
+		return false;
+	}
+}
+
+// Function to populate the model ID datalist
+function populateModelIdDropdown(models) {
+	const modelsArray = Array.from(models || []);
+
+	// Clear existing options
+	dropdownContent.innerHTML = "";
+
+	if (!modelsArray.length) {
+		dropdownHeader.textContent = "No models available";
+		return;
+	}
+
+	dropdownHeader.textContent = `Select Model (${modelsArray.length} available)`;
+
+	// Create option elements
+	modelsArray.forEach((model) => {
+		const option = document.createElement("div");
+		option.className = "dropdown-option";
+		option.textContent = model.id;
+		option.dataset.modelId = model.id;
+
+		// Add click event
+		option.addEventListener("click", () => {
+			modelIdInput.value = model.id;
+			hideDropdown();
+
+			// Remove selection from all options
+			dropdownContent.querySelectorAll(".dropdown-option").forEach((opt) => {
+				opt.classList.remove("selected");
+			});
+
+			// Add selection to clicked option
+			option.classList.add("selected");
+		});
+
+		dropdownContent.appendChild(option);
+	});
+}
+
+// Dropdown visibility functions
+function showDropdown() {
+	if (dropdownContent.children.length > 0) {
+		modelIdDropdown.classList.add("show");
+	}
+}
+
+function hideDropdown() {
+	modelIdDropdown.classList.remove("show");
+}
+
+function toggleDropdown() {
+	if (modelIdDropdown.classList.contains("show")) {
+		hideDropdown();
+	} else {
+		showDropdown();
+	}
+}
+
+// Populate model form with existing data
+function populateModelForm(model) {
+	// Store the original model configId for update operations
+	modelIdInput.setAttribute("data-original-configId", model.configId || "");
+
+	modelIdInput.value = model.id || "";
+
+	// Ensure the provider is in the dropdown options
+	const currentProvider = model.owned_by || "";
+	const providerExists = Array.from(modelProviderInput.options).some((option) => option.value === currentProvider);
+
+	if (!providerExists && currentProvider) {
+		// Add the provider to the dropdown if it doesn't exist
+		const newOption = document.createElement("option");
+		newOption.value = currentProvider;
+		newOption.textContent = currentProvider;
+		modelProviderInput.appendChild(newOption);
+	}
+
+	modelProviderInput.value = currentProvider;
+	modelDisplayNameInput.value = model.displayName || "";
+	modelConfigIdInput.value = model.configId || "";
+	modelBaseUrlInput.value = model.baseUrl || "";
+	modelFamilyInput.value = model.family || "";
+	modelContextLengthInput.value = model.context_length || "";
+	modelMaxTokensInput.value = model.max_tokens || model.max_completion_tokens || "";
+	modelVisionInput.value = model.vision !== undefined ? String(model.vision) : "";
+	modelApiModeInput.value = model.apiMode || "openai";
+	modelTemperatureInput.value = model.temperature !== undefined && model.temperature !== null ? model.temperature : "";
+	modelTopPInput.value = model.top_p !== undefined && model.top_p !== null ? model.top_p : "";
+	modelDelayInput.value = model.delay || "";
+	modelTopKInput.value = model.top_k || "";
+	modelMinPInput.value = model.min_p || "";
+	modelFrequencyPenaltyInput.value = model.frequency_penalty || "";
+	modelPresencePenaltyInput.value = model.presence_penalty || "";
+	modelRepetitionPenaltyInput.value = model.repetition_penalty || "";
+	modelReasoningEffortInput.value = model.reasoning_effort || "";
+	modelEnableThinkingInput.value = model.enable_thinking !== undefined ? String(model.enable_thinking) : "";
+	modelThinkingBudgetInput.value = model.thinking_budget || "";
+	modelIncludeReasoningInput.value =
+		model.include_reasoning_in_request !== undefined ? String(model.include_reasoning_in_request) : "";
+	// Mark that we're in editing mode by setting an attribute
+	modelIdInput.setAttribute("data-editing", "true");
+	modelIdInput.disabled = true;
+	// Disable BaseURL and apiMode fields when editing
+	modelProviderInput.disabled = true;
+	modelBaseUrlInput.disabled = true;
+	modelApiModeInput.disabled = true;
+}
+
+// Initialize dropdown event listeners
+function initDropdownEvents() {
+	// Show dropdown on focus
+	modelIdInput.addEventListener("focus", () => {
+		if (!modelIdInput.disabled && dropdownContent.children.length > 0) {
+			showDropdown();
+		}
+	});
+
+	// Hide dropdown when clicking outside
+	document.addEventListener("click", (event) => {
+		if (!modelIdDropdown.contains(event.target) && event.target !== modelIdInput) {
+			hideDropdown();
+		}
+	});
+
+	// Handle keyboard navigation
+	modelIdInput.addEventListener("keydown", (event) => {
+		if (event.key === "Escape") {
+			hideDropdown();
+		} else if (event.key === "ArrowDown" && modelIdDropdown.classList.contains("show")) {
+			event.preventDefault();
+			const options = dropdownContent.querySelectorAll(".dropdown-option");
+			if (options.length > 0) {
+				const firstOption = options[0];
+				firstOption.focus();
+				firstOption.classList.add("selected");
+			}
+		}
+	});
+
+	// Allow user to type freely
+	modelIdInput.addEventListener("input", () => {
+		// Clear selection when user types
+		dropdownContent.querySelectorAll(".dropdown-option").forEach((opt) => {
+			opt.classList.remove("selected");
+		});
+
+		// Filter options based on input
+		const searchTerm = modelIdInput.value.toLowerCase();
+		const options = dropdownContent.querySelectorAll(".dropdown-option");
+
+		options.forEach((option) => {
+			const modelId = option.dataset.modelId.toLowerCase();
+			if (modelId.includes(searchTerm)) {
+				option.style.display = "block";
+			} else {
+				option.style.display = "none";
+			}
+		});
+
+		// Update header with filtered count
+		const visibleCount = Array.from(options).filter((opt) => opt.style.display !== "none").length;
+		dropdownHeader.textContent = `Select Model (${visibleCount} matching)`;
+	});
+}
+
+// Initialize dropdown events
+initDropdownEvents();
 
 vscode.postMessage({ type: "requestInit" });
