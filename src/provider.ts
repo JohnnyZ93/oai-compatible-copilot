@@ -133,8 +133,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			const globalDelay = config.get<number>("oaicopilot.delay", 0);
 			const delayMs = modelDelay !== undefined ? modelDelay : globalDelay;
 
-			console.debug(`[OAI Compatible Model Provider] Applying delay of ${delayMs} ms`);
-
 			if (delayMs > 0 && this._lastRequestTime !== null) {
 				const elapsed = Date.now() - this._lastRequestTime;
 				if (elapsed < delayMs) {
