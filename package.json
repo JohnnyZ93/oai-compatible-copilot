@@ -64,7 +64,7 @@
 			},
 			{
 				"command": "oaicopilot.openConfig",
-				"title": "OAICopilot: Open Configuration"
+				"title": "OAICopilot: Open Configuration UI"
 			}
 		],
 		"configuration": {
@@ -277,7 +277,7 @@
 									"anthropic"
 								],
 								"default": "openai",
-								"description": "API mode: 'openai' (Default) for API (/v1/chat/completions), 'ollama' for API (/api/chat), 'anthropic' for API (/v1/messages)."
+								"description": "API mode: 'openai' (Default) for API (/chat/completions), 'ollama' for API (/api/chat), 'anthropic' for API (/v1/messages)."
 							},
 							"delay": {
 								"type": "number",

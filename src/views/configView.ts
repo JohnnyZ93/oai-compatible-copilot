@@ -58,7 +58,7 @@ export class ConfigViewPanel {
 
 		const panel = vscode.window.createWebviewPanel(
 			"oaicopilot.config",
-			"OAI Copilot Configuration",
+			"OAICopilot Configuration",
 			column || vscode.ViewColumn.One,
 			{
 				enableScripts: true,

@@ -371,3 +371,12 @@ button:not(.secondary):not(.danger) {
 .error-message:empty {
 	display: none;
 }
+
+/* Field description styling */
+.field-description {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	margin-bottom: 6px;
+	line-height: 1.4;
+	padding: 4px 0;
+}
