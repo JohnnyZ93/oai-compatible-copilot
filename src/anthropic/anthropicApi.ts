@@ -76,10 +76,13 @@ export class AnthropicApi extends CommonApi {
 				}
 			}
 
+			const joinedText = textParts.join("").trim();
+			const joinedThinking = thinkingParts.join("").trim();
+
 			// Handle system messages separately (Anthropic uses top-level system field)
 			if (role === "system") {
-				if (textParts.length > 0) {
-					this._systemContent = textParts.join("\n");
+				if (joinedText) {
+					this._systemContent = joinedText;
 				}
 				continue;
 			}
@@ -88,10 +91,10 @@ export class AnthropicApi extends CommonApi {
 			const contentBlocks: AnthropicContentBlock[] = [];
 
 			// Add text content
-			if (textParts.length > 0) {
+			if (joinedText) {
 				contentBlocks.push({
 					type: "text",
-					text: textParts.join("\n"),
+					text: joinedText,
 				});
 			}
 
@@ -109,10 +112,10 @@ export class AnthropicApi extends CommonApi {
 			}
 
 			// Add thinking content for assistant messages
-			if (role === "assistant" && thinkingParts.length > 0 && modelConfig.includeReasoningInRequest) {
+			if (role === "assistant" && modelConfig.includeReasoningInRequest && joinedThinking) {
 				contentBlocks.push({
 					type: "thinking",
-					thinking: thinkingParts.join("\n"),
+					thinking: joinedThinking,
 				});
 			}
 

@@ -79,7 +79,7 @@ export class OllamaApi extends CommonApi {
 
 			// Handle regular messages
 			if (textParts.length > 0 || imageParts.length > 0 || toolCalls.length > 0) {
-				const content = textParts.join("\n");
+				const content = textParts.join("").trim();
 
 				const ollamaMessage: OllamaMessage = {
 					role,
@@ -90,7 +90,7 @@ export class OllamaApi extends CommonApi {
 					ollamaMessage.images = imageParts;
 				}
 
-				if (thinkingContent && role === "assistant") {
+				if (thinkingContent.trim() && role === "assistant") {
 					ollamaMessage.thinking = thinkingContent;
 				}
 

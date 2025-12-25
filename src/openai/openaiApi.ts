@@ -72,69 +72,76 @@ export class OpenaiApi extends CommonApi {
 					const content = collectToolResultText(part as { content?: ReadonlyArray<unknown> });
 					toolResults.push({ callId, content });
 				} else if (part instanceof vscode.LanguageModelThinkingPart) {
-					// 处理思考内容
 					const content = Array.isArray(part.value) ? part.value.join("") : part.value;
 					reasoningParts.push(content);
 				}
 			}
 
-			// 构建 assistant 消息，包含思考内容
+			const joinedText = textParts.join("").trim();
+			const joinedThinking = reasoningParts.join("").trim();
+
+			// process assistant message
 			if (role === "assistant") {
 				const assistantMessage: OpenAIChatMessage = {
-					role: "assistant",
-					content: textParts.join("\n") || undefined,
+					role: "assistant"
 				};
 
-				// 添加思考内容（根据配置决定是否包含）
-				if (modelConfig.includeReasoningInRequest && reasoningParts.length > 0) {
-					assistantMessage.reasoning_content = reasoningParts.join("\n");
+				if (joinedText) {
+					assistantMessage.content = joinedText;
 				}
 
-				// 添加工具调用
+				if (modelConfig.includeReasoningInRequest && joinedThinking) {
+					assistantMessage.reasoning_content = joinedThinking;
+				}
+
 				if (toolCalls.length > 0) {
 					assistantMessage.tool_calls = toolCalls;
 				}
 
-				// 只有当消息有内容、思考内容或工具调用时才添加
 				if (assistantMessage.content || assistantMessage.reasoning_content || assistantMessage.tool_calls) {
 					out.push(assistantMessage);
 				}
 			}
 
-			// 处理工具结果
+			// process tool result messages
 			for (const tr of toolResults) {
 				out.push({ role: "tool", tool_call_id: tr.callId, content: tr.content || "" });
 			}
 
-			// 处理用户和系统消息
-			if (textParts.length > 0 && role !== "assistant") {
-				if (role === "user") {
-					if (imageParts.length > 0) {
-						// 多模态消息：包含图片、文本
-						const contentArray: ChatMessageContent[] = [];
+			// process user messages
+			if (role === "user") {
+				if (imageParts.length > 0) {
+					// multi-modal message
+					const contentArray: ChatMessageContent[] = [];
+
+					if (joinedText) {
 						contentArray.push({
 							type: "text",
-							text: textParts.join("\n"),
+							text: joinedText,
 						});
-
-						// 添加图片内容
-						for (const imagePart of imageParts) {
-							const dataUrl = createDataUrl(imagePart);
-							contentArray.push({
-								type: "image_url",
-								image_url: {
-									url: dataUrl,
-								},
-							});
-						}
-						out.push({ role, content: contentArray });
-					} else {
-						// 纯文本消息
-						out.push({ role, content: textParts.join("\n") });
 					}
-				} else if (role === "system") {
-					out.push({ role, content: textParts.join("\n") });
+
+					for (const imagePart of imageParts) {
+						const dataUrl = createDataUrl(imagePart);
+						contentArray.push({
+							type: "image_url",
+							image_url: {
+								url: dataUrl,
+							},
+						});
+					}
+					out.push({ role, content: contentArray });
+				} else {
+					// text-only message
+					if (joinedText) {
+						out.push({ role, content: joinedText });
+					}
 				}
+			}
+
+			// process system messages
+			if (role === "system" && joinedText) {
+				out.push({ role, content: joinedText });
 			}
 		}
 		return out;
