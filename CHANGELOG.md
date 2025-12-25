@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.2.0 (2025-12-25)
+
+- Fix: [Text content blocks must be non-empty on Anthropic api](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/79)
+- Fix: [Edit modelId and providerId on configuration UI.](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/85)
+
 ## 0.1.9 (2025-12-24)
 
 - Feat: [Make top_p optional in request body.](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/81)
