@@ -94,33 +94,19 @@ document.getElementById("saveBase").addEventListener("click", () => {
 	});
 });
 
+const handleRefresh = () => {
+	// Hide the model form if it's visible
+	if (modelFormSection.style.display !== "none") {
+		modelFormSection.style.display = "none";
+		resetModelForm();
+	}
+	vscode.postMessage({ type: "requestInit" });
+};
+
 // Refresh buttons event listeners
-document.getElementById("refreshGlobalConfig").addEventListener("click", () => {
-	// Hide the model form if it's visible
-	if (modelFormSection.style.display !== "none") {
-		modelFormSection.style.display = "none";
-		resetModelForm();
-	}
-	vscode.postMessage({ type: "requestInit" });
-});
-
-document.getElementById("refreshProviders").addEventListener("click", () => {
-	// Hide the model form if it's visible
-	if (modelFormSection.style.display !== "none") {
-		modelFormSection.style.display = "none";
-		resetModelForm();
-	}
-	vscode.postMessage({ type: "requestInit" });
-});
-
-document.getElementById("refreshModels").addEventListener("click", () => {
-	// Hide the model form if it's visible
-	if (modelFormSection.style.display !== "none") {
-		modelFormSection.style.display = "none";
-		resetModelForm();
-	}
-	vscode.postMessage({ type: "requestInit" });
-});
+document.getElementById("refreshGlobalConfig").addEventListener("click", handleRefresh);
+document.getElementById("refreshProviders").addEventListener("click", handleRefresh);
+document.getElementById("refreshModels").addEventListener("click", handleRefresh);
 
 // Add Provider button event listener
 document.getElementById("addProvider").addEventListener("click", () => {
@@ -212,18 +198,19 @@ saveModelBtn.addEventListener("click", () => {
 		return;
 	}
 
-	// Determine if this is an update or add operation
-	const isUpdate = modelFormTitle.textContent.startsWith("Edit");
-
 	// For updates, ensure the model ID remains unchanged
-	if (isUpdate) {
+	const isEditing = modelIdInput.hasAttribute("data-editing");
+	if (isEditing) {
 		// Remove helper attributes from the model data before sending
+		let originalModelId = modelData.originalModelId;
 		let originalConfigId = modelData.originalConfigId;
+		delete modelData.originalModelId;
 		delete modelData.originalConfigId;
 
 		vscode.postMessage({
 			type: "updateModel",
 			model: modelData,
+			originalModelId: originalModelId,
 			originalConfigId: originalConfigId,
 		});
 	} else {
@@ -299,7 +286,9 @@ window.addEventListener("message", (event) => {
 
 function renderProviders() {
 	// Get all unique providers
-	const providers = Array.from(new Set(state.models.map((m) => m.owned_by).filter(Boolean)));
+	const providers = Array.from(new Set(state.models.map((m) => m.owned_by).filter(Boolean))).sort((a, b) =>
+		a.localeCompare(b)
+	);
 
 	if (!providers.length) {
 		providerTableBody.innerHTML = '<tr><td colspan="5" class="no-data">No providers</td></tr>';
@@ -399,7 +388,7 @@ function renderProviders() {
 }
 
 function renderModels() {
-	const models = state.models.filter((m) => !m.id.startsWith("__provider__"));
+	const models = state.models.filter((m) => !m.id.startsWith("__provider__")).sort((a, b) => a.id.localeCompare(b.id));
 	if (!models.length) {
 		modelTableBody.innerHTML = '<tr><td colspan="11" class="no-data">No models</td></tr>';
 		return;
@@ -480,7 +469,7 @@ function resetModelForm() {
 	showModelError("");
 
 	modelIdInput.value = "";
-	modelProviderInput.value = ""; // Only reset the selected value, options remain
+	modelProviderInput.value = "";
 	modelDisplayNameInput.value = "";
 	modelConfigIdInput.value = "";
 	modelBaseUrlInput.value = "";
@@ -513,12 +502,13 @@ function resetModelForm() {
 	toggleAdvancedSettingsBtn.textContent = "Show Advanced Settings";
 	// Remove editing attribute
 	modelIdInput.removeAttribute("data-editing");
+	modelIdInput.removeAttribute("data-original-id");
+	modelIdInput.removeAttribute("data-original-configId");
 	// disbale fields when form is reset
 	modelBaseUrlInput.disabled = true;
 	modelApiModeInput.disabled = true;
-	// Re-enable fields when form is reset
-	modelIdInput.disabled = false;
-	modelProviderInput.disabled = false;
+	// Clear dropdown options
+	dropdownContent.innerHTML = "";
 }
 
 // Collect model form data
@@ -562,7 +552,8 @@ function collectModelFormData() {
 		// Parse headers and extra JSON
 		headers: parseJsonField(modelHeadersInput.value),
 		extra: parseJsonField(modelExtraInput.value),
-		// Include original configId for update operations
+		// Include original modelId and configId for update operations
+		originalModelId: isEditing ? modelIdInput.getAttribute("data-original-id") : undefined,
 		originalConfigId: isEditing ? modelIdInput.getAttribute("data-original-configId") : undefined,
 	};
 }
@@ -637,6 +628,35 @@ function validateModelData(modelData) {
 		return false;
 	}
 
+	// Validate modelId and configId Uniqueness
+	const isEditing = modelIdInput.hasAttribute("data-editing");
+	const hasDuplicate = state.models
+		.filter((m) => {
+			if (isEditing) {
+				const isOrigin =
+					m.id === modelData.originalModelId &&
+					((modelData.originalConfigId && m.configId === modelData.originalConfigId) ||
+						(!modelData.originalConfigId && !m.configId));
+				return !isOrigin;
+			}
+			return true;
+		})
+		.some((m) => {
+			return (
+				m.id === modelData.id &&
+				((modelData.configId && m.configId === modelData.configId) || (!modelData.configId && !m.configId))
+			);
+		});
+
+	if (hasDuplicate) {
+		showModelError(
+			`A model with ID="${modelData.id}"${
+				modelData.configId ? ` and Config ID="${modelData.configId}"` : ""
+			} already exists. Model ID and Config ID combination must be unique.`
+		);
+		return false;
+	}
+
 	// Validate numeric fields if provided
 	if (modelData.context_length !== undefined && (isNaN(modelData.context_length) || modelData.context_length <= 0)) {
 		showModelError("Context Length must be a positive number.");
@@ -680,16 +700,6 @@ function validateModelData(modelData) {
 	}
 
 	return true;
-}
-
-// Helper function to validate URL format
-function isValidUrl(string) {
-	try {
-		new URL(string);
-		return true;
-	} catch (_) {
-		return false;
-	}
 }
 
 // Function to populate the model ID datalist
@@ -755,7 +765,8 @@ function populateModelForm(model) {
 	// Clear any error message
 	showModelError("");
 
-	// Store the original model configId for update operations
+	// Store the original modelId and configId for update operations
+	modelIdInput.setAttribute("data-original-id", model.id || "");
 	modelIdInput.setAttribute("data-original-configId", model.configId || "");
 
 	modelIdInput.value = model.id || "";
@@ -771,6 +782,13 @@ function populateModelForm(model) {
 		newOption.textContent = currentProvider;
 		modelProviderInput.appendChild(newOption);
 	}
+
+	// Request to fetch remote models for the selected provider
+	vscode.postMessage({
+		type: "fetchModels",
+		baseUrl: state.providerInfo[currentProvider].baseUrl || state.baseUrl,
+		apiKey: state.providerKeys[currentProvider] || state.apiKey,
+	});
 
 	modelProviderInput.value = currentProvider;
 	modelDisplayNameInput.value = model.displayName || "";
@@ -811,9 +829,7 @@ function populateModelForm(model) {
 	modelExtraInput.value = model.extra ? JSON.stringify(model.extra, null, 2) : "";
 	// Mark that we're in editing mode by setting an attribute
 	modelIdInput.setAttribute("data-editing", "true");
-	modelIdInput.disabled = true;
 	// Disable BaseURL and apiMode fields when editing
-	modelProviderInput.disabled = true;
 	modelBaseUrlInput.disabled = true;
 	modelApiModeInput.disabled = true;
 }
@@ -822,7 +838,7 @@ function populateModelForm(model) {
 function initDropdownEvents() {
 	// Show dropdown on focus
 	modelIdInput.addEventListener("focus", () => {
-		if (!modelIdInput.disabled && dropdownContent.children.length > 0) {
+		if (dropdownContent.children.length > 0) {
 			showDropdown();
 		}
 	});

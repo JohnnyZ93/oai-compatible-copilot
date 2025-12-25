@@ -31,7 +31,7 @@ type IncomingMessage =
 	| { type: "updateProvider"; provider: string; baseUrl?: string; apiKey?: string; apiMode?: string }
 	| { type: "deleteProvider"; provider: string }
 	| { type: "addModel"; model: HFModelItem }
-	| { type: "updateModel"; model: HFModelItem; originalConfigId?: string }
+	| { type: "updateModel"; model: HFModelItem; originalModelId?: string; originalConfigId?: string }
 	| { type: "deleteModel"; modelId: string }
 	| { type: "requestConfirm"; id: string; message: string; action: string };
 
@@ -148,7 +148,7 @@ export class ConfigViewPanel {
 				await this.addModel(message.model);
 				break;
 			case "updateModel":
-				await this.updateModel(message.model, message.originalConfigId);
+				await this.updateModel(message.model, message.originalModelId, message.originalConfigId);
 				break;
 			case "requestConfirm":
 				await this.handleConfirmRequest(message.id, message.message, message.action);
@@ -358,7 +358,7 @@ export class ConfigViewPanel {
 		await this.sendInit();
 	}
 
-	private async updateModel(model: HFModelItem, originalConfigId?: string) {
+	private async updateModel(model: HFModelItem, originalModelId?: string, originalConfigId?: string) {
 		const config = vscode.workspace.getConfiguration();
 		const models = config.get<HFModelItem[]>("oaicopilot.models", []);
 
@@ -368,11 +368,11 @@ export class ConfigViewPanel {
 			// If originalConfigId is undefined (meaning it was originally null/undefined),
 			// then look for a model with no configId
 			const isTargetModel =
-				m.id === model.id &&
+				m.id === originalModelId &&
 				((originalConfigId && m.configId === originalConfigId) || (!originalConfigId && !m.configId));
 
 			if (isTargetModel) {
-				// Update with new values but preserve the original ID
+				// Update with new values
 				return model;
 			}
 			return m;

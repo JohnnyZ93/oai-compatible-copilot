@@ -83,7 +83,7 @@ export class OpenaiApi extends CommonApi {
 			// process assistant message
 			if (role === "assistant") {
 				const assistantMessage: OpenAIChatMessage = {
-					role: "assistant"
+					role: "assistant",
 				};
 
 				if (joinedText) {
