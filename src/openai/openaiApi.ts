@@ -27,12 +27,18 @@ import {
 	mapRole,
 } from "../utils";
 
+import { ReasoningCache } from "../cache/reasoningCache";
+
 import { CommonApi } from "../commonApi";
 
 export class OpenaiApi extends CommonApi {
 	constructor() {
 		super();
 	}
+
+	// Capture state for the current request
+	private _capturedReasoning = "";
+	private _capturedToolCallIds = new Set<string>();
 
 	/**
 	 * Convert VS Code chat request messages into OpenAI-compatible message objects.
@@ -90,15 +96,41 @@ export class OpenaiApi extends CommonApi {
 					assistantMessage.content = joinedText;
 				}
 
-				if (modelConfig.includeReasoningInRequest && joinedThinking) {
-					assistantMessage.reasoning_content = joinedThinking;
+				if (modelConfig.includeReasoningInRequest) {
+					if (joinedThinking) {
+						assistantMessage.reasoning_content = joinedThinking;
+					} else if (toolCalls.length > 0) {
+						// Fallback: If reasoning content is missing but we have tool calls,
+						// try to retrieve it from cache using the first tool call ID.
+						// This is critical for DeepSeek API which requires reasoning_content for tool calls.
+						const cache = ReasoningCache.getInstance();
+						let cachedThinking: string | undefined;
+
+						for (const tc of toolCalls) {
+							cachedThinking = cache.get(tc.id);
+							if (cachedThinking) {
+								break;
+							}
+						}
+
+						if (cachedThinking) {
+							assistantMessage.reasoning_content = cachedThinking;
+						} else {
+							// Explicitly set to null if not found in cache to satisfy API requirement
+							assistantMessage.reasoning_content = null;
+						}
+					}
 				}
 
 				if (toolCalls.length > 0) {
 					assistantMessage.tool_calls = toolCalls;
 				}
 
-				if (assistantMessage.content || assistantMessage.reasoning_content || assistantMessage.tool_calls) {
+				if (
+					assistantMessage.content ||
+					assistantMessage.reasoning_content !== undefined ||
+					assistantMessage.tool_calls
+				) {
 					out.push(assistantMessage);
 				}
 			}
@@ -279,6 +311,10 @@ export class OpenaiApi extends CommonApi {
 		const decoder = new TextDecoder();
 		let buffer = "";
 
+		// Reset capture state
+		this._capturedReasoning = "";
+		this._capturedToolCallIds.clear();
+
 		try {
 			while (true) {
 				if (token.isCancellationRequested) {
@@ -319,6 +355,12 @@ export class OpenaiApi extends CommonApi {
 			reader.releaseLock();
 			// If there's an active thinking sequence, end it first
 			this.reportEndThinking(progress);
+
+			// Cache the captured reasoning content for the tool calls in this response
+			if (this._capturedReasoning && this._capturedToolCallIds.size > 0) {
+				const cache = ReasoningCache.getInstance();
+				cache.add(Array.from(this._capturedToolCallIds), this._capturedReasoning);
+			}
 		}
 	}
 
@@ -370,6 +412,7 @@ export class OpenaiApi extends CommonApi {
 
 					if (extractedText) {
 						this.bufferThinkingContent(extractedText, progress);
+						this._capturedReasoning += extractedText;
 						emitted = true;
 					}
 				}
@@ -389,6 +432,7 @@ export class OpenaiApi extends CommonApi {
 				}
 				if (text) {
 					this.bufferThinkingContent(text, progress);
+					this._capturedReasoning += text;
 					emitted = true;
 				}
 			}
@@ -400,6 +444,11 @@ export class OpenaiApi extends CommonApi {
 			const content = String(deltaObj.content);
 
 			// Process XML think blocks or text content (mutually exclusive)
+			// Pass capturedReasoning reference or capture inside the method
+			// Since processXmlThinkBlocks is private and we need to capture inside it,
+			// we will modify processXmlThinkBlocks to take a callback or return captured content.
+			// Ideally, we can just perform side-effects in the method or pass a mutable object.
+			// However, given the structure, I will inline capture in the processXmlThinkBlocks replacement above.
 			const xmlRes = this.processXmlThinkBlocks(content, progress);
 			if (xmlRes.emittedAny) {
 				emitted = true;
@@ -440,6 +489,7 @@ export class OpenaiApi extends CommonApi {
 				const buf = this._toolCallBuffers.get(idx) ?? { args: "" };
 				if (tc.id && typeof tc.id === "string") {
 					buf.id = tc.id as string;
+					this._capturedToolCallIds.add(tc.id);
 				}
 				const func = tc.function as Record<string, unknown> | undefined;
 				if (func?.name && typeof func.name === "string") {
@@ -532,6 +582,7 @@ export class OpenaiApi extends CommonApi {
 				const thinkContent = data.trim();
 				if (thinkContent) {
 					progress.report(new vscode.LanguageModelThinkingPart(thinkContent, this._currentThinkingId || undefined));
+					this._capturedReasoning += thinkContent;
 					emittedAny = true;
 				}
 				data = "";
@@ -542,6 +593,7 @@ export class OpenaiApi extends CommonApi {
 			const thinkContent = data.slice(0, endIdx);
 			if (thinkContent) {
 				progress.report(new vscode.LanguageModelThinkingPart(thinkContent, this._currentThinkingId || undefined));
+				this._capturedReasoning += thinkContent;
 				emittedAny = true;
 			}
 
