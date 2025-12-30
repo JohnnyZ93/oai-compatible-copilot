@@ -29,7 +29,7 @@ import {
 
 import { CommonApi } from "../commonApi";
 
-export class OpenaiApi extends CommonApi {
+export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unknown>> {
 	constructor() {
 		super();
 	}

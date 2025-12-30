@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import type { HFApiMode, HFModelItem } from "../types";
-import { parseModelId } from "../utils";
+import { normalizeUserModels, parseModelId } from "../utils";
 import { fetchModels } from "../provideModel";
 
 interface InitPayload {
@@ -184,13 +184,23 @@ export class ConfigViewPanel {
 	private async sendInit() {
 		const config = vscode.workspace.getConfiguration();
 		const baseUrl = config.get<string>("oaicopilot.baseUrl", "https://api.openai.com/v1");
-		const models = config.get<HFModelItem[]>("oaicopilot.models", []);
+		const models = normalizeUserModels(config.get<unknown>("oaicopilot.models", []));
 
 		const apiKey = (await this.secrets.get("oaicopilot.apiKey")) ?? "";
 		const providerKeys: Record<string, string> = {};
 		const providers = Array.from(new Set(models.map((m) => m.owned_by).filter(Boolean)));
 		for (const provider of providers) {
-			const key = await this.secrets.get(`oaicopilot.apiKey.${provider}`);
+			const normalized = provider.toLowerCase();
+			let key = await this.secrets.get(`oaicopilot.apiKey.${normalized}`);
+			if (!key && normalized !== provider) {
+				// Backward compat: previous versions stored provider keys with original casing.
+				const legacy = await this.secrets.get(`oaicopilot.apiKey.${provider}`);
+				if (legacy) {
+					key = legacy;
+					await this.secrets.store(`oaicopilot.apiKey.${normalized}`, legacy);
+					await this.secrets.delete(`oaicopilot.apiKey.${provider}`);
+				}
+			}
 			if (key) {
 				providerKeys[provider] = key;
 			}
@@ -264,21 +274,30 @@ export class ConfigViewPanel {
 	}
 
 	private async addProvider(provider: string, baseUrl?: string, apiKey?: string, apiMode?: string) {
+		const trimmedProvider = provider.trim();
+		if (!trimmedProvider) {
+			vscode.window.showErrorMessage("Provider ID is required.");
+			return;
+		}
+		const normalizedProvider = trimmedProvider.toLowerCase();
 		// Save API key for the provider
 		if (apiKey) {
-			await this.secrets.store(`oaicopilot.apiKey.${provider}`, apiKey);
+			await this.secrets.store(`oaicopilot.apiKey.${normalizedProvider}`, apiKey);
+			if (trimmedProvider !== normalizedProvider) {
+				await this.secrets.delete(`oaicopilot.apiKey.${trimmedProvider}`);
+			}
 		}
 
 		// Save provider configuration to the model list
 		const config = vscode.workspace.getConfiguration();
-		const models = config.get<HFModelItem[]>("oaicopilot.models", []);
+		const models = normalizeUserModels(config.get<unknown>("oaicopilot.models", []));
 
 		// If the provider doesn't have models yet, add a default model
-		const hasProviderModels = models.some((model) => model.owned_by === provider);
+		const hasProviderModels = models.some((model) => model.owned_by === trimmedProvider);
 		if (!hasProviderModels) {
 			const defaultModel: HFModelItem = {
-				id: `__provider__${provider}`,
-				owned_by: provider,
+				id: `__provider__${trimmedProvider}`,
+				owned_by: trimmedProvider,
 				baseUrl: baseUrl,
 				apiMode: (apiMode as HFApiMode) || "openai",
 			};
@@ -292,19 +311,31 @@ export class ConfigViewPanel {
 	}
 
 	private async updateProvider(provider: string, baseUrl?: string, apiKey?: string, apiMode?: string) {
+		const trimmedProvider = provider.trim();
+		if (!trimmedProvider) {
+			vscode.window.showErrorMessage("Provider ID is required.");
+			return;
+		}
+		const normalizedProvider = trimmedProvider.toLowerCase();
 		// Update provider API key
 		if (apiKey) {
-			await this.secrets.store(`oaicopilot.apiKey.${provider}`, apiKey);
+			await this.secrets.store(`oaicopilot.apiKey.${normalizedProvider}`, apiKey);
+			if (trimmedProvider !== normalizedProvider) {
+				await this.secrets.delete(`oaicopilot.apiKey.${trimmedProvider}`);
+			}
 		} else {
-			await this.secrets.delete(`oaicopilot.apiKey.${provider}`);
+			await this.secrets.delete(`oaicopilot.apiKey.${normalizedProvider}`);
+			if (trimmedProvider !== normalizedProvider) {
+				await this.secrets.delete(`oaicopilot.apiKey.${trimmedProvider}`);
+			}
 		}
 
 		// Update the provider's configuration in the model list
 		const config = vscode.workspace.getConfiguration();
-		const models = config.get<HFModelItem[]>("oaicopilot.models", []);
+		const models = normalizeUserModels(config.get<unknown>("oaicopilot.models", []));
 
 		const updatedModels = models.map((model) => {
-			if (model.owned_by === provider) {
+			if (model.owned_by === trimmedProvider) {
 				return {
 					...model,
 					baseUrl: baseUrl || model.baseUrl,
@@ -321,13 +352,22 @@ export class ConfigViewPanel {
 	}
 
 	private async deleteProvider(provider: string) {
+		const trimmedProvider = provider.trim();
+		if (!trimmedProvider) {
+			vscode.window.showErrorMessage("Provider ID is required.");
+			return;
+		}
+		const normalizedProvider = trimmedProvider.toLowerCase();
 		// Delete provider API key
-		await this.secrets.delete(`oaicopilot.apiKey.${provider}`);
+		await this.secrets.delete(`oaicopilot.apiKey.${normalizedProvider}`);
+		if (trimmedProvider !== normalizedProvider) {
+			await this.secrets.delete(`oaicopilot.apiKey.${trimmedProvider}`);
+		}
 
 		// Remove all models of this provider from the model list
 		const config = vscode.workspace.getConfiguration();
-		const models = config.get<HFModelItem[]>("oaicopilot.models", []);
-		const filteredModels = models.filter((model) => model.owned_by !== provider);
+		const models = normalizeUserModels(config.get<unknown>("oaicopilot.models", []));
+		const filteredModels = models.filter((model) => model.owned_by !== trimmedProvider);
 
 		await config.update("oaicopilot.models", filteredModels, vscode.ConfigurationTarget.Global);
 		vscode.window.showInformationMessage(`Provider ${provider} and all its models have been deleted.`);

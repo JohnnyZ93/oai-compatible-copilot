@@ -97,6 +97,14 @@
 								"type": "string",
 								"description": "Model provider (e.g., 'zai', 'openai')."
 							},
+							"provider": {
+								"type": "string",
+								"description": "(Alias of owned_by) Model provider (e.g., 'zai', 'openai')."
+							},
+							"provide": {
+								"type": "string",
+								"description": "(Alias of owned_by) Model provider (e.g., 'zai', 'openai')."
+							},
 							"family": {
 								"type": "string",
 								"description": "Model family (e.g., 'gpt-4', 'claude-3', 'gemini'). Enables model-specific optimizations and behaviors. Defaults to 'oai-compatible' if not specified."
@@ -273,11 +281,13 @@
 								"type": "string",
 								"enum": [
 									"openai",
+									"openai-responses",
 									"ollama",
-									"anthropic"
+									"anthropic",
+									"gemini"
 								],
 								"default": "openai",
-								"description": "API mode: 'openai' (Default) for API (/chat/completions), 'ollama' for API (/api/chat), 'anthropic' for API (/v1/messages)."
+								"description": "API mode: 'openai' (Default) for OpenAI Chat Completions (/chat/completions), 'openai-responses' for OpenAI Responses (/responses), 'ollama' for Ollama (/api/chat), 'anthropic' for Anthropic (/v1/messages), 'gemini' for Gemini (*/v1beta/models/{model}:streamGenerateContent?alt=sse)."
 							},
 							"delay": {
 								"type": "number",
@@ -286,10 +296,8 @@
 								"description": "Model-specific delay in milliseconds between consecutive requests. If not specified, falls back to global oaicopilot.delay configuration."
 							}
 						},
-						"required": [
-							"id",
-							"owned_by"
-						]
+						"required": ["id"],
+						"anyOf": [{ "required": ["owned_by"] }, { "required": ["provider"] }, { "required": ["provide"] }]
 					},
 					"description": "A list of preferred models to use. If provided, these models will be used directly instead of fetching from the API."
 				},
