@@ -76,7 +76,8 @@ export interface HFModelItem {
 	include_reasoning_in_request?: boolean;
 
 	/**
-	 * API mode: "openai" for OpenAI-compatible API, "ollama" for Ollama native API.
+	 * API mode: "openai" for OpenAI Chat Completions, "openai-responses" for OpenAI Responses,
+	 * "ollama" for Ollama native API, "anthropic" for Anthropic Messages, "gemini" for Gemini native API.
 	 * Default is "openai".
 	 */
 	apiMode?: HFApiMode;
@@ -133,4 +134,4 @@ export interface RetryConfig {
 }
 
 /** Supports API mode. */
-export type HFApiMode = "openai" | "ollama" | "anthropic";
+export type HFApiMode = "openai" | "openai-responses" | "ollama" | "anthropic" | "gemini";

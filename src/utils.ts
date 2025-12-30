@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { RetryConfig } from "./types";
+import type { HFModelItem, RetryConfig } from "./types";
 import { OpenAIFunctionToolDef } from "./openai/openaiTypes";
 
 const RETRY_MAX_ATTEMPTS = 3;
@@ -12,6 +12,35 @@ const RETRYABLE_STATUS_CODES = [429, 500, 502, 503, 504];
 export interface ParsedModelId {
 	baseId: string;
 	configId?: string;
+}
+
+export function getModelProviderId(model: unknown): string {
+	if (!model || typeof model !== "object") {
+		return "";
+	}
+	const obj = model as Record<string, unknown>;
+	const pick = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
+	return (
+		pick(obj.owned_by) ||
+		pick(obj.provide) ||
+		pick(obj.provider) ||
+		pick(obj.ownedBy) ||
+		pick(obj.owner) ||
+		pick(obj.vendor)
+	);
+}
+
+export function normalizeUserModels(models: unknown): HFModelItem[] {
+	const list = Array.isArray(models) ? models : [];
+	const out: HFModelItem[] = [];
+	for (const item of list) {
+		if (!item || typeof item !== "object") {
+			continue;
+		}
+		const provider = getModelProviderId(item);
+		out.push({ ...(item as HFModelItem), owned_by: provider });
+	}
+	return out;
 }
 
 /**
@@ -87,6 +116,52 @@ export function convertToolsToOpenAI(options: vscode.ProvideLanguageModelChatRes
 	}
 
 	return { tools: toolDefs, tool_choice };
+}
+
+export interface OpenAIResponsesFunctionToolDef {
+	type: "function";
+	name: string;
+	description?: string;
+	parameters?: object;
+}
+
+export type OpenAIResponsesToolChoice = "auto" | { type: "function"; name: string };
+
+/**
+ * Convert VS Code tool definitions to OpenAI Responses API tool definitions.
+ * Responses uses `{ type:"function", name, description, parameters }` (no nested `function` object).
+ */
+export function convertToolsToOpenAIResponses(options: vscode.ProvideLanguageModelChatResponseOptions): {
+	tools?: OpenAIResponsesFunctionToolDef[];
+	tool_choice?: OpenAIResponsesToolChoice;
+} {
+	const toolConfig = convertToolsToOpenAI(options);
+	if (!toolConfig.tools || toolConfig.tools.length === 0) {
+		return {};
+	}
+
+	const tools: OpenAIResponsesFunctionToolDef[] = toolConfig.tools.map((t) => {
+		const out: OpenAIResponsesFunctionToolDef = {
+			type: "function",
+			name: t.function.name,
+		};
+		if (t.function.description) {
+			out.description = t.function.description;
+		}
+		if (t.function.parameters) {
+			out.parameters = t.function.parameters;
+		}
+		return out;
+	});
+
+	let tool_choice: OpenAIResponsesToolChoice | undefined;
+	if (toolConfig.tool_choice === "auto") {
+		tool_choice = "auto";
+	} else if (toolConfig.tool_choice?.type === "function") {
+		tool_choice = { type: "function", name: toolConfig.tool_choice.function.name };
+	}
+
+	return { tools, tool_choice };
 }
 
 /**

@@ -7,15 +7,10 @@ import {
 	Progress,
 	CancellationToken,
 } from "vscode";
-
-import type { OllamaMessage, OllamaRequestBody } from "./ollama/ollamaTypes";
-
-import type { OpenAIChatMessage } from "./openai/openaiTypes";
-import type { AnthropicMessage, AnthropicRequestBody } from "./anthropic/anthropicTypes";
 import { HFModelItem } from "./types";
 import { tryParseJSONObject } from "./utils";
 
-export abstract class CommonApi {
+export abstract class CommonApi<TMessage, TRequestBody> {
 	/** Buffer for assembling streamed tool calls by index. */
 	protected _toolCallBuffers: Map<number, { id?: string; name?: string; args: string }> = new Map<
 		number,
@@ -55,7 +50,7 @@ export abstract class CommonApi {
 	abstract convertMessages(
 		messages: readonly LanguageModelChatRequestMessage[],
 		modelConfig: { includeReasoningInRequest: boolean }
-	): Array<OpenAIChatMessage | OllamaMessage | AnthropicMessage>;
+	): TMessage[];
 
 	/**
 	 * Construct request body for Specific api
@@ -64,10 +59,10 @@ export abstract class CommonApi {
 	 * @param options From VS Code
 	 */
 	abstract prepareRequestBody(
-		rb: Record<string, unknown> | OllamaRequestBody | AnthropicRequestBody,
+		rb: TRequestBody,
 		um: HFModelItem | undefined,
 		options: ProvideLanguageModelChatResponseOptions
-	): Record<string, unknown> | OllamaRequestBody | AnthropicRequestBody;
+	): TRequestBody;
 
 	/**
 	 * Process specific api streaming response (JSON lines format).

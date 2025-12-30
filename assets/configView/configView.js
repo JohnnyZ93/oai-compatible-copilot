@@ -119,8 +119,10 @@ document.getElementById("addProvider").addEventListener("click", () => {
 		<td>
 			<select class="provider-input" data-field="apiMode">
 				<option value="openai">OpenAI</option>
+				<option value="openai-responses">OpenAI Responses</option>
 				<option value="ollama">Ollama</option>
 				<option value="anthropic">Anthropic</option>
+				<option value="gemini">Gemini</option>
 			</select>
 		</td>
 		<td>
@@ -311,8 +313,10 @@ function renderProviders() {
 				<td>
 					<select class="provider-input" data-field="apiMode">
 						<option value="openai" ${firstModel.apiMode === "openai" ? "selected" : ""}>OpenAI</option>
+						<option value="openai-responses" ${firstModel.apiMode === "openai-responses" ? "selected" : ""}>OpenAI Responses</option>
 						<option value="ollama" ${firstModel.apiMode === "ollama" ? "selected" : ""}>Ollama</option>
 						<option value="anthropic" ${firstModel.apiMode === "anthropic" ? "selected" : ""}>Anthropic</option>
+						<option value="gemini" ${firstModel.apiMode === "gemini" ? "selected" : ""}>Gemini</option>
 					</select>
 				</td>
 				<td>
