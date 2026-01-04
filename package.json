@@ -2,7 +2,7 @@
 	"name": "oai-compatible-copilot",
 	"publisher": "johnny-zhao",
 	"displayName": "OAI Compatible Provider for Copilot",
-	"description": "An extension that integrates OpenAI/Ollama/Anthropic API Providers into GitHub Copilot Chat",
+	"description": "An extension that integrates OpenAI/Ollama/Anthropic/Gemini API Providers into GitHub Copilot Chat",
 	"icon": "assets/logo.png",
 	"keywords": [
 		"ai",
@@ -13,13 +13,14 @@
 		"openai",
 		"ollama",
 		"anthropic",
-		"claude"
+		"claude",
+		"gemini"
 	],
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/JohnnyZ93/oai-compatible-copilot"
 	},
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"engines": {
 		"vscode": "^1.104.0"
 	},

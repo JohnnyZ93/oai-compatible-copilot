@@ -6,7 +6,7 @@
 Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.2, GLM 4.6 and more in VS Code with GitHub Copilot Chat powered by any OpenAI-compatible provider 🔥
 
 ## ✨ Features
-- Supports almost all OpenAI-compatible providers, such as ModelScope, SiliconFlow, DeepSeek...
+- Supports OpenAI/Ollama/Anthropic/Gemini API providers, such as ModelScope, SiliconFlow, DeepSeek...
 - Supports vision models.
 - Offers additional configuration options for chat requests.
 - Supports control model thinking and reasoning content show in chat interface.

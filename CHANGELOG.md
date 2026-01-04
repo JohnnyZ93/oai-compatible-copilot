@@ -1,6 +1,8 @@
 # Change Log
 
-## Unreleased
+## 0.2.1 (2025-01-04)
+
+Thanks to @Andy963 for contributing the [PR #89](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/89):
 
 - Feat: Add OpenAI Responses API mode (`apiMode: "openai-responses"`, endpoint `/responses`).
 - Feat: Add Gemini native API mode (`apiMode: "gemini"`, endpoint `.../v1beta/models/{model}:streamGenerateContent?alt=sse`).
