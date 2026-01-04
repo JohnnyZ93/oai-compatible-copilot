@@ -80,4 +80,3 @@ export interface GeminiGenerateContentResponse {
 	usageMetadata?: unknown;
 	[key: string]: unknown;
 }
-

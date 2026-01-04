@@ -259,7 +259,10 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 		}
 	}
 
-	private async processEvent(event: Record<string, unknown>, progress: Progress<LanguageModelResponsePart2>): Promise<void> {
+	private async processEvent(
+		event: Record<string, unknown>,
+		progress: Progress<LanguageModelResponsePart2>
+	): Promise<void> {
 		const eventType = typeof event.type === "string" ? event.type : "";
 		if (!eventType) {
 			return;
@@ -364,13 +367,17 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 				const name =
 					typeof item.name === "string"
 						? item.name
-						: item.function && typeof item.function === "object" && typeof (item.function as Record<string, unknown>).name === "string"
+						: item.function &&
+							  typeof item.function === "object" &&
+							  typeof (item.function as Record<string, unknown>).name === "string"
 							? String((item.function as Record<string, unknown>).name)
 							: "";
 				const args =
 					typeof item.arguments === "string"
 						? item.arguments
-						: item.function && typeof item.function === "object" && typeof (item.function as Record<string, unknown>).arguments === "string"
+						: item.function &&
+							  typeof item.function === "object" &&
+							  typeof (item.function as Record<string, unknown>).arguments === "string"
 							? String((item.function as Record<string, unknown>).arguments)
 							: "";
 

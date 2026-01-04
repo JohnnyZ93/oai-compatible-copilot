@@ -12,7 +12,14 @@ import type { OpenAIFunctionToolDef } from "../openai/openaiTypes";
 
 import { CommonApi } from "../commonApi";
 
-import { isImageMimeType, isToolResultPart, collectToolResultText, convertToolsToOpenAI, mapRole, tryParseJSONObject } from "../utils";
+import {
+	isImageMimeType,
+	isToolResultPart,
+	collectToolResultText,
+	convertToolsToOpenAI,
+	mapRole,
+	tryParseJSONObject,
+} from "../utils";
 
 import type {
 	GeminiGenerateContentRequest,
@@ -134,10 +141,16 @@ function jsonSchemaToGeminiSchema(
 		return {};
 	}
 
-	const root = rootSchema && typeof rootSchema === "object" ? (rootSchema as Record<string, unknown>) : (jsonSchema as Record<string, unknown>);
+	const root =
+		rootSchema && typeof rootSchema === "object"
+			? (rootSchema as Record<string, unknown>)
+			: (jsonSchema as Record<string, unknown>);
 	const stack = refStack instanceof Set ? refStack : new Set<string>();
 
-	const ref = typeof (jsonSchema as Record<string, unknown>).$ref === "string" ? String((jsonSchema as Record<string, unknown>).$ref).trim() : "";
+	const ref =
+		typeof (jsonSchema as Record<string, unknown>).$ref === "string"
+			? String((jsonSchema as Record<string, unknown>).$ref).trim()
+			: "";
 	if (ref) {
 		if (stack.has(ref)) {
 			return {};
@@ -180,7 +193,9 @@ function jsonSchemaToGeminiSchema(
 		return out;
 	}
 
-	const allOf = Array.isArray((jsonSchema as Record<string, unknown>).allOf) ? ((jsonSchema as Record<string, unknown>).allOf as unknown[]) : null;
+	const allOf = Array.isArray((jsonSchema as Record<string, unknown>).allOf)
+		? ((jsonSchema as Record<string, unknown>).allOf as unknown[])
+		: null;
 	if (allOf && allOf.length > 0) {
 		const merged: Record<string, unknown> = { ...(jsonSchema as Record<string, unknown>) };
 		delete merged.allOf;
@@ -191,7 +206,10 @@ function jsonSchemaToGeminiSchema(
 			const itObj = it as Record<string, unknown>;
 			for (const [k, v] of Object.entries(itObj)) {
 				if (k === "properties" && v && typeof v === "object" && !Array.isArray(v)) {
-					const baseProps = merged.properties && typeof merged.properties === "object" && !Array.isArray(merged.properties) ? (merged.properties as Record<string, unknown>) : {};
+					const baseProps =
+						merged.properties && typeof merged.properties === "object" && !Array.isArray(merged.properties)
+							? (merged.properties as Record<string, unknown>)
+							: {};
 					merged.properties = { ...baseProps, ...(v as Record<string, unknown>) };
 					continue;
 				}
@@ -212,7 +230,11 @@ function jsonSchemaToGeminiSchema(
 	const input = { ...(jsonSchema as Record<string, unknown>) };
 
 	// Handle nullable unions like { anyOf: [{type:'null'}, {...}] }
-	const anyOf = Array.isArray(input.anyOf) ? (input.anyOf as unknown[]) : Array.isArray(input.oneOf) ? (input.oneOf as unknown[]) : null;
+	const anyOf = Array.isArray(input.anyOf)
+		? (input.anyOf as unknown[])
+		: Array.isArray(input.oneOf)
+			? (input.oneOf as unknown[])
+			: null;
 	if (anyOf && anyOf.length === 2) {
 		const a0 = anyOf[0] && typeof anyOf[0] === "object" ? (anyOf[0] as Record<string, unknown>) : null;
 		const a1 = anyOf[1] && typeof anyOf[1] === "object" ? (anyOf[1] as Record<string, unknown>) : null;
@@ -246,7 +268,14 @@ function jsonSchemaToGeminiSchema(
 		if (k.startsWith("$")) {
 			continue;
 		}
-		if (k === "additionalProperties" || k === "definitions" || k === "$defs" || k === "title" || k === "examples" || k === "default") {
+		if (
+			k === "additionalProperties" ||
+			k === "definitions" ||
+			k === "$defs" ||
+			k === "title" ||
+			k === "examples" ||
+			k === "default"
+		) {
 			continue;
 		}
 		if (k === "allOf") {
@@ -315,7 +344,9 @@ function jsonSchemaToGeminiSchema(
 	return out;
 }
 
-function openaiToolsToGeminiFunctionDeclarations(tools: OpenAIFunctionToolDef[]): Array<{ name: string; description?: string; parameters?: Record<string, unknown> }> {
+function openaiToolsToGeminiFunctionDeclarations(
+	tools: OpenAIFunctionToolDef[]
+): Array<{ name: string; description?: string; parameters?: Record<string, unknown> }> {
 	const out: Array<{ name: string; description?: string; parameters?: Record<string, unknown> }> = [];
 	for (const t of Array.isArray(tools) ? tools : []) {
 		if (!t || typeof t !== "object") {
@@ -408,7 +439,11 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 			return { text: textParts.join("").trim(), imageParts, toolCalls, toolResults };
 		};
 
-		const toolResultToFunctionResponsePart = (callId: string, outputText: string, fallbackName = ""): GeminiPart | null => {
+		const toolResultToFunctionResponsePart = (
+			callId: string,
+			outputText: string,
+			fallbackName = ""
+		): GeminiPart | null => {
 			if (!callId) {
 				return null;
 			}
@@ -562,7 +597,9 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 		options: ProvideLanguageModelChatResponseOptions
 	): GeminiGenerateContentRequest {
 		const generationConfig: Record<string, unknown> = {
-			...(rb.generationConfig && typeof rb.generationConfig === "object" ? (rb.generationConfig as Record<string, unknown>) : {}),
+			...(rb.generationConfig && typeof rb.generationConfig === "object"
+				? (rb.generationConfig as Record<string, unknown>)
+				: {}),
 		};
 
 		// temperature
@@ -583,7 +620,11 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 
 		// maxOutputTokens
 		const maxOutput =
-			um?.max_completion_tokens !== undefined ? um.max_completion_tokens : um?.max_tokens !== undefined ? um.max_tokens : undefined;
+			um?.max_completion_tokens !== undefined
+				? um.max_completion_tokens
+				: um?.max_tokens !== undefined
+					? um.max_tokens
+					: undefined;
 		if (maxOutput !== undefined) {
 			generationConfig.maxOutputTokens = maxOutput;
 		}
@@ -707,12 +748,16 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 							}
 							continue;
 						}
-						const name = typeof (fc as { name?: unknown }).name === "string" ? String((fc as { name: string }).name).trim() : "";
+						const name =
+							typeof (fc as { name?: unknown }).name === "string" ? String((fc as { name: string }).name).trim() : "";
 						if (!name) {
 							continue;
 						}
 						const argsRaw = (fc as { args?: unknown }).args;
-						const argsObj = argsRaw && typeof argsRaw === "object" && !Array.isArray(argsRaw) ? (argsRaw as Record<string, unknown>) : {};
+						const argsObj =
+							argsRaw && typeof argsRaw === "object" && !Array.isArray(argsRaw)
+								? (argsRaw as Record<string, unknown>)
+								: {};
 						const key = `${name}\n${JSON.stringify(argsObj)}`;
 
 						const pObj = p && typeof p === "object" ? (p as unknown as Record<string, unknown>) : null;
@@ -772,7 +817,11 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 					}
 
 					const textJoined = parts
-						.map((p) => (p && typeof p === "object" && typeof (p as GeminiPart).text === "string" ? String((p as GeminiPart).text) : ""))
+						.map((p) =>
+							p && typeof p === "object" && typeof (p as GeminiPart).text === "string"
+								? String((p as GeminiPart).text)
+								: ""
+						)
 						.filter(Boolean)
 						.join("");
 

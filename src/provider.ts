@@ -331,7 +331,11 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				for (const msg of geminiMessages) {
 					if (msg.role === "system") {
 						const text = msg.parts
-							.map((p) => (p && typeof p === "object" && typeof (p as { text?: unknown }).text === "string" ? String((p as { text: string }).text) : ""))
+							.map((p) =>
+								p && typeof p === "object" && typeof (p as { text?: unknown }).text === "string"
+									? String((p as { text: string }).text)
+									: ""
+							)
 							.join("")
 							.trim();
 						if (text) {
@@ -447,25 +451,14 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			"User-Agent": this.userAgent,
 		};
 
-		if (apiMode === "anthropic") {
-			// Match Claude Code CLI / official Anthropic API requirements.
-			headers["anthropic-version"] = "2023-06-01";
-			headers["Accept"] = "text/event-stream";
-		}
-		if (apiMode === "openai-responses") {
-			headers["openai-beta"] = "responses=v1";
-			headers["Accept"] = "text/event-stream";
-		}
-		if (apiMode === "gemini") {
-			headers["x-goog-api-key"] = apiKey;
-			headers["Accept"] = "text/event-stream";
-		}
-
 		// Provider-specific header formats
 		if (apiMode === "anthropic") {
 			headers["x-api-key"] = apiKey;
+			headers["anthropic-version"] = "2023-06-01";
 		} else if (apiMode === "ollama" && apiKey !== "ollama") {
 			headers["Authorization"] = `Bearer ${apiKey}`;
+		} else if (apiMode === "gemini") {
+			headers["x-goog-api-key"] = apiKey;
 		} else {
 			headers["Authorization"] = `Bearer ${apiKey}`;
 		}
