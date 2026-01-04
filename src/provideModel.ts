@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { CancellationToken, LanguageModelChatInformation } from "vscode";
 
 import type { HFModelItem, HFModelsResponse } from "./types";
+import { normalizeUserModels } from "./utils";
 
 const DEFAULT_CONTEXT_LENGTH = 128000;
 const DEFAULT_MAX_TOKENS = 4096;
@@ -20,7 +21,7 @@ export async function prepareLanguageModelChatInformation(
 ): Promise<LanguageModelChatInformation[]> {
 	// Check for user-configured models first
 	const config = vscode.workspace.getConfiguration();
-	const userModels = config.get<HFModelItem[]>("oaicopilot.models", []);
+	const userModels = normalizeUserModels(config.get<unknown>("oaicopilot.models", []));
 
 	let infos: LanguageModelChatInformation[];
 	if (userModels && userModels.length > 0) {

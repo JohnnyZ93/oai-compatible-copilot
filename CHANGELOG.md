@@ -1,5 +1,13 @@
 # Change Log
 
+## Unreleased
+
+- Feat: Add OpenAI Responses API mode (`apiMode: "openai-responses"`, endpoint `/responses`).
+- Feat: Add Gemini native API mode (`apiMode: "gemini"`, endpoint `.../v1beta/models/{model}:streamGenerateContent?alt=sse`).
+- Fix: Preserve Gemini `thoughtSignature` for tool-calling follow-up requests (required by newer Gemini thinking models).
+- Fix: Accept `provider` / `provide` as aliases of `owned_by` in `oaicopilot.models`.
+- Fix: Anthropic mode sends `anthropic-version: 2023-06-01` and includes request URL in errors for easier relay debugging.
+
 ## 0.2.0 (2025-12-25)
 
 - Fix: [Text content blocks must be non-empty on Anthropic api](https://github.com/JohnnyZ93/oai-compatible-copilot/issues/79)
