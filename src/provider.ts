@@ -13,15 +13,18 @@ import type { HFModelItem } from "./types";
 
 import type { OllamaRequestBody } from "./ollama/ollamaTypes";
 
-import { parseModelId, createRetryConfig, executeWithRetry } from "./utils";
+import { parseModelId, createRetryConfig, executeWithRetry, normalizeUserModels } from "./utils";
 
 import { prepareLanguageModelChatInformation } from "./provideModel";
 import { prepareTokenCount } from "./provideToken";
 import { updateContextStatusBar } from "./statusBar";
 import { OllamaApi } from "./ollama/ollamaApi";
 import { OpenaiApi } from "./openai/openaiApi";
+import { OpenaiResponsesApi } from "./openai/openaiResponsesApi";
 import { AnthropicApi } from "./anthropic/anthropicApi";
 import { AnthropicRequestBody } from "./anthropic/anthropicTypes";
+import { GeminiApi, buildGeminiGenerateContentUrl, type GeminiToolCallMeta } from "./gemini/geminiApi";
+import type { GeminiGenerateContentRequest } from "./gemini/geminiTypes";
 
 /**
  * VS Code Chat provider backed by Hugging Face Inference Providers.
@@ -29,6 +32,8 @@ import { AnthropicRequestBody } from "./anthropic/anthropicTypes";
 export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	/** Track last request completion time for delay calculation. */
 	private _lastRequestTime: number | null = null;
+
+	private readonly _geminiToolCallMetaByCallId = new Map<string, GeminiToolCallMeta>();
 
 	/**
 	 * Create a provider using the given secret storage for the API key.
@@ -108,7 +113,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		try {
 			// get model config from user settings
 			const config = vscode.workspace.getConfiguration();
-			const userModels = config.get<HFModelItem[]>("oaicopilot.models", []);
+			const userModels = normalizeUserModels(config.get<unknown>("oaicopilot.models", []));
 
 			// 解析模型ID以处理配置ID
 			const parsedModelId = parseModelId(model.id);
@@ -189,8 +194,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				// console.debug("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(ollamaRequestBody));
 
 				// send Ollama chat request with retry
+				const url = `${BASE_URL.replace(/\/+$/, "")}/api/chat`;
 				const response = await executeWithRetry(async () => {
-					const res = await fetch(`${BASE_URL.replace(/\/+$/, "")}/api/chat`, {
+					const res = await fetch(url, {
 						method: "POST",
 						headers: requestHeaders,
 						body: JSON.stringify(ollamaRequestBody),
@@ -199,7 +205,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					if (!res.ok) {
 						const errorText = await res.text();
 						console.error("[Ollama Provider] Ollama API error response", errorText);
-						throw new Error(`Ollama API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`);
+						throw new Error(
+							`Ollama API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}\nURL: ${url}`
+						);
 					}
 
 					return res;
@@ -224,8 +232,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				// console.debug("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(requestBody));
 
 				// send Anthropic chat request with retry
+				const url = `${BASE_URL.replace(/\/+$/, "")}/v1/messages`;
 				const response = await executeWithRetry(async () => {
-					const res = await fetch(`${BASE_URL.replace(/\/+$/, "")}/v1/messages`, {
+					const res = await fetch(url, {
 						method: "POST",
 						headers: requestHeaders,
 						body: JSON.stringify(requestBody),
@@ -235,7 +244,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 						const errorText = await res.text();
 						console.error("[Anthropic Provider] Anthropic API error response", errorText);
 						throw new Error(
-							`Anthropic API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`
+							`Anthropic API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}\nURL: ${url}`
 						);
 					}
 
@@ -246,6 +255,132 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					throw new Error("No response body from Anthropic API");
 				}
 				await anthropicApi.processStreamingResponse(response.body, trackingProgress, token);
+			} else if (apiMode === "openai-responses") {
+				// OpenAI Responses API mode
+				const openaiResponsesApi = new OpenaiResponsesApi();
+				const rawInput = openaiResponsesApi.convertMessages(messages, modelConfig);
+
+				const instructionsParts: string[] = [];
+				const input: unknown[] = [];
+				for (const item of rawInput) {
+					if (
+						item &&
+						typeof item === "object" &&
+						"role" in item &&
+						(item as { role?: unknown }).role === "system" &&
+						Array.isArray((item as { content?: unknown }).content)
+					) {
+						for (const part of (item as { content: unknown[] }).content) {
+							if (
+								part &&
+								typeof part === "object" &&
+								(part as { type?: unknown }).type === "input_text" &&
+								typeof (part as { text?: unknown }).text === "string" &&
+								(part as { text: string }).text.trim()
+							) {
+								instructionsParts.push((part as { text: string }).text);
+							}
+						}
+						continue;
+					}
+					input.push(item);
+				}
+
+				// requestBody
+				let requestBody: Record<string, unknown> = {
+					model: parsedModelId.baseId,
+					input,
+					stream: true,
+				};
+				if (instructionsParts.length > 0) {
+					requestBody.instructions = instructionsParts.join("\n");
+				}
+				requestBody = openaiResponsesApi.prepareRequestBody(requestBody, um, options);
+
+				// send Responses API request with retry
+				const url = `${BASE_URL.replace(/\/+$/, "")}/responses`;
+				const response = await executeWithRetry(async () => {
+					const res = await fetch(url, {
+						method: "POST",
+						headers: requestHeaders,
+						body: JSON.stringify(requestBody),
+					});
+
+					if (!res.ok) {
+						const errorText = await res.text();
+						console.error("[OAI Compatible Model Provider] Responses API error response", errorText);
+						throw new Error(
+							`Responses API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}\nURL: ${url}`
+						);
+					}
+
+					return res;
+				}, retryConfig);
+
+				if (!response.body) {
+					throw new Error("No response body from Responses API");
+				}
+				await openaiResponsesApi.processStreamingResponse(response.body, trackingProgress, token);
+			} else if (apiMode === "gemini") {
+				// Gemini native API mode
+				const geminiApi = new GeminiApi(this._geminiToolCallMetaByCallId);
+				const geminiMessages = geminiApi.convertMessages(messages, modelConfig);
+
+				const systemParts: string[] = [];
+				const contents: GeminiGenerateContentRequest["contents"] = [];
+				for (const msg of geminiMessages) {
+					if (msg.role === "system") {
+						const text = msg.parts
+							.map((p) =>
+								p && typeof p === "object" && typeof (p as { text?: unknown }).text === "string"
+									? String((p as { text: string }).text)
+									: ""
+							)
+							.join("")
+							.trim();
+						if (text) {
+							systemParts.push(text);
+						}
+						continue;
+					}
+					contents.push({ role: msg.role, parts: msg.parts });
+				}
+
+				let requestBody: GeminiGenerateContentRequest = {
+					contents,
+				};
+				if (systemParts.length > 0) {
+					requestBody.systemInstruction = { role: "user", parts: [{ text: systemParts.join("\n") }] };
+				}
+				requestBody = geminiApi.prepareRequestBody(requestBody, um, options);
+
+				const url = buildGeminiGenerateContentUrl(BASE_URL, parsedModelId.baseId, true);
+				if (!url) {
+					throw new Error("Invalid Gemini base URL configuration.");
+				}
+
+				const response = await executeWithRetry(async () => {
+					const res = await fetch(url, {
+						method: "POST",
+						headers: requestHeaders,
+						body: JSON.stringify(requestBody),
+					});
+
+					if (!res.ok) {
+						const errorText = await res.text();
+						console.error("[Gemini Provider] Gemini API error response", errorText);
+						throw new Error(
+							`Gemini API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}\nURL: ${url}`
+						);
+					}
+
+					return res;
+				}, retryConfig);
+
+				if (!response.body) {
+					throw new Error("No response body from Gemini API");
+				}
+				await geminiApi.processStreamingResponse(response.body, trackingProgress, token);
 			} else {
 				// OpenAI compatible API mode (default)
 				const openaiApi = new OpenaiApi();
@@ -262,8 +397,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				// console.debug("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(requestBody));
 
 				// send chat request with retry
+				const url = `${BASE_URL.replace(/\/+$/, "")}/chat/completions`;
 				const response = await executeWithRetry(async () => {
-					const res = await fetch(`${BASE_URL.replace(/\/+$/, "")}/chat/completions`, {
+					const res = await fetch(url, {
 						method: "POST",
 						headers: requestHeaders,
 						body: JSON.stringify(requestBody),
@@ -273,7 +409,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 						const errorText = await res.text();
 						console.error("[OAI Compatible Model Provider] OAI Compatible API error response", errorText);
 						throw new Error(
-							`OAI Compatible API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`
+							`OAI Compatible API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}\nURL: ${url}`
 						);
 					}
 
@@ -318,8 +454,11 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		// Provider-specific header formats
 		if (apiMode === "anthropic") {
 			headers["x-api-key"] = apiKey;
+			headers["anthropic-version"] = "2023-06-01";
 		} else if (apiMode === "ollama" && apiKey !== "ollama") {
 			headers["Authorization"] = `Bearer ${apiKey}`;
+		} else if (apiMode === "gemini") {
+			headers["x-goog-api-key"] = apiKey;
 		} else {
 			headers["Authorization"] = `Bearer ${apiKey}`;
 		}
@@ -341,7 +480,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		// Try to get provider-specific API key first
 		let apiKey: string | undefined;
 		if (provider && provider.trim() !== "") {
-			const normalizedProvider = provider.toLowerCase();
+			const normalizedProvider = provider.trim().toLowerCase();
 			const providerKey = `oaicopilot.apiKey.${normalizedProvider}`;
 			apiKey = await this.secrets.get(providerKey);
 

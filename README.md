@@ -6,7 +6,7 @@
 Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.2, GLM 4.6 and more in VS Code with GitHub Copilot Chat powered by any OpenAI-compatible provider 🔥
 
 ## ✨ Features
-- Supports almost all OpenAI-compatible providers, such as ModelScope, SiliconFlow, DeepSeek...
+- Supports OpenAI/Ollama/Anthropic/Gemini API providers, such as ModelScope, SiliconFlow, DeepSeek...
 - Supports vision models.
 - Offers additional configuration options for chat requests.
 - Supports control model thinking and reasoning content show in chat interface.
@@ -103,24 +103,34 @@ There are two ways to open the configuration interface:
 
 ## * Multi Api Mode
 
-The extension supports three different API protocols to work with various model providers. You can specify which API mode to use for each model via the `apiMode` parameter.
+The extension supports five different API protocols to work with various model providers. You can specify which API mode to use for each model via the `apiMode` parameter.
 
 ### Supported API Modes
 
-1. **`openai`** (default) - OpenAI-compatible API
+1. **`openai`** (default) - OpenAI Chat Completions API
    - Endpoint: `/chat/completions`
    - Header: `Authorization: Bearer <apiKey>`
    - Use for: Most OpenAI-compatible providers (ModelScope, SiliconFlow, etc.)
 
-2. **`ollama`** - Ollama native API
+2. **`openai-responses`** - OpenAI Responses API
+   - Endpoint: `/responses`
+   - Header: `Authorization: Bearer <apiKey>`
+   - Use for: OpenAI official Responses API (and compatible gateways like rsp4copilot)
+
+3. **`ollama`** - Ollama native API
    - Endpoint: `/api/chat`
    - Header: `Authorization: Bearer <apiKey>` (or no header for local Ollama)
    - Use for: Local Ollama instances
 
-3. **`anthropic`** - Anthropic Claude API
+4. **`anthropic`** - Anthropic Claude API
    - Endpoint: `/v1/messages`
    - Header: `x-api-key: <apiKey>`
    - Use for: Anthropic Claude models
+
+5. **`gemini`** - Gemini native API
+   - Endpoint: `/v1beta/models/{model}:streamGenerateContent?alt=sse`
+   - Header: `x-goog-api-key: <apiKey>`
+   - Use for: Google Gemini models (and compatible gateways like rsp4copilot)
 
 ### Configuration Examples
 Mixed configuration with multiple API modes:
@@ -154,7 +164,7 @@ Mixed configuration with multiple API modes:
 
 ## * Multi-Provider Guide
 
-> `owned_by` in model config is used for group apiKey. The storage key is `oaicopilot.apiKey.${owned_by}`.
+> `owned_by` (alias: `provider` / `provide`) in model config is used for grouping provider-specific apiKey. The storage key is `oaicopilot.apiKey.<providerIdLowercase>`.
 
 1. Open VS Code Settings and configure `oaicopilot.models`.
 2. Open command center ( Ctrl + Shift + P ), and search "OAICopilot: Set OAI Compatible Multi-Provider Apikey" to configure provider-specific API keys.
@@ -359,7 +369,7 @@ All parameters support individual configuration for different models, providing 
 - `headers`: Custom HTTP headers to be sent with every request to this model's provider (e.g., `{"X-API-Version": "v1", "X-Custom-Header": "value"}`). These headers will be merged with the default headers (Authorization, Content-Type, User-Agent)
 - `extra`: Extra request body parameters.
 - `include_reasoning_in_request`: Whether to include reasoning_content in assistant messages sent to the API. Support deepseek-v3.2 or others.
-- `apiMode`: API mode: 'openai' (Default) for API (/chat/completions), 'ollama' for API (/api/chat), 'anthropic' for API (/v1/messages).
+- `apiMode`: API mode: 'openai' (Default) for API (/chat/completions), 'openai-responses' for API (/responses), 'ollama' for API (/api/chat), 'anthropic' for API (/v1/messages), 'gemini' for API (/v1beta/models/{model}:streamGenerateContent?alt=sse).
 - `delay`: Model-specific delay in milliseconds between consecutive requests. If not specified, falls back to global `oaicopilot.delay` configuration.
 ---
 

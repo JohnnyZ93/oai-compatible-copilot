@@ -2,7 +2,7 @@
 	"name": "oai-compatible-copilot",
 	"publisher": "johnny-zhao",
 	"displayName": "OAI Compatible Provider for Copilot",
-	"description": "An extension that integrates OpenAI/Ollama/Anthropic API Providers into GitHub Copilot Chat",
+	"description": "An extension that integrates OpenAI/Ollama/Anthropic/Gemini API Providers into GitHub Copilot Chat",
 	"icon": "assets/logo.png",
 	"keywords": [
 		"ai",
@@ -13,13 +13,14 @@
 		"openai",
 		"ollama",
 		"anthropic",
-		"claude"
+		"claude",
+		"gemini"
 	],
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/JohnnyZ93/oai-compatible-copilot"
 	},
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"engines": {
 		"vscode": "^1.104.0"
 	},
@@ -96,6 +97,14 @@
 							"owned_by": {
 								"type": "string",
 								"description": "Model provider (e.g., 'zai', 'openai')."
+							},
+							"provider": {
+								"type": "string",
+								"description": "(Alias of owned_by) Model provider (e.g., 'zai', 'openai')."
+							},
+							"provide": {
+								"type": "string",
+								"description": "(Alias of owned_by) Model provider (e.g., 'zai', 'openai')."
 							},
 							"family": {
 								"type": "string",
@@ -273,11 +282,13 @@
 								"type": "string",
 								"enum": [
 									"openai",
+									"openai-responses",
 									"ollama",
-									"anthropic"
+									"anthropic",
+									"gemini"
 								],
 								"default": "openai",
-								"description": "API mode: 'openai' (Default) for API (/chat/completions), 'ollama' for API (/api/chat), 'anthropic' for API (/v1/messages)."
+								"description": "API mode: 'openai' (Default) for OpenAI Chat Completions (/chat/completions), 'openai-responses' for OpenAI Responses (/responses), 'ollama' for Ollama (/api/chat), 'anthropic' for Anthropic (/v1/messages), 'gemini' for Gemini (*/v1beta/models/{model}:streamGenerateContent?alt=sse)."
 							},
 							"delay": {
 								"type": "number",
@@ -286,10 +297,8 @@
 								"description": "Model-specific delay in milliseconds between consecutive requests. If not specified, falls back to global oaicopilot.delay configuration."
 							}
 						},
-						"required": [
-							"id",
-							"owned_by"
-						]
+						"required": ["id"],
+						"anyOf": [{ "required": ["owned_by"] }, { "required": ["provider"] }, { "required": ["provide"] }]
 					},
 					"description": "A list of preferred models to use. If provided, these models will be used directly instead of fetching from the API."
 				},

@@ -15,7 +15,7 @@ import { isToolResultPart, collectToolResultText, convertToolsToOpenAI, mapRole 
 
 import { CommonApi } from "../commonApi";
 
-export class OllamaApi extends CommonApi {
+export class OllamaApi extends CommonApi<OllamaMessage, OllamaRequestBody> {
 	constructor() {
 		super();
 	}

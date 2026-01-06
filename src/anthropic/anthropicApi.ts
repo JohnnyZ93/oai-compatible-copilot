@@ -22,7 +22,7 @@ import { isImageMimeType, isToolResultPart, collectToolResultText, convertToolsT
 
 import { CommonApi } from "../commonApi";
 
-export class AnthropicApi extends CommonApi {
+export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBody> {
 	private _systemContent: string | undefined;
 
 	constructor() {
