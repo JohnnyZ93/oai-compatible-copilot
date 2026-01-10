@@ -55,14 +55,15 @@ export function createProgressBar(usedTokens: number, maxTokens: number): string
 export async function updateContextStatusBar(
 	messages: readonly LanguageModelChatRequestMessage[],
 	model: LanguageModelChatInformation,
-	statusBarItem: vscode.StatusBarItem
+	statusBarItem: vscode.StatusBarItem,
+	modelConfig: { includeReasoningInRequest: boolean }
 ): Promise<void> {
 	// Create a single CancellationTokenSource for all token count operations
 	const cancellationTokenSource = new CancellationTokenSource();
 
 	// Calculate tokens for all messages in parallel
 	const tokenCountPromises = messages.map((message) =>
-		prepareTokenCount(model, message, cancellationTokenSource.token)
+		prepareTokenCount(model, message, cancellationTokenSource.token, modelConfig)
 	);
 
 	const tokenCounts = await Promise.all(tokenCountPromises);

@@ -11,7 +11,8 @@ import { CancellationToken, LanguageModelChatInformation, LanguageModelChatReque
 export async function prepareTokenCount(
 	model: LanguageModelChatInformation,
 	text: string | LanguageModelChatRequestMessage,
-	_token: CancellationToken
+	_token: CancellationToken,
+	modelConfig: { includeReasoningInRequest: boolean }
 ): Promise<number> {
 	if (typeof text === "string") {
 		// Estimate tokens directly for plain text
@@ -43,8 +44,10 @@ export async function prepareTokenCount(
 				totalTokens += estimateTextTokens(resultText);
 			} else if (part instanceof vscode.LanguageModelThinkingPart) {
 				// Thinking Token
-				const thinkingText = Array.isArray(part.value) ? part.value.join("") : part.value;
-				totalTokens += estimateTextTokens(thinkingText);
+				if (modelConfig.includeReasoningInRequest) {
+					const thinkingText = Array.isArray(part.value) ? part.value.join("") : part.value;
+					totalTokens += estimateTextTokens(thinkingText);
+				}
 			}
 		}
 

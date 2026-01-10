@@ -75,7 +75,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		text: string | LanguageModelChatRequestMessage,
 		_token: CancellationToken
 	): Promise<number> {
-		return prepareTokenCount(model, text, _token);
+		return prepareTokenCount(model, text, _token, { includeReasoningInRequest: false });
 	}
 
 	/**
@@ -95,9 +95,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		progress: Progress<LanguageModelResponsePart2>,
 		token: CancellationToken
 	): Promise<void> {
-		// Update Token Usage
-		updateContextStatusBar(messages, model, this.statusBarItem);
-
 		const trackingProgress: Progress<LanguageModelResponsePart2> = {
 			report: (part) => {
 				try {
@@ -115,12 +112,12 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			const config = vscode.workspace.getConfiguration();
 			const userModels = normalizeUserModels(config.get<unknown>("oaicopilot.models", []));
 
-			// 解析模型ID以处理配置ID
+			// Parse model ID to handle config ID
 			const parsedModelId = parseModelId(model.id);
 
-			// 查找匹配的用户模型配置
-			// 优先匹配同时具有相同基础ID和配置ID的模型
-			// 如果没有配置ID，则匹配基础ID相同的模型
+			// Find matching user model configuration
+			// Prioritize matching models with same base ID and config ID
+			// If no config ID, match models with same base ID
 			let um: HFModelItem | undefined = userModels.find(
 				(um) =>
 					um.id === parsedModelId.baseId &&
@@ -128,10 +125,18 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 						(!parsedModelId.configId && !um.configId))
 			);
 
-			// 如果仍然没有找到模型，尝试查找任何匹配基础ID的模型（最宽松的匹配，用于向后兼容）
+			// If still no model found, try to find any model matching the base ID (most lenient match, for backward compatibility)
 			if (!um) {
 				um = userModels.find((um) => um.id === parsedModelId.baseId);
 			}
+
+			// Prepare model configuration
+			const modelConfig = {
+				includeReasoningInRequest: um?.include_reasoning_in_request ?? false,
+			};
+
+			// Update Token Usage
+			updateContextStatusBar(messages, model, this.statusBarItem, modelConfig);
 
 			// Apply delay between consecutive requests
 			const modelDelay = um?.delay;
@@ -150,11 +155,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					});
 				}
 			}
-
-			// Prepare model configuration for message conversion
-			const modelConfig = {
-				includeReasoningInRequest: um?.include_reasoning_in_request ?? false,
-			};
 
 			// Get API key for the model's provider
 			const provider = um?.owned_by;
