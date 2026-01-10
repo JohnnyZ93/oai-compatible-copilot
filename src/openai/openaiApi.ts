@@ -90,8 +90,8 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 					assistantMessage.content = joinedText;
 				}
 
-				if (modelConfig.includeReasoningInRequest && joinedThinking) {
-					assistantMessage.reasoning_content = joinedThinking;
+				if (modelConfig.includeReasoningInRequest) {
+					assistantMessage.reasoning_content = joinedThinking || "Next step.";
 				}
 
 				if (toolCalls.length > 0) {

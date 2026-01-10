@@ -112,10 +112,10 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 			}
 
 			// Add thinking content for assistant messages
-			if (role === "assistant" && modelConfig.includeReasoningInRequest && joinedThinking) {
+			if (role === "assistant" && modelConfig.includeReasoningInRequest) {
 				contentBlocks.push({
 					type: "thinking",
-					thinking: joinedThinking,
+					thinking: joinedThinking || "Next step.",
 				});
 			}
 
