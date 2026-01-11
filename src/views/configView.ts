@@ -13,6 +13,7 @@ interface InitPayload {
 		interval_ms?: number;
 		status_codes?: number[];
 	};
+	commitModel: string;
 	models: HFModelItem[];
 	providerKeys: Record<string, string>;
 }
@@ -25,6 +26,7 @@ type IncomingMessage =
 			apiKey: string;
 			delay: number;
 			retry: { enabled?: boolean; max_attempts?: number; interval_ms?: number; status_codes?: number[] };
+			commitModel: string;
 	  }
 	| { type: "fetchModels"; baseUrl: string; apiKey: string }
 	| { type: "addProvider"; provider: string; baseUrl?: string; apiKey?: string; apiMode?: string }
@@ -121,7 +123,7 @@ export class ConfigViewPanel {
 				await this.sendInit();
 				break;
 			case "saveGlobalConfig":
-				await this.saveGlobalConfig(message.baseUrl, message.apiKey, message.delay, message.retry);
+				await this.saveGlobalConfig(message.baseUrl, message.apiKey, message.delay, message.retry, message.commitModel);
 				break;
 			case "fetchModels": {
 				const { models } = await fetchModels(message.baseUrl, message.apiKey);
@@ -211,7 +213,9 @@ export class ConfigViewPanel {
 			interval_ms: 1000,
 		});
 
-		const payload: InitPayload = { baseUrl, apiKey, delay, retry, models, providerKeys };
+		const foundModel = models.find((model) => model.useForCommitGeneration === true);
+		const commitModel = foundModel ? `${foundModel.id}${foundModel.configId ? "::" + foundModel.configId : ""}` : "";
+		const payload: InitPayload = { baseUrl, apiKey, delay, retry, commitModel, models, providerKeys };
 		this.panel.webview.postMessage({ type: "init", payload });
 	}
 
@@ -219,7 +223,8 @@ export class ConfigViewPanel {
 		rawBaseUrl: string,
 		rawApiKey: string,
 		delay: number,
-		retry: { enabled?: boolean; max_attempts?: number; interval_ms?: number; status_codes?: number[] }
+		retry: { enabled?: boolean; max_attempts?: number; interval_ms?: number; status_codes?: number[] },
+		commitModel: string
 	) {
 		const baseUrl = rawBaseUrl.trim();
 		const apiKey = rawApiKey.trim();
@@ -232,6 +237,22 @@ export class ConfigViewPanel {
 		} else {
 			await this.secrets.delete("oaicopilot.apiKey");
 		}
+
+		// Update models to set useForCommitGeneration based on selected commitModel
+		if (commitModel) {
+			const models = config.get<HFModelItem[]>("oaicopilot.models", []);
+			const updatedModels = models.map((model) => {
+				const fullModelId = `${model.id}${model.configId ? "::" + model.configId : ""}`;
+				if (fullModelId === commitModel) {
+					return { ...model, useForCommitGeneration: true };
+				} else {
+					const { useForCommitGeneration, ...rest } = model;
+					return rest;
+				}
+			});
+			await config.update("oaicopilot.models", updatedModels, vscode.ConfigurationTarget.Global);
+		}
+
 		vscode.window.showInformationMessage(
 			"OAI Compatible base URL, Delay, Retry and API Key have been saved to global settings."
 		);

@@ -4,6 +4,7 @@ const state = {
 	apiKey: "",
 	delay: 0,
 	retry: { enabled: true, max_attempts: 3, interval_ms: 1000, status_codes: [429, 500, 502, 503, 504] },
+	commitModel: "",
 	models: [],
 	providerKeys: {},
 	providerInfo: {},
@@ -62,6 +63,7 @@ const modelExtraInput = document.getElementById("modelExtra");
 const saveModelBtn = document.getElementById("saveModel");
 const cancelModelBtn = document.getElementById("cancelModel");
 const toggleAdvancedSettingsBtn = document.getElementById("toggleAdvancedSettings");
+const commitModelInput = document.getElementById("commitModel");
 const advancedSettingsContent = document.getElementById("advancedSettingsContent");
 
 // Error message element
@@ -91,6 +93,7 @@ document.getElementById("saveBase").addEventListener("click", () => {
 		apiKey: apiKeyInput.value,
 		delay: parseInt(delayInput.value) || 0,
 		retry: retry,
+		commitModel: commitModelInput.value,
 	});
 });
 
@@ -239,7 +242,7 @@ window.addEventListener("message", (event) => {
 
 	switch (message.type) {
 		case "init":
-			const { baseUrl, apiKey, delay, retry, models, providerKeys } = message.payload;
+			const { baseUrl, apiKey, delay, retry, commitModel, models, providerKeys } = message.payload;
 			state.baseUrl = baseUrl;
 			state.apiKey = apiKey;
 			state.delay = delay || 0;
@@ -250,6 +253,7 @@ window.addEventListener("message", (event) => {
 				status_codes: [],
 			};
 			state.models = models || [];
+			state.commitModel = commitModel || "";
 			state.providerKeys = providerKeys || {};
 
 			// Update base configuration
@@ -260,6 +264,10 @@ window.addEventListener("message", (event) => {
 			maxAttemptsInput.value = state.retry.max_attempts || 3;
 			intervalMsInput.value = state.retry.interval_ms || 1000;
 			statusCodesInput.value = state.retry.status_codes ? state.retry.status_codes.join(",") : "";
+
+			// Populate commit model dropdown and select current commit model
+			populateCommitModelDropdown();
+			commitModelInput.value = state.commitModel || "";
 
 			// Render provider and model management
 			renderProviders();
@@ -742,6 +750,31 @@ function populateModelIdDropdown(models) {
 		});
 
 		dropdownContent.appendChild(option);
+	});
+}
+
+// Function to populate the commit model dropdown
+function populateCommitModelDropdown() {
+	// Clear existing options except the first "None" option
+	while (commitModelInput.children.length > 1) {
+		commitModelInput.removeChild(commitModelInput.lastChild);
+	}
+
+	// Filter models that support commit generation (openai or anthropic apiMode)
+	const commitCompatibleModels = state.models
+		.filter((model) => {
+			const apiMode = model.apiMode || "openai";
+			return (apiMode === "openai" || apiMode === "anthropic") && !model.id.startsWith("__provider__");
+		})
+		.sort((a, b) => a.id.localeCompare(b.id));
+
+	// Add options for compatible models
+	commitCompatibleModels.forEach((model) => {
+		const option = document.createElement("option");
+		const fullModelId = `${model.id}${model.configId ? "::" + model.configId : ""}`;
+		option.value = fullModelId;
+		option.textContent = model.displayName || fullModelId;
+		commitModelInput.appendChild(option);
 	});
 }
 

@@ -15,12 +15,11 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.2, GLM 4.6 and mor
 - Supports auto retry mechanism for handling api errors like [429, 500, 502, 503, 504].
 - Supports token usage count and set provider api keys in status bar.
 - Supports provider and model visual configuration ui.
----
+- Supports generate git commit message on source control.
 
 ## Requirements
 - VS Code 1.104.0 or higher.
 - OpenAI-compatible provider API key.
----
 
 ## ⚡ Quick Start
 1. Install the OAI Compatible Provider for Copilot extension [here](https://marketplace.visualstudio.com/items?itemName=johnny-zhao.oai-compatible-copilot).
@@ -46,9 +45,8 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.2, GLM 4.6 and mor
     }
 ]
 ```
----
 
-## * Configuration UI
+## ✨ Configuration UI
 
 The extension provides a visual configuration interface that makes it easy to manage global settings, providers, and models without editing JSON files manually.
 
@@ -63,6 +61,9 @@ There are two ways to open the configuration interface:
 
 2. **From the Status Bar**:
    - Click on the "OAICopilot" status bar item in the bottom-right corner of VS Code
+
+<details>
+<summary>Click Here for Details</summary>
 
 ### Workflow Example
 
@@ -99,9 +100,9 @@ There are two ways to open the configuration interface:
 - **Save Frequently**: Changes are saved to VS Code settings immediately
 - **Refresh**: Use the "Refresh" buttons to reload current configuration from VS Code settings
 
----
+</details>
 
-## * Multi Api Mode
+## ✨ Multi Api Mode
 
 The extension supports five different API protocols to work with various model providers. You can specify which API mode to use for each model via the `apiMode` parameter.
 
@@ -132,6 +133,9 @@ The extension supports five different API protocols to work with various model p
    - Header: `x-goog-api-key: <apiKey>`
    - Use for: Google Gemini models (and compatible gateways like rsp4copilot)
 
+<details>
+<summary>Click Here for Details</summary>
+
 ### Configuration Examples
 Mixed configuration with multiple API modes:
 
@@ -160,9 +164,10 @@ Mixed configuration with multiple API modes:
 - The `apiMode` parameter defaults to `"openai"` if not specified.
 - When using `ollama` mode, you can omit the API key (`ollama` by default) or set it to any string.
 - Each API mode uses different message conversion logic internally to match provider-specific formats (tools, images, thinking).
----
 
-## * Multi-Provider Guide
+</details>
+
+## ✨ Multi-Provider Guide
 
 > `owned_by` (alias: `provider` / `provide`) in model config is used for grouping provider-specific apiKey. The storage key is `oaicopilot.apiKey.<providerIdLowercase>`.
 
@@ -172,6 +177,9 @@ Mixed configuration with multiple API modes:
 4. Click the model picker and select "Manage Models...".
 5. Choose "OAI Compatible" provider.
 6. Select the models you want to add to the model picker.
+
+<details>
+<summary>Click Here for Details</summary>
 
 ### Settings Example
 
@@ -198,11 +206,14 @@ Mixed configuration with multiple API modes:
 ]
 ```
 
----
+</details>
 
-## * Multi-config for the same model
+## ✨ Multi-config for the same model
 
 You can define multiple configurations for the same model ID by using the `configId` field. This allows you to have the same base model with different settings for different use cases.
+
+<details>
+<summary>Click Here for Details</summary>
 
 To use this feature:
 
@@ -241,9 +252,9 @@ In this example, you'll have three different configurations of the glm-4.6 model
 - `glm-4.6::thinking` - use GLM-4.6 with thinking
 - `glm-4.6::no-thinking` - use GLM-4.6 without thinking
 
----
+</details>
 
-## * Custom Headers
+## ✨ Custom Headers
 
 You can specify custom HTTP headers that will be sent with every request to a specific model's provider. This is useful for:
 
@@ -251,6 +262,9 @@ You can specify custom HTTP headers that will be sent with every request to a sp
 - Custom authentication headers (in addition to the standard Authorization header)
 - Provider-specific headers required by certain APIs
 - Request tracking or debugging headers
+
+<details>
+<summary>Click Here for Details</summary>
 
 ### Custom Headers Example
 
@@ -274,9 +288,10 @@ You can specify custom HTTP headers that will be sent with every request to a sp
 - If a custom header conflicts with a default header, the custom header takes precedence
 - Headers are applied on a per-model basis, allowing different headers for different providers
 - Header values must be strings
----
 
-## * Custom Request body parameters
+</details>
+
+## ✨ Custom Request body parameters
 
 The `extra` field allows you to add arbitrary parameters to the API request body. This is useful for provider-specific features that aren't covered by the standard parameters.
 
@@ -284,6 +299,9 @@ The `extra` field allows you to add arbitrary parameters to the API request body
 - Parameters in `extra` are merged directly into the request body
 - Works with all API modes (`openai`, `openai-responses`, `ollama`, `anthropic`, `gemini`)
 - Values can be any valid JSON type (string, number, boolean, object, array)
+
+<details>
+<summary>Click Here for Details</summary>
 
 ### Common use cases
 - **OpenAI-specific parameters**: `seed`, `logprobs`, `top_logprobs`, `suffix`, `presence_penalty` (if not using standard parameter)
@@ -374,7 +392,7 @@ Use `apiMode: "gemini"` and enable thought summaries:
 - Standard parameters (temperature, top_p, etc.) should use their dedicated fields when possible
 - API provider must support the parameters you specify
 
----
+</details>
 
 ## Model Parameters
 All parameters support individual configuration for different models, providing highly flexible model tuning capabilities.
@@ -411,7 +429,7 @@ All parameters support individual configuration for different models, providing 
 - `include_reasoning_in_request`: Whether to include reasoning_content in assistant messages sent to the API. Support deepseek-v3.2 or others.
 - `apiMode`: API mode: 'openai' (Default) for API (/chat/completions), 'openai-responses' for API (/responses), 'ollama' for API (/api/chat), 'anthropic' for API (/v1/messages), 'gemini' for API (/v1beta/models/{model}:streamGenerateContent?alt=sse).
 - `delay`: Model-specific delay in milliseconds between consecutive requests. If not specified, falls back to global `oaicopilot.delay` configuration.
----
+- `useForCommitGeneration`: Whether to be used for Git commit message generation. Only supports openai and anthropic apiMode.
 
 ## Thanks to
 
@@ -420,8 +438,6 @@ Thanks to all the people who contribute.
 - [Contributors](https://github.com/JohnnyZ93/oai-compatible-copilot/graphs/contributors)
 - [Hugging Face Chat Extension](https://github.com/huggingface/huggingface-vscode-chat)
 - [VS Code Chat Provider API](https://code.visualstudio.com/api/extension-guides/ai/language-model-chat-provider)
-
----
 
 ## Support & License
 - Open issues: https://github.com/JohnnyZ93/oai-compatible-copilot/issues
