@@ -1,5 +1,14 @@
 # Change Log
 
+## 0.2.2 (2025-01-12)
+
+- Feat: Add git commit message generation button on Souce Control Panel
+- Feat(thinking): show reasoning summaries in Copilot (OpenAI Responses + Gemini)
+- Fix: add default thinking content for empty reasoning
+- Fix: add conditional reasoning token counting on statusBarItem
+
+Thanks to @Andy963 for contributing the [PR #104](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/104).
+
 ## 0.2.1 (2025-01-04)
 
 Thanks to @Andy963 for contributing the [PR #89](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/89):
