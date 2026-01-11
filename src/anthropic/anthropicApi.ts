@@ -373,24 +373,21 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 		apiKey: string
 	): AsyncGenerator<{ type: "text"; text: string }> {
 		// For Anthropic, we need to separate system prompt from messages
-		const anthropicMessages = messages.map((m) => ({
+		const anthropicMessages: AnthropicMessage[] = messages.map((m) => ({
 			role: m.role === "user" || m.role === "assistant" ? m.role : "user",
 			content: m.content,
 		}));
+		this._systemContent = systemPrompt;
 
-		const requestBody = {
+		// requestBody
+		let requestBody: AnthropicRequestBody = {
 			model: model.id,
 			messages: anthropicMessages,
-			max_tokens: 1024,
-			system: systemPrompt,
 			stream: true,
 		};
+		requestBody = this.prepareRequestBody(requestBody, model, undefined);
 
-		const headers = {
-			"Content-Type": "application/json",
-			"X-API-Key": apiKey,
-			"anthropic-version": "2023-06-01",
-		};
+		const headers = CommonApi.prepareHeaders(apiKey, model.apiMode ?? "openai", model.headers);
 
 		const url = `${baseUrl.replace(/\/+$/, "")}/v1/messages`;
 
@@ -425,28 +422,31 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 				buffer = lines.pop() || "";
 
 				for (const line of lines) {
-					if (line.startsWith("data: ")) {
-						const dataStr = line.slice(6).trim();
-						if (dataStr === "[DONE]") continue;
+					if (line.trim() === "") continue;
+					if (!line.startsWith("data: ")) continue;
 
-						try {
-							const parsed = JSON.parse(dataStr);
+					const data = line.slice(6);
+					if (data === "[DONE]") continue;
 
-							// Anthropic streaming response
-							if (parsed.type === "content_block_delta" && parsed.delta?.type === "text_delta") {
-								yield { type: "text", text: parsed.delta.text };
-							}
-							// Handle message stop
-							if (parsed.type === "message_stop") {
-								break;
-							}
-							// Handle error responses
-							if (parsed.type === "error") {
-								throw new Error(`Anthropic API error: ${parsed.error?.message || "Unknown error"}`);
-							}
-						} catch (e) {
-							console.error("Error parsing Anthropic SSE data:", dataStr, e);
+					try {
+						const chunk: AnthropicStreamChunk = JSON.parse(data);
+
+						// Anthropic streaming response
+						if (chunk.type === "content_block_delta" && chunk.delta?.type === "text_delta" && chunk.delta?.text) {
+							yield { type: "text", text: chunk.delta.text };
 						}
+
+						// Handle message stop
+						if (chunk.type === "message_stop") break;
+
+						// Handle error responses
+						if (chunk.type === "error") {
+							const errorType = chunk.error?.type || "unknown_error";
+							const errorMessage = chunk.error?.message || "Anthropic API streaming error";
+							console.error(`[Anthropic Provider] Streaming error: ${errorType} - ${errorMessage}`);
+						}
+					} catch (e) {
+						console.error("[Anthropic Provider] Failed to parse SSE chunk:", e, "data:", data);
 					}
 				}
 			}
