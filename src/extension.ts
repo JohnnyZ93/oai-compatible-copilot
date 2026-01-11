@@ -4,6 +4,7 @@ import type { HFModelItem } from "./types";
 import { initStatusBar } from "./statusBar";
 import { ConfigViewPanel } from "./views/configView";
 import { normalizeUserModels } from "./utils";
+import { abortCommitGeneration, generateCommitMsg } from "./gitCommit/commitMessageGenerator";
 
 export function activate(context: vscode.ExtensionContext) {
 	// Build a descriptive User-Agent to help quantify API usage
@@ -102,6 +103,16 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
 		vscode.commands.registerCommand("oaicopilot.openConfig", async () => {
 			ConfigViewPanel.openPanel(context.extensionUri, context.secrets, ua);
+		})
+	);
+
+	// Register the generateGitCommitMessage command handler
+	context.subscriptions.push(
+		vscode.commands.registerCommand("oaicopilot.generateGitCommitMessage", async (scm) => {
+			generateCommitMsg(scm);
+		}),
+		vscode.commands.registerCommand("oaicopilot.abortGitCommitMessage", () => {
+			abortCommitGeneration();
 		})
 	);
 }

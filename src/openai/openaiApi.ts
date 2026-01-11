@@ -553,4 +553,97 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 
 		return { emittedAny };
 	}
+
+	async *createMessage(
+		model: HFModelItem,
+		systemPrompt: string,
+		messages: { role: string; content: string }[],
+		baseUrl: string,
+		apiKey: string
+	): AsyncIterable<{ type: "text"; text: string }> {
+		// Combine system prompt with first user message or as separate system message
+		const openaiMessages = [...messages];
+		if (systemPrompt) {
+			openaiMessages.unshift({ role: "system", content: systemPrompt });
+		}
+
+		const requestBody = {
+			model: model.id,
+			messages: openaiMessages,
+			max_tokens: 1024,
+			temperature: 0,
+			stream: true,
+			stream_options: { include_usage: true },
+		};
+
+		const headers = {
+			"Content-Type": "application/json",
+			Authorization: `Bearer ${apiKey}`,
+		};
+
+		const url = `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
+
+		// Make the API request
+		const response = await fetch(url, {
+			method: "POST",
+			headers,
+			body: JSON.stringify(requestBody),
+		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(`OpenAI API request failed: [${response.status}] ${response.statusText}\n${errorText}`);
+		}
+
+		if (!response.body) {
+			throw new Error("No response body from OpenAI API");
+		}
+
+		// Process the response
+		const reader = response.body.getReader();
+		const decoder = new TextDecoder();
+		let buffer = "";
+
+		try {
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+
+				buffer += decoder.decode(value, { stream: true });
+				const lines = buffer.split("\n");
+				buffer = lines.pop() || "";
+
+				for (const line of lines) {
+					if (line.startsWith("data: ")) {
+						const dataStr = line.slice(6).trim();
+						if (dataStr === "[DONE]") continue;
+
+						try {
+							const parsed = JSON.parse(dataStr);
+
+							// OpenAI-compatible streaming response
+							if (parsed.choices && parsed.choices.length > 0) {
+								const choice = parsed.choices[0];
+								if (choice.delta?.content) {
+									yield { type: "text", text: choice.delta.content };
+								}
+								// Handle finish reason
+								if (choice.finish_reason) {
+									break;
+								}
+							}
+							// Handle error responses
+							if (parsed.error) {
+								throw new Error(`OpenAI API error: ${parsed.error.message || "Unknown error"}`);
+							}
+						} catch (e) {
+							console.error("Error parsing OpenAI SSE data:", dataStr, e);
+						}
+					}
+				}
+			}
+		} finally {
+			reader.releaseLock();
+		}
+	}
 }

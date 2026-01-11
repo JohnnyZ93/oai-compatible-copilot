@@ -805,11 +805,11 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 								} else {
 									delta = thoughtSummaryText;
 									pendingThoughtSummarySoFar += thoughtSummaryText;
-									}
-									if (delta) {
-										this.bufferThinkingContent(delta, progress);
-									}
 								}
+								if (delta) {
+									this.bufferThinkingContent(delta, progress);
+								}
+							}
 							if (thought) {
 								let delta = "";
 								if (thought.startsWith(pendingThoughtSoFar)) {
@@ -822,10 +822,10 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 									pendingThoughtSoFar += thought;
 								}
 
-									if (delta) {
-										this.bufferThinkingContent(delta, progress);
-									}
+								if (delta) {
+									this.bufferThinkingContent(delta, progress);
 								}
+							}
 							if (thoughtSigRaw) {
 								pendingThoughtSignature = thoughtSigRaw;
 							}
@@ -868,10 +868,10 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 								pendingThoughtSoFar += thoughtRaw;
 							}
 
-								if (delta) {
-									this.bufferThinkingContent(delta, progress);
-								}
+							if (delta) {
+								this.bufferThinkingContent(delta, progress);
 							}
+						}
 
 						let id = toolCallKeyToId.get(key);
 						const isNew = !id;
@@ -953,9 +953,19 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 					}
 				}
 			}
-			} finally {
-				reader.releaseLock();
-				this.reportEndThinking(progress);
-			}
+		} finally {
+			reader.releaseLock();
+			this.reportEndThinking(progress);
 		}
 	}
+
+	async *createMessage(
+		model: HFModelItem,
+		systemPrompt: string,
+		messages: { role: string; content: string }[],
+		baseUrl: string,
+		apiKey: string
+	): AsyncIterable<{ type: "text"; text: string }> {
+		throw new Error("Method not implemented.");
+	}
+}

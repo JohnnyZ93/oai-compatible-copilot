@@ -57,17 +57,56 @@
 		"commands": [
 			{
 				"command": "oaicopilot.setApikey",
-				"title": "OAICopilot: Set OAI Compatible Apikey"
+				"category": "OAICopilot",
+				"title": "Set OAI Compatible Apikey"
 			},
 			{
 				"command": "oaicopilot.setProviderApikey",
-				"title": "OAICopilot: Set OAI Compatible Multi-Provider Apikey"
+				"category": "OAICopilot",
+				"title": "Set OAI Compatible Multi-Provider Apikey"
 			},
 			{
 				"command": "oaicopilot.openConfig",
-				"title": "OAICopilot: Open Configuration UI"
+				"category": "OAICopilot",
+				"title": "Open Configuration UI"
+			},
+			{
+				"command": "oaicopilot.generateGitCommitMessage",
+				"title": "Generate Commit Message with OAICopilot",
+				"category": "OAICopilot",
+				"icon": "$(wand)"
+			},
+			{
+				"command": "oaicopilot.abortGitCommitMessage",
+				"title": "Generate Commit Message with OAICopilot - Stop",
+				"category": "OAICopilot",
+				"icon": "$(debug-stop)"
 			}
 		],
+		"menus": {
+			"scm/title": [
+				{
+					"command": "oaicopilot.generateGitCommitMessage",
+					"group": "navigation",
+					"when": "config.git.enabled && scmProvider == git && !oaicopilot.isGeneratingCommit"
+				},
+				{
+					"command": "oaicopilot.abortGitCommitMessage",
+					"group": "navigation",
+					"when": "config.git.enabled && scmProvider == git && oaicopilot.isGeneratingCommit"
+				}
+			],
+			"commandPalette": [
+				{
+					"command": "oaicopilot.generateGitCommitMessage",
+					"when": "config.git.enabled && !oaicopilot.isGeneratingCommit"
+				},
+				{
+					"command": "oaicopilot.abortGitCommitMessage",
+					"when": "config.git.enabled && oaicopilot.isGeneratingCommit"
+				}
+			]
+		},
 		"configuration": {
 			"title": "OAI Compatible Copilot",
 			"properties": {
@@ -289,6 +328,11 @@
 								],
 								"default": "openai",
 								"description": "API mode: 'openai' (Default) for OpenAI Chat Completions (/chat/completions), 'openai-responses' for OpenAI Responses (/responses), 'ollama' for Ollama (/api/chat), 'anthropic' for Anthropic (/v1/messages), 'gemini' for Gemini (*/v1beta/models/{model}:streamGenerateContent?alt=sse)."
+							},
+							"useForCommitGeneration": {
+								"type": "boolean",
+								"default": false,
+								"description": "Whether to be used for Git commit message generation. Only supports openai and anthropic apiMode."
 							},
 							"delay": {
 								"type": "number",

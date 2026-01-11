@@ -249,4 +249,14 @@ export class OllamaApi extends CommonApi<OllamaMessage, OllamaRequestBody> {
 			progress.report(new vscode.LanguageModelTextPart(message.content));
 		}
 	}
+
+	async *createMessage(
+		model: HFModelItem,
+		systemPrompt: string,
+		messages: { role: string; content: string }[],
+		baseUrl: string,
+		apiKey: string
+	): AsyncIterable<{ type: "text"; text: string }> {
+		throw new Error("Method not implemented.");
+	}
 }

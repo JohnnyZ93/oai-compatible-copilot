@@ -364,4 +364,94 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 			this.reportEndThinking(progress);
 		}
 	}
+
+	async *createMessage(
+		model: HFModelItem,
+		systemPrompt: string,
+		messages: { role: string; content: string }[],
+		baseUrl: string,
+		apiKey: string
+	): AsyncIterable<{ type: "text"; text: string }> {
+		// For Anthropic, we need to separate system prompt from messages
+		const anthropicMessages = messages.map((m) => ({
+			role: m.role === "user" || m.role === "assistant" ? m.role : "user",
+			content: m.content,
+		}));
+
+		const requestBody = {
+			model: model.id,
+			messages: anthropicMessages,
+			max_tokens: 1024,
+			system: systemPrompt,
+			stream: true,
+		};
+
+		const headers = {
+			"Content-Type": "application/json",
+			"X-API-Key": apiKey,
+			"anthropic-version": "2023-06-01",
+		};
+
+		const url = `${baseUrl.replace(/\/+$/, "")}/v1/messages`;
+
+		// Make the API request
+		const response = await fetch(url, {
+			method: "POST",
+			headers,
+			body: JSON.stringify(requestBody),
+		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(`Anthropic API request failed: [${response.status}] ${response.statusText}\n${errorText}`);
+		}
+
+		if (!response.body) {
+			throw new Error("No response body from Anthropic API");
+		}
+
+		// Process the response
+		const reader = response.body.getReader();
+		const decoder = new TextDecoder();
+		let buffer = "";
+
+		try {
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+
+				buffer += decoder.decode(value, { stream: true });
+				const lines = buffer.split("\n");
+				buffer = lines.pop() || "";
+
+				for (const line of lines) {
+					if (line.startsWith("data: ")) {
+						const dataStr = line.slice(6).trim();
+						if (dataStr === "[DONE]") continue;
+
+						try {
+							const parsed = JSON.parse(dataStr);
+
+							// Anthropic streaming response
+							if (parsed.type === "content_block_delta" && parsed.delta?.type === "text_delta") {
+								yield { type: "text", text: parsed.delta.text };
+							}
+							// Handle message stop
+							if (parsed.type === "message_stop") {
+								break;
+							}
+							// Handle error responses
+							if (parsed.type === "error") {
+								throw new Error(`Anthropic API error: ${parsed.error?.message || "Unknown error"}`);
+							}
+						} catch (e) {
+							console.error("Error parsing Anthropic SSE data:", dataStr, e);
+						}
+					}
+				}
+			}
+		} finally {
+			reader.releaseLock();
+		}
+	}
 }

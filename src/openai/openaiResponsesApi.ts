@@ -739,4 +739,14 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 		}
 		return this._toolCallIdToIndex.get(callId)!;
 	}
+
+	async *createMessage(
+		model: HFModelItem,
+		systemPrompt: string,
+		messages: { role: string; content: string }[],
+		baseUrl: string,
+		apiKey: string
+	): AsyncIterable<{ type: "text"; text: string }> {
+		throw new Error("Method not implemented.");
+	}
 }

@@ -77,6 +77,23 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 	): Promise<void>;
 
 	/**
+	 * Create a message stream for the specific API.
+	 * @param model The model to use.
+	 * @param systemPrompt The system prompt to use.
+	 * @param messages The messages to send.
+	 * @param baseUrl The base URL for the API.
+	 * @param apiKey The API key to use.
+	 * @returns An async iterable of text chunks.
+	 */
+	abstract createMessage(
+		model: HFModelItem,
+		systemPrompt: string,
+		messages: { role: string; content: string }[],
+		baseUrl: string,
+		apiKey: string
+	): AsyncIterable<{ type: "text"; text: string }>;
+
+	/**
 	 * Try to emit a buffered tool call when a valid name and JSON arguments are available.
 	 * @param index The tool call index from the stream.
 	 * @param progress Progress reporter for parts.
