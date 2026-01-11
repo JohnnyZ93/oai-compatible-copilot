@@ -25,7 +25,7 @@ The commit message should:
 4. Be clear and informative`,
 };
 
-export async function generateCommitMsg(scm?: vscode.SourceControl) {
+export async function generateCommitMsg(secrets: vscode.SecretStorage, scm?: vscode.SourceControl) {
 	try {
 		const gitExtension = vscode.extensions.getExtension("vscode.git")?.exports;
 		if (!gitExtension) {
@@ -45,18 +45,18 @@ export async function generateCommitMsg(scm?: vscode.SourceControl) {
 				throw new Error("Repository not found for provided SCM");
 			}
 
-			await generateCommitMsgForRepository(repository);
+			await generateCommitMsgForRepository(secrets, repository);
 			return;
 		}
 
-		await orchestrateWorkspaceCommitMsgGeneration(git.repositories);
+		await orchestrateWorkspaceCommitMsgGeneration(secrets, git.repositories);
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : String(error);
 		vscode.window.showErrorMessage(`[Commit Generation Failed] ${errorMessage}`);
 	}
 }
 
-async function orchestrateWorkspaceCommitMsgGeneration(repos: any[]) {
+async function orchestrateWorkspaceCommitMsgGeneration(secrets: vscode.SecretStorage, repos: any[]) {
 	const reposWithChanges = await filterForReposWithChanges(repos);
 
 	if (reposWithChanges.length === 0) {
@@ -67,7 +67,7 @@ async function orchestrateWorkspaceCommitMsgGeneration(repos: any[]) {
 	if (reposWithChanges.length === 1) {
 		// Only one repo with changes, generate for it
 		const repo = reposWithChanges[0];
-		await generateCommitMsgForRepository(repo);
+		await generateCommitMsgForRepository(secrets, repo);
 		return;
 	}
 
@@ -82,14 +82,14 @@ async function orchestrateWorkspaceCommitMsgGeneration(repos: any[]) {
 		// Generate for all repositories with changes
 		for (const repo of reposWithChanges) {
 			try {
-				await generateCommitMsgForRepository(repo);
+				await generateCommitMsgForRepository(secrets, repo);
 			} catch (error) {
 				console.error(`Failed to generate commit message for ${repo.rootUri.fsPath}:`, error);
 			}
 		}
 	} else {
 		// Generate for selected repository
-		await generateCommitMsgForRepository(selection.repo);
+		await generateCommitMsgForRepository(secrets, selection.repo);
 	}
 }
 
@@ -129,7 +129,7 @@ async function promptRepoSelection(repos: any[]) {
 	});
 }
 
-async function generateCommitMsgForRepository(repository: any) {
+async function generateCommitMsgForRepository(secrets: vscode.SecretStorage, repository: any) {
 	const inputBox = repository.inputBox;
 	const repoPath = repository.rootUri.fsPath;
 	const gitDiff = await getGitDiff(repoPath);
@@ -144,11 +144,11 @@ async function generateCommitMsgForRepository(repository: any) {
 			title: `Generating commit message for ${repoPath.split(path.sep).pop() || "repository"}...`,
 			cancellable: true,
 		},
-		() => performCommitMsgGeneration(gitDiff, inputBox)
+		() => performCommitMsgGeneration(secrets, gitDiff, inputBox)
 	);
 }
 
-async function performCommitMsgGeneration(gitDiff: string, inputBox: any) {
+async function performCommitMsgGeneration(secrets: vscode.SecretStorage, gitDiff: string, inputBox: any) {
 	try {
 		vscode.commands.executeCommand("setContext", "oaicopilot.isGeneratingCommit", true);
 
@@ -181,22 +181,16 @@ async function performCommitMsgGeneration(gitDiff: string, inputBox: any) {
 		const selectedModel = commitModels[0];
 
 		// Get API key for the model's provider
-		let apiKey = (await vscode.workspace.getConfiguration().get("oaicopilot.apiKey")) as string;
+		const apiKey = await ensureApiKey(secrets, selectedModel.owned_by);
 		if (!apiKey) {
-			// Try to get provider-specific API key
-			const provider = selectedModel.owned_by;
-			if (provider) {
-				apiKey = (await vscode.workspace.getConfiguration().get(`oaicopilot.apiKey.${provider}`)) as string;
-			}
-		}
-
-		if (!apiKey) {
-			throw new Error("No API key found. Please set oaicopilot.apiKey in your configuration.");
+			throw new Error("OAI Compatible API key not found");
 		}
 
 		// Get base URL for the model
-		const baseUrl =
-			selectedModel.baseUrl || (config.get("oaicopilot.baseUrl") as string) || "https://api.openai.com/v1";
+		const baseUrl = selectedModel.baseUrl || config.get<string>("oaicopilot.baseUrl", "");
+		if (!baseUrl || !baseUrl.startsWith("http")) {
+			throw new Error(`Invalid base URL configuration.`);
+		}
 
 		// Create a system prompt
 		const systemPrompt = PROMPT.system;
@@ -254,4 +248,19 @@ function extractCommitMessage(str: string): string {
 		.trim()
 		.replace(/^```[^\n]*\n?|```$/g, "")
 		.trim();
+}
+
+/**
+ * Ensure an API key exists in SecretStorage
+ * @param provider provider name to get provider-specific API key.
+ */
+async function ensureApiKey(secrets: vscode.SecretStorage, provider: string): Promise<string | undefined> {
+	let apiKey: string | undefined;
+	if (provider && provider.trim() !== "") {
+		const normalizedProvider = provider.trim().toLowerCase();
+		const providerKey = `oaicopilot.apiKey.${normalizedProvider}`;
+		apiKey = await secrets.get(providerKey);
+	}
+
+	return apiKey;
 }

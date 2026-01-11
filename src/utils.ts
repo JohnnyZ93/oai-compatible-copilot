@@ -81,11 +81,11 @@ export function mapRole(message: vscode.LanguageModelChatRequestMessage): "user"
  * Convert VS Code tool definitions to OpenAI function tool definitions.
  * @param options Request options containing tools and toolMode.
  */
-export function convertToolsToOpenAI(options: vscode.ProvideLanguageModelChatResponseOptions): {
+export function convertToolsToOpenAI(options?: vscode.ProvideLanguageModelChatResponseOptions): {
 	tools?: OpenAIFunctionToolDef[];
 	tool_choice?: "auto" | { type: "function"; function: { name: string } };
 } {
-	const tools = options.tools ?? [];
+	const tools = options?.tools ?? [];
 	if (!tools || tools.length === 0) {
 		return {};
 	}
@@ -107,7 +107,7 @@ export function convertToolsToOpenAI(options: vscode.ProvideLanguageModelChatRes
 		});
 
 	let tool_choice: "auto" | { type: "function"; function: { name: string } } = "auto";
-	if (options.toolMode === vscode.LanguageModelChatToolMode.Required) {
+	if (options?.toolMode === vscode.LanguageModelChatToolMode.Required) {
 		if (tools.length !== 1) {
 			console.error("[OAI Compatible Model Provider] ToolMode.Required but multiple tools:", tools.length);
 			throw new Error("LanguageModelChatToolMode.Required is not supported with more than one tool");
@@ -131,7 +131,7 @@ export type OpenAIResponsesToolChoice = "auto" | { type: "function"; name: strin
  * Convert VS Code tool definitions to OpenAI Responses API tool definitions.
  * Responses uses `{ type:"function", name, description, parameters }` (no nested `function` object).
  */
-export function convertToolsToOpenAIResponses(options: vscode.ProvideLanguageModelChatResponseOptions): {
+export function convertToolsToOpenAIResponses(options?: vscode.ProvideLanguageModelChatResponseOptions): {
 	tools?: OpenAIResponsesFunctionToolDef[];
 	tool_choice?: OpenAIResponsesToolChoice;
 } {

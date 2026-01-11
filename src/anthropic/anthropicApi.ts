@@ -150,7 +150,7 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 	prepareRequestBody(
 		rb: AnthropicRequestBody,
 		um: HFModelItem | undefined,
-		options: ProvideLanguageModelChatResponseOptions
+		options?: ProvideLanguageModelChatResponseOptions
 	): AnthropicRequestBody {
 		// Set max_tokens (required for Anthropic)
 		if (um?.max_tokens !== undefined) {
@@ -163,7 +163,7 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 		}
 
 		// Add temperature
-		const oTemperature = options.modelOptions?.temperature ?? 0;
+		const oTemperature = options?.modelOptions?.temperature ?? 0;
 		const temperature = um?.temperature ?? oTemperature;
 		rb.temperature = temperature;
 		if (um && um.temperature === null) {
@@ -371,7 +371,7 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 		messages: { role: string; content: string }[],
 		baseUrl: string,
 		apiKey: string
-	): AsyncIterable<{ type: "text"; text: string }> {
+	): AsyncGenerator<{ type: "text"; text: string }> {
 		// For Anthropic, we need to separate system prompt from messages
 		const anthropicMessages = messages.map((m) => ({
 			role: m.role === "user" || m.role === "assistant" ? m.role : "user",

@@ -108,7 +108,7 @@ export class OllamaApi extends CommonApi<OllamaMessage, OllamaRequestBody> {
 	prepareRequestBody(
 		rb: OllamaRequestBody,
 		um: HFModelItem | undefined,
-		options: ProvideLanguageModelChatResponseOptions
+		options?: ProvideLanguageModelChatResponseOptions
 	): OllamaRequestBody {
 		// Add model options if configured
 		if (
@@ -256,7 +256,7 @@ export class OllamaApi extends CommonApi<OllamaMessage, OllamaRequestBody> {
 		messages: { role: string; content: string }[],
 		baseUrl: string,
 		apiKey: string
-	): AsyncIterable<{ type: "text"; text: string }> {
+	): AsyncGenerator<{ type: "text"; text: string }> {
 		throw new Error("Method not implemented.");
 	}
 }

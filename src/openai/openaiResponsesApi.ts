@@ -155,13 +155,13 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 	prepareRequestBody(
 		rb: Record<string, unknown>,
 		um: HFModelItem | undefined,
-		options: ProvideLanguageModelChatResponseOptions
+		options?: ProvideLanguageModelChatResponseOptions
 	): Record<string, unknown> {
 		const isPlainObject = (v: unknown): v is Record<string, unknown> =>
 			!!v && typeof v === "object" && !Array.isArray(v);
 
 		// temperature
-		const oTemperature = options.modelOptions?.temperature ?? 0;
+		const oTemperature = options?.modelOptions?.temperature ?? 0;
 		const temperature = um?.temperature ?? oTemperature;
 		rb.temperature = temperature;
 		if (um && um.temperature === null) {
@@ -190,7 +190,7 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 		}
 
 		// stop
-		if (options.modelOptions) {
+		if (options?.modelOptions) {
 			const mo = options.modelOptions as Record<string, unknown>;
 			if (typeof mo.stop === "string" || Array.isArray(mo.stop)) {
 				rb.stop = mo.stop;
@@ -746,7 +746,7 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 		messages: { role: string; content: string }[],
 		baseUrl: string,
 		apiKey: string
-	): AsyncIterable<{ type: "text"; text: string }> {
+	): AsyncGenerator<{ type: "text"; text: string }> {
 		throw new Error("Method not implemented.");
 	}
 }

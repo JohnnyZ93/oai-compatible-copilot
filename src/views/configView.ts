@@ -45,10 +45,9 @@ export class ConfigViewPanel {
 	private readonly panel: vscode.WebviewPanel;
 	private readonly extensionUri: vscode.Uri;
 	private readonly secrets: vscode.SecretStorage;
-	private readonly userAgent: string;
 	private disposables: vscode.Disposable[] = [];
 
-	public static openPanel(extensionUri: vscode.Uri, secrets: vscode.SecretStorage, userAgent: string) {
+	public static openPanel(extensionUri: vscode.Uri, secrets: vscode.SecretStorage) {
 		const column = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.viewColumn : undefined;
 
 		if (ConfigViewPanel.currentPanel) {
@@ -67,19 +66,13 @@ export class ConfigViewPanel {
 			}
 		);
 
-		ConfigViewPanel.currentPanel = new ConfigViewPanel(panel, extensionUri, secrets, userAgent);
+		ConfigViewPanel.currentPanel = new ConfigViewPanel(panel, extensionUri, secrets);
 	}
 
-	private constructor(
-		panel: vscode.WebviewPanel,
-		extensionUri: vscode.Uri,
-		secrets: vscode.SecretStorage,
-		userAgent: string
-	) {
+	private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, secrets: vscode.SecretStorage) {
 		this.panel = panel;
 		this.extensionUri = extensionUri;
 		this.secrets = secrets;
-		this.userAgent = userAgent;
 
 		this.update();
 
@@ -131,7 +124,7 @@ export class ConfigViewPanel {
 				await this.saveGlobalConfig(message.baseUrl, message.apiKey, message.delay, message.retry);
 				break;
 			case "fetchModels": {
-				const { models } = await fetchModels(message.baseUrl, message.apiKey, this.userAgent);
+				const { models } = await fetchModels(message.baseUrl, message.apiKey);
 				this.panel.webview.postMessage({ type: "modelsFetched", models });
 				break;
 			}

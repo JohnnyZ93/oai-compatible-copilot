@@ -25,6 +25,7 @@ import { AnthropicApi } from "./anthropic/anthropicApi";
 import { AnthropicRequestBody } from "./anthropic/anthropicTypes";
 import { GeminiApi, buildGeminiGenerateContentUrl, type GeminiToolCallMeta } from "./gemini/geminiApi";
 import type { GeminiGenerateContentRequest } from "./gemini/geminiTypes";
+import { CommonApi } from "./commonApi";
 
 /**
  * VS Code Chat provider backed by Hugging Face Inference Providers.
@@ -41,7 +42,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	 */
 	constructor(
 		private readonly secrets: vscode.SecretStorage,
-		private readonly userAgent: string,
 		private readonly statusBarItem: vscode.StatusBarItem
 	) {}
 
@@ -55,12 +55,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		options: { silent: boolean },
 		_token: CancellationToken
 	): Promise<LanguageModelChatInformation[]> {
-		return prepareLanguageModelChatInformation(
-			{ silent: options.silent ?? false },
-			_token,
-			this.secrets,
-			this.userAgent
-		);
+		return prepareLanguageModelChatInformation({ silent: options.silent ?? false }, _token, this.secrets);
 	}
 
 	/**
@@ -177,7 +172,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			const apiMode = um?.apiMode ?? "openai";
 
 			// prepare headers with custom headers if specified
-			const requestHeaders = this.prepareHeaders(modelApiKey, apiMode, um?.headers);
+			const requestHeaders = CommonApi.prepareHeaders(modelApiKey, apiMode, um?.headers);
 
 			// console.debug("[OAI Compatible Model Provider] messages:", JSON.stringify(messages));
 			if (apiMode === "ollama") {
@@ -432,44 +427,6 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			// Update last request time after successful completion
 			this._lastRequestTime = Date.now();
 		}
-	}
-
-	/**
-	 * Prepare headers for API request.
-	 * @param apiKey The API key to use.
-	 * @param apiMode The apiMode (affects header format).
-	 * @param customHeaders Optional custom headers from model config.
-	 * @returns Headers object.
-	 */
-	private prepareHeaders(
-		apiKey: string,
-		apiMode: string,
-		customHeaders?: Record<string, string>
-	): Record<string, string> {
-		const headers: Record<string, string> = {
-			"Content-Type": "application/json",
-			"User-Agent": this.userAgent,
-		};
-
-		// Provider-specific header formats
-		if (apiMode === "anthropic") {
-			headers["x-api-key"] = apiKey;
-			headers["anthropic-version"] = "2023-06-01";
-		} else if (apiMode === "ollama" && apiKey !== "ollama") {
-			headers["Authorization"] = `Bearer ${apiKey}`;
-		} else if (apiMode === "gemini") {
-			headers["x-goog-api-key"] = apiKey;
-			headers["Accept"] = "text/event-stream";
-		} else {
-			headers["Authorization"] = `Bearer ${apiKey}`;
-		}
-
-		// Merge custom headers
-		if (customHeaders) {
-			return { ...headers, ...customHeaders };
-		}
-
-		return headers;
 	}
 
 	/**

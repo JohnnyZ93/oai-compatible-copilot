@@ -644,7 +644,7 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 	prepareRequestBody(
 		rb: GeminiGenerateContentRequest,
 		um: HFModelItem | undefined,
-		options: ProvideLanguageModelChatResponseOptions
+		options?: ProvideLanguageModelChatResponseOptions
 	): GeminiGenerateContentRequest {
 		const generationConfig: Record<string, unknown> = {
 			...(rb.generationConfig && typeof rb.generationConfig === "object"
@@ -653,7 +653,7 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 		};
 
 		// temperature
-		const oTemperature = options.modelOptions?.temperature ?? 0;
+		const oTemperature = options?.modelOptions?.temperature ?? 0;
 		const temperature = um?.temperature ?? oTemperature;
 		generationConfig.temperature = temperature;
 		if (um && um.temperature === null) {
@@ -680,7 +680,7 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 		}
 
 		// stop sequences
-		if (options.modelOptions) {
+		if (options?.modelOptions) {
 			const mo = options.modelOptions as Record<string, unknown>;
 			if (typeof mo.stop === "string" && mo.stop) {
 				generationConfig.stopSequences = [mo.stop];
@@ -965,7 +965,7 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 		messages: { role: string; content: string }[],
 		baseUrl: string,
 		apiKey: string
-	): AsyncIterable<{ type: "text"; text: string }> {
+	): AsyncGenerator<{ type: "text"; text: string }> {
 		throw new Error("Method not implemented.");
 	}
 }

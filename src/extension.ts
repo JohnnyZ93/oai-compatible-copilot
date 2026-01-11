@@ -7,15 +7,8 @@ import { normalizeUserModels } from "./utils";
 import { abortCommitGeneration, generateCommitMsg } from "./gitCommit/commitMessageGenerator";
 
 export function activate(context: vscode.ExtensionContext) {
-	// Build a descriptive User-Agent to help quantify API usage
-	const ext = vscode.extensions.getExtension("johnny-zhao.oai-compatible-copilot");
-	const extVersion = ext?.packageJSON?.version ?? "unknown";
-	const vscodeVersion = vscode.version;
-	// Keep UA minimal: only extension version and VS Code version
-	const ua = `oai-compatible-copilot/${extVersion} VSCode/${vscodeVersion}`;
-
 	const tokenCountStatusBarItem: vscode.StatusBarItem = initStatusBar(context);
-	const provider = new HuggingFaceChatModelProvider(context.secrets, ua, tokenCountStatusBarItem);
+	const provider = new HuggingFaceChatModelProvider(context.secrets, tokenCountStatusBarItem);
 	// Register the Hugging Face provider under the vendor id used in package.json
 	vscode.lm.registerLanguageModelChatProvider("oaicopilot", provider);
 
@@ -102,14 +95,14 @@ export function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand("oaicopilot.openConfig", async () => {
-			ConfigViewPanel.openPanel(context.extensionUri, context.secrets, ua);
+			ConfigViewPanel.openPanel(context.extensionUri, context.secrets);
 		})
 	);
 
 	// Register the generateGitCommitMessage command handler
 	context.subscriptions.push(
 		vscode.commands.registerCommand("oaicopilot.generateGitCommitMessage", async (scm) => {
-			generateCommitMsg(scm);
+			generateCommitMsg(context.secrets, scm);
 		}),
 		vscode.commands.registerCommand("oaicopilot.abortGitCommitMessage", () => {
 			abortCommitGeneration();

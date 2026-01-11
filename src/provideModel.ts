@@ -3,6 +3,7 @@ import { CancellationToken, LanguageModelChatInformation } from "vscode";
 
 import type { HFModelItem, HFModelsResponse } from "./types";
 import { normalizeUserModels } from "./utils";
+import { VersionManager } from "./versionManager";
 
 const DEFAULT_CONTEXT_LENGTH = 128000;
 const DEFAULT_MAX_TOKENS = 4096;
@@ -16,8 +17,7 @@ const DEFAULT_MAX_TOKENS = 4096;
 export async function prepareLanguageModelChatInformation(
 	options: { silent: boolean },
 	_token: CancellationToken,
-	secrets: vscode.SecretStorage,
-	userAgent: string
+	secrets: vscode.SecretStorage
 ): Promise<LanguageModelChatInformation[]> {
 	// Check for user-configured models first
 	const config = vscode.workspace.getConfiguration();
@@ -70,7 +70,7 @@ export async function prepareLanguageModelChatInformation(
 		if (!BASE_URL || !BASE_URL.startsWith("http")) {
 			throw new Error(`Invalid base URL configuration.`);
 		}
-		const { models } = await fetchModels(BASE_URL, apiKey, userAgent);
+		const { models } = await fetchModels(BASE_URL, apiKey);
 
 		infos = models.flatMap((m) => {
 			const providers = m?.providers ?? [];
@@ -131,15 +131,11 @@ export async function prepareLanguageModelChatInformation(
 /**
  * Fetch the list of models and supplementary metadata from Provider.
  */
-export async function fetchModels(
-	baseUrl: string,
-	apiKey: string,
-	userAgent: string
-): Promise<{ models: HFModelItem[] }> {
+export async function fetchModels(baseUrl: string, apiKey: string): Promise<{ models: HFModelItem[] }> {
 	const modelsList = (async () => {
 		const resp = await fetch(`${baseUrl.replace(/\/+$/, "")}/models`, {
 			method: "GET",
-			headers: { Authorization: `Bearer ${apiKey}`, "User-Agent": userAgent },
+			headers: { Authorization: `Bearer ${apiKey}`, "User-Agent": VersionManager.getUserAgent() },
 		});
 		if (!resp.ok) {
 			let text = "";

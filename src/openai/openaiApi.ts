@@ -150,10 +150,10 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 	prepareRequestBody(
 		rb: Record<string, unknown>,
 		um: HFModelItem | undefined,
-		options: ProvideLanguageModelChatResponseOptions
+		options?: ProvideLanguageModelChatResponseOptions
 	): Record<string, unknown> {
 		// temperature
-		const oTemperature = options.modelOptions?.temperature ?? 0;
+		const oTemperature = options?.modelOptions?.temperature ?? 0;
 		const temperature = um?.temperature ?? oTemperature;
 		rb.temperature = temperature;
 		if (um && um.temperature === null) {
@@ -218,7 +218,7 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 		}
 
 		// stop
-		if (options.modelOptions) {
+		if (options?.modelOptions) {
 			const mo = options.modelOptions as Record<string, unknown>;
 			if (typeof mo.stop === "string" || Array.isArray(mo.stop)) {
 				rb.stop = mo.stop;
@@ -560,26 +560,21 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 		messages: { role: string; content: string }[],
 		baseUrl: string,
 		apiKey: string
-	): AsyncIterable<{ type: "text"; text: string }> {
+	): AsyncGenerator<{ type: "text"; text: string }> {
 		// Combine system prompt with first user message or as separate system message
 		const openaiMessages = [...messages];
 		if (systemPrompt) {
 			openaiMessages.unshift({ role: "system", content: systemPrompt });
 		}
 
-		const requestBody = {
+		let requestBody: Record<string, unknown> = {
 			model: model.id,
 			messages: openaiMessages,
-			max_tokens: 1024,
-			temperature: 0,
 			stream: true,
-			stream_options: { include_usage: true },
 		};
+		requestBody = this.prepareRequestBody(requestBody, model, undefined);
 
-		const headers = {
-			"Content-Type": "application/json",
-			Authorization: `Bearer ${apiKey}`,
-		};
+		const headers = CommonApi.prepareHeaders(apiKey, model.apiMode ?? "openai", model.headers);
 
 		const url = `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
 
@@ -614,31 +609,28 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 				buffer = lines.pop() || "";
 
 				for (const line of lines) {
-					if (line.startsWith("data: ")) {
-						const dataStr = line.slice(6).trim();
-						if (dataStr === "[DONE]") continue;
+					if (!line.startsWith("data:")) {
+						continue;
+					}
+					const data = line.slice(5).trim();
+					if (data === "[DONE]") continue;
 
-						try {
-							const parsed = JSON.parse(dataStr);
+					try {
+						const parsed = JSON.parse(data);
 
-							// OpenAI-compatible streaming response
-							if (parsed.choices && parsed.choices.length > 0) {
-								const choice = parsed.choices[0];
-								if (choice.delta?.content) {
-									yield { type: "text", text: choice.delta.content };
-								}
-								// Handle finish reason
-								if (choice.finish_reason) {
-									break;
-								}
-							}
-							// Handle error responses
-							if (parsed.error) {
-								throw new Error(`OpenAI API error: ${parsed.error.message || "Unknown error"}`);
-							}
-						} catch (e) {
-							console.error("Error parsing OpenAI SSE data:", dataStr, e);
+						// OpenAI-compatible streaming response
+						const choice = (parsed.choices as Record<string, unknown>[] | undefined)?.[0];
+						if (!choice) continue;
+
+						const deltaObj = choice.delta as Record<string, unknown> | undefined;
+						if (deltaObj?.content) {
+							const content = String(deltaObj.content);
+							yield { type: "text", text: content };
 						}
+						// Handle finish reason
+						if (choice.finish_reason) break;
+					} catch {
+						// Silently ignore malformed SSE lines temporarily
 					}
 				}
 			}

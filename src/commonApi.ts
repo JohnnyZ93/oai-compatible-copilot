@@ -9,6 +9,7 @@ import {
 } from "vscode";
 import { HFModelItem } from "./types";
 import { tryParseJSONObject } from "./utils";
+import { VersionManager } from "./versionManager";
 
 export abstract class CommonApi<TMessage, TRequestBody> {
 	/** Buffer for assembling streamed tool calls by index. */
@@ -61,7 +62,7 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 	abstract prepareRequestBody(
 		rb: TRequestBody,
 		um: HFModelItem | undefined,
-		options: ProvideLanguageModelChatResponseOptions
+		options?: ProvideLanguageModelChatResponseOptions
 	): TRequestBody;
 
 	/**
@@ -91,7 +92,7 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 		messages: { role: string; content: string }[],
 		baseUrl: string,
 		apiKey: string
-	): AsyncIterable<{ type: "text"; text: string }>;
+	): AsyncGenerator<{ type: "text"; text: string }>;
 
 	/**
 	 * Try to emit a buffered tool call when a valid name and JSON arguments are available.
@@ -224,5 +225,43 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 			this._thinkingBuffer = "";
 			progress.report(new LanguageModelThinkingPart(text, this._currentThinkingId));
 		}
+	}
+
+	/**
+	 * Prepare headers for API request.
+	 * @param apiKey The API key to use.
+	 * @param apiMode The apiMode (affects header format).
+	 * @param customHeaders Optional custom headers from model config.
+	 * @returns Headers object.
+	 */
+	public static prepareHeaders(
+		apiKey: string,
+		apiMode: string,
+		customHeaders?: Record<string, string>
+	): Record<string, string> {
+		const headers: Record<string, string> = {
+			"Content-Type": "application/json",
+			"User-Agent": VersionManager.getUserAgent(),
+		};
+
+		// Provider-specific header formats
+		if (apiMode === "anthropic") {
+			headers["x-api-key"] = apiKey;
+			headers["anthropic-version"] = "2023-06-01";
+		} else if (apiMode === "ollama" && apiKey !== "ollama") {
+			headers["Authorization"] = `Bearer ${apiKey}`;
+		} else if (apiMode === "gemini") {
+			headers["x-goog-api-key"] = apiKey;
+			headers["Accept"] = "text/event-stream";
+		} else {
+			headers["Authorization"] = `Bearer ${apiKey}`;
+		}
+
+		// Merge custom headers
+		if (customHeaders) {
+			return { ...headers, ...customHeaders };
+		}
+
+		return headers;
 	}
 }
