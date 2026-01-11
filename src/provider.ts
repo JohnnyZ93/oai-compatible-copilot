@@ -459,6 +459,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			headers["Authorization"] = `Bearer ${apiKey}`;
 		} else if (apiMode === "gemini") {
 			headers["x-goog-api-key"] = apiKey;
+			headers["Accept"] = "text/event-stream";
 		} else {
 			headers["Authorization"] = `Bearer ${apiKey}`;
 		}

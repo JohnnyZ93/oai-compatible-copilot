@@ -40,6 +40,40 @@ export interface GeminiToolCallMeta {
 	createdAt: number;
 }
 
+const UNSUPPORTED_GEMINI_SCHEMA_KEYS = new Set(["exclusiveMinimum", "exclusiveMaximum"]);
+
+function stripUnsupportedGeminiSchemaKeys(value: unknown): number {
+	if (!value) {
+		return 0;
+	}
+
+	if (Array.isArray(value)) {
+		let removed = 0;
+		for (const v of value) {
+			removed += stripUnsupportedGeminiSchemaKeys(v);
+		}
+		return removed;
+	}
+
+	if (typeof value !== "object") {
+		return 0;
+	}
+
+	const obj = value as Record<string, unknown>;
+	let removed = 0;
+
+	for (const key of Object.keys(obj)) {
+		if (UNSUPPORTED_GEMINI_SCHEMA_KEYS.has(key)) {
+			delete obj[key];
+			removed++;
+			continue;
+		}
+		removed += stripUnsupportedGeminiSchemaKeys(obj[key]);
+	}
+
+	return removed;
+}
+
 function normalizeBaseUrl(raw: string): string {
 	const v = (raw || "").trim();
 	if (!v) {
@@ -278,6 +312,21 @@ function jsonSchemaToGeminiSchema(
 		) {
 			continue;
 		}
+
+		// Gemini Schema doesn't support Draft-07 exclusive bounds fields.
+		// Best-effort: map numeric exclusive bounds to inclusive ones.
+		if (k === "exclusiveMinimum") {
+			if (typeof v === "number" && !("minimum" in out)) {
+				out.minimum = v;
+			}
+			continue;
+		}
+		if (k === "exclusiveMaximum") {
+			if (typeof v === "number" && !("maximum" in out)) {
+				out.maximum = v;
+			}
+			continue;
+		}
 		if (k === "allOf") {
 			continue;
 		}
@@ -366,6 +415,7 @@ function openaiToolsToGeminiFunctionDeclarations(
 		}
 		if (fn.parameters && typeof fn.parameters === "object") {
 			decl.parameters = jsonSchemaToGeminiSchema(fn.parameters);
+			stripUnsupportedGeminiSchemaKeys(decl.parameters);
 		}
 		out.push(decl);
 	}
@@ -687,7 +737,8 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 
 		let textSoFar = "";
 		const toolCallKeyToId = new Map<string, string>();
-		let pendingThought = "";
+		let pendingThoughtSoFar = "";
+		let pendingThoughtSummarySoFar = "";
 		let pendingThoughtSignature = "";
 
 		try {
@@ -731,8 +782,12 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 					for (const p of parts) {
 						const fc = p?.functionCall;
 						if (!fc || typeof fc !== "object") {
-							// Standalone thought (2025 API: thought comes in separate part before functionCall)
+							// Standalone thought (Gemini "thought summaries" or 2025 API: thought comes in separate part)
 							const maybeThought = p && typeof p === "object" ? (p as unknown as Record<string, unknown>) : null;
+							const thoughtSummaryText =
+								maybeThought && maybeThought.thought === true && typeof (p as GeminiPart).text === "string"
+									? String((p as GeminiPart).text)
+									: "";
 							const thought = maybeThought && typeof maybeThought.thought === "string" ? maybeThought.thought : "";
 							const thoughtSigRaw =
 								maybeThought && typeof maybeThought.thoughtSignature === "string"
@@ -740,9 +795,37 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 									: maybeThought && typeof maybeThought.thought_signature === "string"
 										? maybeThought.thought_signature
 										: "";
+							if (thoughtSummaryText) {
+								let delta = "";
+								if (thoughtSummaryText.startsWith(pendingThoughtSummarySoFar)) {
+									delta = thoughtSummaryText.slice(pendingThoughtSummarySoFar.length);
+									pendingThoughtSummarySoFar = thoughtSummaryText;
+								} else if (pendingThoughtSummarySoFar.startsWith(thoughtSummaryText)) {
+									delta = "";
+								} else {
+									delta = thoughtSummaryText;
+									pendingThoughtSummarySoFar += thoughtSummaryText;
+									}
+									if (delta) {
+										this.bufferThinkingContent(delta, progress);
+									}
+								}
 							if (thought) {
-								pendingThought = thought;
-							}
+								let delta = "";
+								if (thought.startsWith(pendingThoughtSoFar)) {
+									delta = thought.slice(pendingThoughtSoFar.length);
+									pendingThoughtSoFar = thought;
+								} else if (pendingThoughtSoFar.startsWith(thought)) {
+									delta = "";
+								} else {
+									delta = thought;
+									pendingThoughtSoFar += thought;
+								}
+
+									if (delta) {
+										this.bufferThinkingContent(delta, progress);
+									}
+								}
 							if (thoughtSigRaw) {
 								pendingThoughtSignature = thoughtSigRaw;
 							}
@@ -771,11 +854,24 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 						const thoughtRaw =
 							(pObj && typeof pObj.thought === "string" ? pObj.thought : "") ||
 							(fcObj && typeof fcObj.thought === "string" ? fcObj.thought : "") ||
-							pendingThought;
+							pendingThoughtSoFar;
 
-						// Reset pending after consuming
-						pendingThought = "";
-						pendingThoughtSignature = "";
+						if (thoughtRaw) {
+							let delta = "";
+							if (thoughtRaw.startsWith(pendingThoughtSoFar)) {
+								delta = thoughtRaw.slice(pendingThoughtSoFar.length);
+								pendingThoughtSoFar = thoughtRaw;
+							} else if (pendingThoughtSoFar.startsWith(thoughtRaw)) {
+								delta = "";
+							} else {
+								delta = thoughtRaw;
+								pendingThoughtSoFar += thoughtRaw;
+							}
+
+								if (delta) {
+									this.bufferThinkingContent(delta, progress);
+								}
+							}
 
 						let id = toolCallKeyToId.get(key);
 						const isNew = !id;
@@ -808,6 +904,9 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 
 						if (isNew) {
 							this.reportEndThinking(progress);
+							pendingThoughtSoFar = "";
+							pendingThoughtSummarySoFar = "";
+							pendingThoughtSignature = "";
 							if (!this._emittedBeginToolCallsHint && this._hasEmittedAssistantText) {
 								progress.report(new vscode.LanguageModelTextPart(" "));
 								this._emittedBeginToolCallsHint = true;
@@ -817,11 +916,17 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 					}
 
 					const textJoined = parts
-						.map((p) =>
-							p && typeof p === "object" && typeof (p as GeminiPart).text === "string"
-								? String((p as GeminiPart).text)
-								: ""
-						)
+						.map((p) => {
+							if (!p || typeof p !== "object") {
+								return "";
+							}
+							const obj = p as unknown as Record<string, unknown>;
+							// Thought summary text comes through as `text` with `thought: true`
+							if (obj.thought === true) {
+								return "";
+							}
+							return typeof (p as GeminiPart).text === "string" ? String((p as GeminiPart).text) : "";
+						})
 						.filter(Boolean)
 						.join("");
 
@@ -839,15 +944,18 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 
 						if (delta) {
 							this.reportEndThinking(progress);
+							pendingThoughtSoFar = "";
+							pendingThoughtSummarySoFar = "";
+							pendingThoughtSignature = "";
 							progress.report(new vscode.LanguageModelTextPart(delta));
 							this._hasEmittedAssistantText = true;
 						}
 					}
 				}
 			}
-		} finally {
-			reader.releaseLock();
-			this.reportEndThinking(progress);
+			} finally {
+				reader.releaseLock();
+				this.reportEndThinking(progress);
+			}
 		}
 	}
-}

@@ -282,7 +282,7 @@ The `extra` field allows you to add arbitrary parameters to the API request body
 
 ### How it works
 - Parameters in `extra` are merged directly into the request body
-- Works with all API modes (`openai`, `ollama`, `anthropic`)
+- Works with all API modes (`openai`, `openai-responses`, `ollama`, `anthropic`, `gemini`)
 - Values can be any valid JSON type (string, number, boolean, object, array)
 
 ### Common use cases
@@ -325,6 +325,46 @@ The `extra` field allows you to add arbitrary parameters to the API request body
         }
     }
 ]
+```
+
+### Show thinking in Copilot
+These are provider-specific parameters that can make Copilot show a **Thinking** block (if the provider/model supports it).
+
+#### OpenAI Responses
+Use `apiMode: "openai-responses"` and set the reasoning summary mode:
+
+```json
+{
+  "id": "gpt-4o-mini",
+  "owned_by": "openai",
+  "baseUrl": "https://api.openai.com/v1",
+  "apiMode": "openai-responses",
+  "reasoning_effort": "high",
+  "extra": {
+    "reasoning": {
+      "summary": "detailed"
+    }
+  }
+}
+```
+
+#### Gemini
+Use `apiMode: "gemini"` and enable thought summaries:
+
+```json
+{
+  "id": "gemini-3-flash-preview",
+  "owned_by": "gemini",
+  "baseUrl": "https://generativelanguage.googleapis.com",
+  "apiMode": "gemini",
+  "extra": {
+    "generationConfig": {
+      "thinkingConfig": {
+        "includeThoughts": true
+      }
+    }
+  }
+}
 ```
 
 ### Important Notes

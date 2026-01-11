@@ -20,7 +20,7 @@ export interface GeminiPart {
 	functionCall?: GeminiFunctionCall;
 	functionResponse?: GeminiFunctionResponse;
 	// 2025+ thinking fields (may appear in streaming responses)
-	thought?: string;
+	thought?: boolean | string;
 	thought_signature?: string;
 	thoughtSignature?: string;
 }
