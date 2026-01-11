@@ -49,6 +49,8 @@ export interface ResponsesFunctionCallOutput {
 export type ResponsesInputItem = ResponsesInputMessage | ResponsesFunctionCall | ResponsesFunctionCallOutput;
 
 export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<string, unknown>> {
+	private _reasoningSoFar = "";
+
 	constructor() {
 		super();
 	}
@@ -155,6 +157,9 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 		um: HFModelItem | undefined,
 		options: ProvideLanguageModelChatResponseOptions
 	): Record<string, unknown> {
+		const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+			!!v && typeof v === "object" && !Array.isArray(v);
+
 		// temperature
 		const oTemperature = options.modelOptions?.temperature ?? 0;
 		const temperature = um?.temperature ?? oTemperature;
@@ -177,7 +182,9 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 
 		// OpenAI reasoning configuration
 		if (um?.reasoning_effort !== undefined) {
+			const existing = isPlainObject(rb.reasoning) ? { ...(rb.reasoning as Record<string, unknown>) } : {};
 			rb.reasoning = {
+				...existing,
 				effort: um.reasoning_effort,
 			};
 		}
@@ -203,6 +210,11 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 		if (um?.extra && typeof um.extra === "object") {
 			for (const [key, value] of Object.entries(um.extra)) {
 				if (value !== undefined) {
+					// Deep-merge reasoning config so `extra.reasoning` doesn't clobber `reasoning.effort`.
+					if (key === "reasoning" && isPlainObject(value) && isPlainObject(rb.reasoning)) {
+						rb.reasoning = { ...(rb.reasoning as Record<string, unknown>), ...(value as Record<string, unknown>) };
+						continue;
+					}
 					rb[key] = value;
 				}
 			}
@@ -259,6 +271,184 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 		}
 	}
 
+	private bufferReasoningChunk(text: string, progress: Progress<LanguageModelResponsePart2>): void {
+		if (!text) {
+			return;
+		}
+
+		let delta = "";
+		if (text.startsWith(this._reasoningSoFar)) {
+			delta = text.slice(this._reasoningSoFar.length);
+			this._reasoningSoFar = text;
+		} else if (this._reasoningSoFar.startsWith(text)) {
+			delta = "";
+		} else {
+			delta = text;
+			this._reasoningSoFar += text;
+		}
+
+		if (delta) {
+			this.bufferThinkingContent(delta, progress);
+		}
+	}
+
+	private coerceText(value: unknown): string {
+		if (typeof value === "string") {
+			return value;
+		}
+		if (value && typeof value === "object") {
+			const obj = value as Record<string, unknown>;
+			if (typeof obj.text === "string") {
+				return obj.text;
+			}
+			if (typeof obj.thinking === "string") {
+				return obj.thinking;
+			}
+			if (typeof obj.reasoning === "string") {
+				return obj.reasoning;
+			}
+			if (typeof obj.summary === "string") {
+				return obj.summary;
+			}
+			if (typeof obj.value === "string") {
+				return obj.value;
+			}
+		}
+		return "";
+	}
+
+	private looksLikeReasoningConfigValue(value: string): boolean {
+		const v = (value || "").trim().toLowerCase();
+		return (
+			v === "high" ||
+			v === "medium" ||
+			v === "low" ||
+			v === "minimal" ||
+			v === "auto" ||
+			v === "none" ||
+			v === "detailed" ||
+			v === "concise"
+		);
+	}
+
+	private extractSummaryText(value: unknown): string {
+		if (typeof value === "string") {
+			return value;
+		}
+		if (!value || typeof value !== "object") {
+			return "";
+		}
+
+		// OpenAI Responses reasoning items often encode summary as an array of `{ type: "summary_text", text: "..." }`.
+		if (Array.isArray(value)) {
+			const parts: string[] = [];
+			for (const item of value) {
+				if (!item || typeof item !== "object") {
+					continue;
+				}
+				const obj = item as Record<string, unknown>;
+				if (typeof obj.text === "string" && obj.text) {
+					parts.push(obj.text);
+				}
+			}
+			return parts.join("\n");
+		}
+
+		return this.coerceText(value);
+	}
+
+	private extractReasoningFromResponse(response: Record<string, unknown>): string {
+		const parts: string[] = [];
+
+		const directReasoning = this.coerceText(response.reasoning);
+		if (directReasoning && !this.looksLikeReasoningConfigValue(directReasoning)) {
+			parts.push(directReasoning);
+		}
+
+		const directSummary = this.coerceText((response as Record<string, unknown>).reasoning_summary);
+		if (directSummary && !this.looksLikeReasoningConfigValue(directSummary)) {
+			parts.push(directSummary);
+		}
+
+		const output = Array.isArray(response.output) ? response.output : [];
+		for (const item of output) {
+			if (!item || typeof item !== "object") {
+				continue;
+			}
+			const itemObj = item as Record<string, unknown>;
+			if (itemObj.type !== "reasoning" && itemObj.type !== "reasoning_summary") {
+				continue;
+			}
+			const text = this.coerceText(itemObj.text) || this.coerceText(itemObj.content);
+			if (text && !this.looksLikeReasoningConfigValue(text)) {
+				parts.push(text);
+			}
+			const summary = this.extractSummaryText(itemObj.summary);
+			if (summary && !this.looksLikeReasoningConfigValue(summary)) {
+				parts.push(summary);
+			}
+		}
+
+		return parts
+			.map((p) => p.trim())
+			.filter(Boolean)
+			.filter((p, idx, arr) => arr.indexOf(p) === idx)
+			.join("\n\n");
+	}
+
+	private processOutputTextChunk(text: string, progress: Progress<LanguageModelResponsePart2>): void {
+		if (!text) {
+			return;
+		}
+
+		const THINK_START = "<think>";
+		const THINK_END = "</think>";
+
+		let data = text;
+		while (data.length > 0) {
+			if (!this._xmlThinkActive) {
+				const startIdx = data.indexOf(THINK_START);
+				if (startIdx === -1) {
+					this.reportEndThinking(progress);
+					progress.report(new vscode.LanguageModelTextPart(data));
+					this._hasEmittedAssistantText = true;
+					return;
+				}
+
+				const before = data.slice(0, startIdx);
+				if (before) {
+					this.reportEndThinking(progress);
+					progress.report(new vscode.LanguageModelTextPart(before));
+					this._hasEmittedAssistantText = true;
+				}
+
+				// Start a fresh thinking sequence for the <think> block.
+				this.reportEndThinking(progress);
+				this._xmlThinkActive = true;
+				this._currentThinkingId = this.generateThinkingId();
+				data = data.slice(startIdx + THINK_START.length);
+				continue;
+			}
+
+			const endIdx = data.indexOf(THINK_END);
+			if (endIdx === -1) {
+				if (data) {
+					this.bufferThinkingContent(data, progress);
+				}
+				return;
+			}
+
+			const thinkContent = data.slice(0, endIdx);
+			if (thinkContent) {
+				this.bufferThinkingContent(thinkContent, progress);
+			}
+
+			this._xmlThinkActive = false;
+			this.reportEndThinking(progress);
+			data = data.slice(endIdx + THINK_END.length);
+		}
+	}
+
 	private async processEvent(
 		event: Record<string, unknown>,
 		progress: Progress<LanguageModelResponsePart2>
@@ -271,34 +461,54 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 		switch (eventType) {
 			case "response.output_text.delta":
 			case "response.refusal.delta": {
-				const delta = typeof event.delta === "string" ? event.delta : "";
+				const delta = this.coerceText(event.delta);
 				if (!delta) {
 					return;
 				}
-				this.reportEndThinking(progress);
-				progress.report(new vscode.LanguageModelTextPart(delta));
-				this._hasEmittedAssistantText = true;
+				this.processOutputTextChunk(delta, progress);
 				return;
 			}
 
 			case "response.output_text.done":
 			case "response.refusal.done": {
 				// Some gateways only emit a final "done" payload (no deltas).
-				const text = typeof event.text === "string" ? event.text : "";
+				const text = this.coerceText(event.text);
 				if (!text || this._hasEmittedAssistantText) {
 					return;
 				}
-				this.reportEndThinking(progress);
-				progress.report(new vscode.LanguageModelTextPart(text));
-				this._hasEmittedAssistantText = true;
+				this.processOutputTextChunk(text, progress);
 				return;
 			}
 
 			case "response.reasoning.delta":
-			case "response.reasoning_summary.delta": {
-				const delta = typeof event.delta === "string" ? event.delta : "";
-				if (delta) {
-					this.bufferThinkingContent(delta, progress);
+			case "response.reasoning_text.delta":
+			case "response.reasoning_summary.delta":
+			case "response.reasoning_summary_text.delta":
+			case "response.thinking.delta":
+			case "response.thinking_summary.delta":
+			case "response.thought.delta":
+			case "response.thought_summary.delta":
+			case "response.reasoning.done":
+			case "response.reasoning_text.done":
+			case "response.reasoning_summary.done":
+			case "response.reasoning_summary_text.done":
+			case "response.thinking.done":
+			case "response.thinking_summary.done":
+			case "response.thought.done":
+			case "response.thought_summary.done": {
+				const candidates = [
+					this.coerceText(event.delta),
+					this.coerceText(event.text),
+					this.coerceText((event as Record<string, unknown>).reasoning),
+					this.coerceText((event as Record<string, unknown>).summary),
+				].filter(Boolean);
+
+				for (const chunk of candidates) {
+					if (this.looksLikeReasoningConfigValue(chunk)) {
+						continue;
+					}
+					this.bufferReasoningChunk(chunk, progress);
+					break;
 				}
 				return;
 			}
@@ -415,16 +625,28 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 					event.response && typeof event.response === "object" ? (event.response as Record<string, unknown>) : null;
 
 				if (responseObj) {
+					const reasoning = this.extractReasoningFromResponse(responseObj);
+					if (reasoning) {
+						this.bufferReasoningChunk(reasoning, progress);
+					}
+
 					if (!this._hasEmittedAssistantText) {
 						const text = this.extractOutputText(responseObj);
 						if (text) {
-							this.reportEndThinking(progress);
-							progress.report(new vscode.LanguageModelTextPart(text));
-							this._hasEmittedAssistantText = true;
+							this.processOutputTextChunk(text, progress);
 						}
 					}
 
-					for (const call of this.extractToolCalls(responseObj)) {
+					const calls = this.extractToolCalls(responseObj);
+					if (calls.length > 0) {
+						this.reportEndThinking(progress);
+						if (!this._emittedBeginToolCallsHint && this._hasEmittedAssistantText) {
+							progress.report(new vscode.LanguageModelTextPart(" "));
+							this._emittedBeginToolCallsHint = true;
+						}
+					}
+
+					for (const call of calls) {
 						const idx = this.getToolCallIndex(call.callId);
 						if (this._completedToolCallIndices.has(idx)) {
 							continue;
