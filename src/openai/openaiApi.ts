@@ -486,8 +486,8 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 	}
 
 	/**
-	 * Process streamed text content for XML think blocks and emit thinking parts.
-	 * Returns whether any thinking content was emitted.
+	 * Process streamed text content for XML think blocks and buffer thinking content.
+	 * Returns whether any XML think tags were processed (preventing text fallback).
 	 */
 	private processXmlThinkBlocks(
 		input: string,
@@ -515,7 +515,8 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 					break;
 				}
 
-				// Found think start tag
+				// Found think start tag - mark that we processed XML tags
+				emittedAny = true;
 				this._xmlThinkActive = true;
 				// Generate a new thinking ID for this XML think block
 				this._currentThinkingId = this.generateThinkingId();
@@ -528,26 +529,19 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 			// We are inside a think block, look for end tag
 			const endIdx = data.indexOf(THINK_END);
 			if (endIdx === -1) {
-				// No end tag found, emit current chunk content as thinking part
-				const thinkContent = data.trim();
-				if (thinkContent) {
-					progress.report(new vscode.LanguageModelThinkingPart(thinkContent, this._currentThinkingId || undefined));
-					emittedAny = true;
-				}
+				this.bufferThinkingContent(data, progress);
+				emittedAny = true;
 				data = "";
 				break;
 			}
 
-			// Found end tag, emit final thinking part
+			// Found end tag, buffer final thinking content before the end tag
 			const thinkContent = data.slice(0, endIdx);
-			if (thinkContent) {
-				progress.report(new vscode.LanguageModelThinkingPart(thinkContent, this._currentThinkingId || undefined));
-				emittedAny = true;
-			}
+			this.bufferThinkingContent(thinkContent, progress);
 
-			// Reset state and continue with remaining data
+			// Mark end tag as processed and reset state
+			emittedAny = true;
 			this._xmlThinkActive = false;
-			this._currentThinkingId = null;
 			data = data.slice(endIdx + THINK_END.length);
 		}
 
