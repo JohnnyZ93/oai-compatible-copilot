@@ -100,6 +100,19 @@ There are two ways to open the configuration interface:
 - **Save Frequently**: Changes are saved to VS Code settings immediately
 - **Refresh**: Use the "Refresh" buttons to reload current configuration from VS Code settings
 
+### Model family & System Prompts
+
+VS Code Copilot has optimized system prompts for specific models. [Detailed introduction](https://github.com/microsoft/vscode-copilot-chat/blob/main/docs/prompts.md)
+
+Below are the model family settings supported by Copilot:
+
+| Model Family | General `family` | Specific Model `family` | Notes |
+|---|---|---|---|
+| Anthropic | 'claude', 'Anthropic'  | 'claude-sonnet-4-5', 'claude-haiku-4-5' |  |
+| Gemini | 'gemini' | 'gemini-3-flash' | "github.copilot.chat.alternateGeminiModelFPrompt.enabled": true |
+| xAI | 'grok-code' |  |  |
+| OpenAI | 'gpt', 'o4-mini', 'o3-mini', 'OpenAI' | 'gpt-4.1', 'gpt-5-codex', 'gpt-5', 'gpt-5-mini', `!!family.startsWith('gpt-') && family.includes('-codex')`, `!!family.match(/^gpt-5\.\d+/i)` | "github.copilot.chat.alternateGptPrompt.enabled": true |
+
 </details>
 
 ## ✨ Multi Api Mode
