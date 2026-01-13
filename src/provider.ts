@@ -227,7 +227,12 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				// console.debug("[OAI Compatible Model Provider] RequestBody:", JSON.stringify(requestBody));
 
 				// send Anthropic chat request with retry
-				const url = `${BASE_URL.replace(/\/+$/, "")}/v1/messages`;
+				const normalizedBaseUrl = BASE_URL.replace(/\/+$/, "");
+				// Some providers require configuring the baseUrl with a version suffix (e.g. .../v1).
+				// Avoid double-appending (e.g. .../v1/v1/messages).
+				const url = normalizedBaseUrl.endsWith("/v1")
+					? `${normalizedBaseUrl}/messages`
+					: `${normalizedBaseUrl}/v1/messages`;
 				const response = await executeWithRetry(async () => {
 					const res = await fetch(url, {
 						method: "POST",

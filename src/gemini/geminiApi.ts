@@ -653,11 +653,8 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 		};
 
 		// temperature
-		const oTemperature = options?.modelOptions?.temperature ?? 0;
-		const temperature = um?.temperature ?? oTemperature;
-		generationConfig.temperature = temperature;
-		if (um && um.temperature === null) {
-			delete generationConfig.temperature;
+		if (um?.temperature !== undefined && um.temperature !== null) {
+			generationConfig.temperature = um.temperature;
 		}
 
 		// topP/topK
