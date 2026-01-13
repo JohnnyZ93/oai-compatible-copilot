@@ -24,29 +24,47 @@ import { CommonApi } from "../commonApi";
 export interface ResponsesInputMessage {
 	role: "user" | "assistant" | "system";
 	content: ResponsesContentPart[];
+	type?: "message";
+	id?: string;
+	status?: "completed" | "incomplete";
 }
 
 export interface ResponsesContentPart {
-	type: "input_text" | "input_image" | "output_text";
+	type: "input_text" | "input_image" | "output_text" | "summary_text";
 	text?: string;
 	image_url?: string;
+	detail?: "auto";
 }
 
 export interface ResponsesFunctionCall {
 	type: "function_call";
-	id?: string;
+	id: string;
 	call_id: string;
 	name: string;
 	arguments: string;
+	status: "completed";
 }
 
 export interface ResponsesFunctionCallOutput {
 	type: "function_call_output";
 	call_id: string;
 	output: string;
+	id: string;
+	status: "completed";
 }
 
-export type ResponsesInputItem = ResponsesInputMessage | ResponsesFunctionCall | ResponsesFunctionCallOutput;
+export interface ResponsesReasoning {
+	type: "reasoning";
+	summary: ResponsesContentPart[];
+	id: string;
+	status: "completed";
+}
+
+export type ResponsesInputItem =
+	| ResponsesInputMessage
+	| ResponsesFunctionCall
+	| ResponsesFunctionCallOutput
+	| ResponsesReasoning;
 
 export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<string, unknown>> {
 	private _reasoningSoFar = "";
@@ -98,11 +116,22 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 
 			// assistant message (optional)
 			if (role === "assistant") {
-				const assistantText = joinedText || joinedThinking;
-				if (assistantText) {
+				if (joinedText) {
 					out.push({
 						role: "assistant",
-						content: [{ type: "output_text", text: assistantText }],
+						content: [{ type: "output_text", text: joinedText }],
+						type: "message",
+						id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+						status: "completed",
+					});
+				}
+
+				if (joinedThinking) {
+					out.push({
+						summary: [{ type: "summary_text", text: joinedThinking }],
+						type: "reasoning",
+						id: `tk_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+						status: "completed",
 					});
 				}
 
@@ -113,6 +142,7 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 						call_id: tc.id,
 						name: tc.function.name,
 						arguments: tc.function.arguments,
+						status: "completed",
 					});
 				}
 			}
@@ -126,6 +156,8 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 					type: "function_call_output",
 					call_id: tr.callId,
 					output: tr.content || "",
+					id: `fco_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+					status: "completed",
 				});
 			}
 
@@ -137,16 +169,32 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 				}
 				for (const imagePart of imageParts) {
 					const dataUrl = createDataUrl(imagePart);
-					contentArray.push({ type: "input_image", image_url: dataUrl });
+					contentArray.push({ type: "input_image", image_url: dataUrl, detail: "auto" });
 				}
 				if (contentArray.length > 0) {
-					out.push({ role: "user", content: contentArray });
+					out.push({
+						role: "user",
+						content: contentArray,
+						type: "message",
+						status: "completed",
+					});
 				}
 			}
 
 			// system message (used to build `instructions` in request body)
 			if (role === "system" && joinedText) {
-				out.push({ role: "system", content: [{ type: "input_text", text: joinedText }] });
+				this._systemContent = joinedText;
+			}
+		}
+
+		// the last user message may be incomplete
+		if (out.length > 0) {
+			const lastItem = out[out.length - 1];
+			if (lastItem && typeof lastItem === "object" && "type" in lastItem) {
+				const item = lastItem as unknown as Record<string, unknown>;
+				if (item.type === "message" && item.role === "user") {
+					item.status = "incomplete";
+				}
 			}
 		}
 		return out;
@@ -159,6 +207,11 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 	): Record<string, unknown> {
 		const isPlainObject = (v: unknown): v is Record<string, unknown> =>
 			!!v && typeof v === "object" && !Array.isArray(v);
+
+		// Add system content if we extracted it
+		if (this._systemContent) {
+			rb.instructions = this._systemContent;
+		}
 
 		// temperature
 		const oTemperature = options?.modelOptions?.temperature ?? 0;
@@ -186,6 +239,13 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 			rb.reasoning = {
 				...existing,
 				effort: um.reasoning_effort,
+			};
+		}
+
+		// thinking (Volcengine provider)
+		if (um?.thinking?.type !== undefined) {
+			rb.thinking = {
+				type: um.thinking.type,
 			};
 		}
 
@@ -432,16 +492,12 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 
 			const endIdx = data.indexOf(THINK_END);
 			if (endIdx === -1) {
-				if (data) {
-					this.bufferThinkingContent(data, progress);
-				}
+				this.bufferThinkingContent(data, progress);
 				return;
 			}
 
 			const thinkContent = data.slice(0, endIdx);
-			if (thinkContent) {
-				this.bufferThinkingContent(thinkContent, progress);
-			}
+			this.bufferThinkingContent(thinkContent, progress);
 
 			this._xmlThinkActive = false;
 			this.reportEndThinking(progress);

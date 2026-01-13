@@ -253,33 +253,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			} else if (apiMode === "openai-responses") {
 				// OpenAI Responses API mode
 				const openaiResponsesApi = new OpenaiResponsesApi();
-				const rawInput = openaiResponsesApi.convertMessages(messages, modelConfig);
-
-				const instructionsParts: string[] = [];
-				const input: unknown[] = [];
-				for (const item of rawInput) {
-					if (
-						item &&
-						typeof item === "object" &&
-						"role" in item &&
-						(item as { role?: unknown }).role === "system" &&
-						Array.isArray((item as { content?: unknown }).content)
-					) {
-						for (const part of (item as { content: unknown[] }).content) {
-							if (
-								part &&
-								typeof part === "object" &&
-								(part as { type?: unknown }).type === "input_text" &&
-								typeof (part as { text?: unknown }).text === "string" &&
-								(part as { text: string }).text.trim()
-							) {
-								instructionsParts.push((part as { text: string }).text);
-							}
-						}
-						continue;
-					}
-					input.push(item);
-				}
+				const input = openaiResponsesApi.convertMessages(messages, modelConfig);
 
 				// requestBody
 				let requestBody: Record<string, unknown> = {
@@ -287,9 +261,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					input,
 					stream: true,
 				};
-				if (instructionsParts.length > 0) {
-					requestBody.instructions = instructionsParts.join("\n");
-				}
+
 				requestBody = openaiResponsesApi.prepareRequestBody(requestBody, um, options);
 
 				// send Responses API request with retry

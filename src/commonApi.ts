@@ -40,6 +40,9 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 	/** Timer for delayed flushing of thinking buffer. */
 	protected _thinkingFlushTimer: NodeJS.Timeout | null = null;
 
+	/** System prompts to include in requests. */
+	protected _systemContent: string | undefined;
+
 	constructor() {}
 
 	/**
