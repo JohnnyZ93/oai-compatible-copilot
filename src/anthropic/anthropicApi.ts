@@ -387,7 +387,12 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 
 		const headers = CommonApi.prepareHeaders(apiKey, model.apiMode ?? "openai", model.headers);
 
-		const url = `${baseUrl.replace(/\/+$/, "")}/v1/messages`;
+		const normalizedBaseUrl = baseUrl.replace(/\/+$/, "");
+		// Some providers require configuring the baseUrl with a version suffix (e.g. .../v1).
+		// Avoid double-appending (e.g. .../v1/v1/messages).
+		const url = normalizedBaseUrl.endsWith("/v1")
+			? `${normalizedBaseUrl}/messages`
+			: `${normalizedBaseUrl}/v1/messages`;
 
 		// Make the API request
 		const response = await fetch(url, {
