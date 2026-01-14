@@ -6,9 +6,20 @@ import { ConfigViewPanel } from "./views/configView";
 import { normalizeUserModels } from "./utils";
 import { abortCommitGeneration, generateCommitMsg } from "./gitCommit/commitMessageGenerator";
 
-const ALLOW_PROGRAMMATIC_API_KEY = true;
+interface OaicopilotConfig {
+	allowProgrammaticApiKey?: boolean;
+}
+
+function getExtensionConfig(): OaicopilotConfig {
+	const extension = vscode.extensions.getExtension("johnny-zhao.oai-compatible-copilot");
+	const packageJson = extension?.packageJSON;
+	return packageJson?.oaicopilotConfig ?? {};
+}
 
 export function activate(context: vscode.ExtensionContext) {
+	const extensionConfig = getExtensionConfig();
+	const ALLOW_PROGRAMMATIC_API_KEY = extensionConfig.allowProgrammaticApiKey ?? false;
+
 	const tokenCountStatusBarItem: vscode.StatusBarItem = initStatusBar(context);
 	const provider = new HuggingFaceChatModelProvider(context.secrets, tokenCountStatusBarItem);
 	// Register the Hugging Face provider under the vendor id used in package.json
