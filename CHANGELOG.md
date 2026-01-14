@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.2.4 (2026-01-15)
+
+- Feat(openai-responses): enhance streaming response handling.
+
 ## 0.2.3 (2026-01-14)
 
 - Fix(anthropic): avoid double /v1 suffix when baseUrl already includes version.
