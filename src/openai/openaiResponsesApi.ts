@@ -394,6 +394,12 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 		}
 
 		switch (eventType) {
+			case "error": {
+				const errorText = JSON.stringify(event);
+				console.error("[OAI Compatible Model Provider] Responses API streaming process error:", errorText);
+				return;
+			}
+
 			// Output text delta events
 			case "response.output_text.delta":
 			case "response.refusal.delta": {
@@ -489,7 +495,7 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 				}
 
 				if (eventType === "response.function_call_arguments.delta") {
-					if(chunk) buf.args += chunk;
+					if (chunk) buf.args += chunk;
 				} else {
 					// "done" events typically provide the full argument string.
 					buf.args = chunk;
