@@ -1,6 +1,15 @@
 # Change Log
 
-## 0.2.2 (2025-01-12)
+## 0.2.3 (2026-01-14)
+
+- Fix(anthropic): avoid double /v1 suffix when baseUrl already includes version.
+- Refactor: update `OpenAI responses` interface and supports Volcengine provider.
+- Feat: add model `family` and system prompts documentation to README. (Include: Anthropic, Gemini, xAI, OpenAI)
+- Refactor: simplify temperature handling in API implementations. Now You can delete `temperature` in request.
+
+Thanks to @matchs for contributing the [PR #111](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/111).
+
+## 0.2.2 (2026-01-12)
 
 - Feat: Add git commit message generation button on Souce Control Panel
 - Feat(thinking): show reasoning summaries in Copilot (OpenAI Responses + Gemini)
@@ -9,7 +18,7 @@
 
 Thanks to @Andy963 for contributing the [PR #104](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/104).
 
-## 0.2.1 (2025-01-04)
+## 0.2.1 (2026-01-04)
 
 Thanks to @Andy963 for contributing the [PR #89](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/89):
 

@@ -5,6 +5,8 @@
 
 Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.2, GLM 4.6 and more in VS Code with GitHub Copilot Chat powered by any OpenAI-compatible provider 🔥
 
+‼️ **Important**: This extension is not currently available to Copilot Business or Copilot Enterprise users. [FYI](https://code.visualstudio.com/docs/copilot/customization/language-models#_bring-your-own-language-model-key)
+
 ## ✨ Features
 - Supports OpenAI/Ollama/Anthropic/Gemini API providers, such as ModelScope, SiliconFlow, DeepSeek...
 - Supports vision models.
