@@ -406,10 +406,8 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 
 				// Only process text content if no XML think blocks were emitted
 				const res = this.processTextContent(content, progress);
-				if (res.emittedText) {
-					this._hasEmittedAssistantText = true;
-				}
 				if (res.emittedAny) {
+					this._hasEmittedAssistantText = true;
 					emitted = true;
 				}
 			}
@@ -458,91 +456,6 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 			await this.flushToolCallBuffers(progress, /*throwOnInvalid*/ true);
 		}
 		return emitted;
-	}
-
-	/**
-	 * Process streamed text content for inline tool-call control tokens and emit text/tool calls.
-	 * Returns which parts were emitted for logging/flow control.
-	 */
-	private processTextContent(
-		input: string,
-		progress: Progress<LanguageModelResponsePart2>
-	): { emittedText: boolean; emittedAny: boolean } {
-		let emittedText = false;
-		let emittedAny = false;
-
-		// Emit any visible text
-		const textToEmit = input;
-		if (textToEmit && textToEmit.length > 0) {
-			progress.report(new vscode.LanguageModelTextPart(textToEmit));
-			emittedText = true;
-			emittedAny = true;
-		}
-
-		return { emittedText, emittedAny };
-	}
-
-	/**
-	 * Process streamed text content for XML think blocks and buffer thinking content.
-	 * Returns whether any XML think tags were processed (preventing text fallback).
-	 */
-	private processXmlThinkBlocks(
-		input: string,
-		progress: Progress<LanguageModelResponsePart2>
-	): { emittedAny: boolean } {
-		// If we've already attempted detection and found no THINK_START, skip processing
-		if (this._xmlThinkDetectionAttempted && !this._xmlThinkActive) {
-			return { emittedAny: false };
-		}
-
-		const THINK_START = "<think>";
-		const THINK_END = "</think>";
-
-		let data = input;
-		let emittedAny = false;
-
-		while (data.length > 0) {
-			if (!this._xmlThinkActive) {
-				// Look for think start tag
-				const startIdx = data.indexOf(THINK_START);
-				if (startIdx === -1) {
-					// No think start found, mark detection as attempted and skip future processing
-					this._xmlThinkDetectionAttempted = true;
-					data = "";
-					break;
-				}
-
-				// Found think start tag - mark that we processed XML tags
-				emittedAny = true;
-				this._xmlThinkActive = true;
-				// Generate a new thinking ID for this XML think block
-				this._currentThinkingId = this.generateThinkingId();
-
-				// Skip the start tag and continue processing
-				data = data.slice(startIdx + THINK_START.length);
-				continue;
-			}
-
-			// We are inside a think block, look for end tag
-			const endIdx = data.indexOf(THINK_END);
-			if (endIdx === -1) {
-				this.bufferThinkingContent(data, progress);
-				emittedAny = true;
-				data = "";
-				break;
-			}
-
-			// Found end tag, buffer final thinking content before the end tag
-			const thinkContent = data.slice(0, endIdx);
-			this.bufferThinkingContent(thinkContent, progress);
-
-			// Mark end tag as processed and reset state
-			emittedAny = true;
-			this._xmlThinkActive = false;
-			data = data.slice(endIdx + THINK_END.length);
-		}
-
-		return { emittedAny };
 	}
 
 	async *createMessage(

@@ -67,8 +67,6 @@ export type ResponsesInputItem =
 	| ResponsesReasoning;
 
 export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<string, unknown>> {
-	private _reasoningSoFar = "";
-
 	constructor() {
 		super();
 	}
@@ -328,27 +326,6 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 		}
 	}
 
-	private bufferReasoningChunk(text: string, progress: Progress<LanguageModelResponsePart2>): void {
-		if (!text) {
-			return;
-		}
-
-		let delta = "";
-		if (text.startsWith(this._reasoningSoFar)) {
-			delta = text.slice(this._reasoningSoFar.length);
-			this._reasoningSoFar = text;
-		} else if (this._reasoningSoFar.startsWith(text)) {
-			delta = "";
-		} else {
-			delta = text;
-			this._reasoningSoFar += text;
-		}
-
-		if (delta) {
-			this.bufferThinkingContent(delta, progress);
-		}
-	}
-
 	private coerceText(value: unknown): string {
 		if (typeof value === "string") {
 			return value;
@@ -388,117 +365,22 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 		);
 	}
 
-	private extractSummaryText(value: unknown): string {
-		if (typeof value === "string") {
-			return value;
-		}
-		if (!value || typeof value !== "object") {
-			return "";
-		}
-
-		// OpenAI Responses reasoning items often encode summary as an array of `{ type: "summary_text", text: "..." }`.
-		if (Array.isArray(value)) {
-			const parts: string[] = [];
-			for (const item of value) {
-				if (!item || typeof item !== "object") {
-					continue;
-				}
-				const obj = item as Record<string, unknown>;
-				if (typeof obj.text === "string" && obj.text) {
-					parts.push(obj.text);
-				}
-			}
-			return parts.join("\n");
-		}
-
-		return this.coerceText(value);
-	}
-
-	private extractReasoningFromResponse(response: Record<string, unknown>): string {
-		const parts: string[] = [];
-
-		const directReasoning = this.coerceText(response.reasoning);
-		if (directReasoning && !this.looksLikeReasoningConfigValue(directReasoning)) {
-			parts.push(directReasoning);
-		}
-
-		const directSummary = this.coerceText((response as Record<string, unknown>).reasoning_summary);
-		if (directSummary && !this.looksLikeReasoningConfigValue(directSummary)) {
-			parts.push(directSummary);
-		}
-
-		const output = Array.isArray(response.output) ? response.output : [];
-		for (const item of output) {
-			if (!item || typeof item !== "object") {
-				continue;
-			}
-			const itemObj = item as Record<string, unknown>;
-			if (itemObj.type !== "reasoning" && itemObj.type !== "reasoning_summary") {
-				continue;
-			}
-			const text = this.coerceText(itemObj.text) || this.coerceText(itemObj.content);
-			if (text && !this.looksLikeReasoningConfigValue(text)) {
-				parts.push(text);
-			}
-			const summary = this.extractSummaryText(itemObj.summary);
-			if (summary && !this.looksLikeReasoningConfigValue(summary)) {
-				parts.push(summary);
-			}
-		}
-
-		return parts
-			.map((p) => p.trim())
-			.filter(Boolean)
-			.filter((p, idx, arr) => arr.indexOf(p) === idx)
-			.join("\n\n");
-	}
-
 	private processOutputTextChunk(text: string, progress: Progress<LanguageModelResponsePart2>): void {
 		if (!text) {
 			return;
 		}
-
-		const THINK_START = "<think>";
-		const THINK_END = "</think>";
-
-		let data = text;
-		while (data.length > 0) {
-			if (!this._xmlThinkActive) {
-				const startIdx = data.indexOf(THINK_START);
-				if (startIdx === -1) {
-					this.reportEndThinking(progress);
-					progress.report(new vscode.LanguageModelTextPart(data));
-					this._hasEmittedAssistantText = true;
-					return;
-				}
-
-				const before = data.slice(0, startIdx);
-				if (before) {
-					this.reportEndThinking(progress);
-					progress.report(new vscode.LanguageModelTextPart(before));
-					this._hasEmittedAssistantText = true;
-				}
-
-				// Start a fresh thinking sequence for the <think> block.
-				this.reportEndThinking(progress);
-				this._xmlThinkActive = true;
-				this._currentThinkingId = this.generateThinkingId();
-				data = data.slice(startIdx + THINK_START.length);
-				continue;
-			}
-
-			const endIdx = data.indexOf(THINK_END);
-			if (endIdx === -1) {
-				this.bufferThinkingContent(data, progress);
-				return;
-			}
-
-			const thinkContent = data.slice(0, endIdx);
-			this.bufferThinkingContent(thinkContent, progress);
-
-			this._xmlThinkActive = false;
+		// Process XML think blocks or text content (mutually exclusive)
+		const xmlRes = this.processXmlThinkBlocks(text, progress);
+		if (!xmlRes.emittedAny) {
+			// If there's an active thinking sequence, end it first
 			this.reportEndThinking(progress);
-			data = data.slice(endIdx + THINK_END.length);
+
+			// Only process text content if no XML think blocks were emitted
+			const res = this.processTextContent(text, progress);
+			if (res.emittedAny) {
+				this._hasEmittedAssistantText = true;
+				this._hasEmittedText = true;
+			}
 		}
 	}
 
@@ -512,27 +394,31 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 		}
 
 		switch (eventType) {
+			// Output text delta events
 			case "response.output_text.delta":
 			case "response.refusal.delta": {
+				this._hasEmittedText = false;
 				const delta = this.coerceText(event.delta);
-				if (!delta) {
-					return;
-				}
 				this.processOutputTextChunk(delta, progress);
 				return;
 			}
 
-			case "response.output_text.done":
-			case "response.refusal.done": {
+			// Output text done events
+			case "response.output_text.done": {
 				// Some gateways only emit a final "done" payload (no deltas).
-				const text = this.coerceText(event.text);
-				if (!text || this._hasEmittedAssistantText) {
+				if (this._hasEmittedText) {
+					this._hasEmittedText = false;
 					return;
 				}
+				const text = this.coerceText(event.text);
 				this.processOutputTextChunk(text, progress);
 				return;
 			}
+			case "response.refusal.done": {
+				return;
+			}
 
+			// Reasoning delta events
 			case "response.reasoning.delta":
 			case "response.reasoning_text.delta":
 			case "response.reasoning_summary.delta":
@@ -540,7 +426,13 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 			case "response.thinking.delta":
 			case "response.thinking_summary.delta":
 			case "response.thought.delta":
-			case "response.thought_summary.delta":
+			case "response.thought_summary.delta": {
+				this._hasEmittedThinking = false;
+				this.processReasoningText(event, progress);
+				return;
+			}
+
+			// Reasoning done events
 			case "response.reasoning.done":
 			case "response.reasoning_text.done":
 			case "response.reasoning_summary.done":
@@ -549,27 +441,33 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 			case "response.thinking_summary.done":
 			case "response.thought.done":
 			case "response.thought_summary.done": {
-				const candidates = [
-					this.coerceText(event.delta),
-					this.coerceText(event.text),
-					this.coerceText((event as Record<string, unknown>).reasoning),
-					this.coerceText((event as Record<string, unknown>).summary),
-				].filter(Boolean);
-
-				for (const chunk of candidates) {
-					if (this.looksLikeReasoningConfigValue(chunk)) {
-						continue;
-					}
-					this.bufferReasoningChunk(chunk, progress);
-					break;
+				if (this._hasEmittedThinking) {
+					this.reportEndThinking(progress);
+					this._hasEmittedThinking = false;
+					return;
 				}
+
+				this.processReasoningText(event, progress);
+				this.reportEndThinking(progress);
 				return;
 			}
 
+			// Tool call events
 			case "response.function_call_arguments.delta":
-			case "response.function_call_arguments.done":
-			case "response.function_call.done": {
+			case "response.function_call_arguments.done": {
 				this.reportEndThinking(progress);
+
+				// SSEProcessor-like: if first tool call appears after text, emit a whitespace
+				// to ensure any UI buffers/linkifiers are flushed without adding visible noise.
+				if (!this._emittedBeginToolCallsHint && this._hasEmittedAssistantText) {
+					progress.report(new vscode.LanguageModelTextPart(" "));
+					this._emittedBeginToolCallsHint = true;
+				}
+
+				const idx = (event.output_index as number) ?? 0;
+				if (this._completedToolCallIndices.has(idx)) {
+					return;
+				}
 
 				const callId = this.getCallIdFromEvent(event);
 				const name = typeof event.name === "string" ? event.name : "";
@@ -582,37 +480,24 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 							? event.arguments
 							: "";
 
-				if (!callId) {
-					return;
-				}
-
-				if (!this._emittedBeginToolCallsHint && this._hasEmittedAssistantText) {
-					progress.report(new vscode.LanguageModelTextPart(" "));
-					this._emittedBeginToolCallsHint = true;
-				}
-
-				const idx = this.getToolCallIndex(callId);
-				if (this._completedToolCallIndices.has(idx)) {
-					return;
-				}
-
 				const buf = this._toolCallBuffers.get(idx) ?? { args: "" };
-				buf.id = callId;
-				if (name) {
+				if (!buf.id && callId) {
+					buf.id = callId;
+				}
+				if (!buf.name && name) {
 					buf.name = name;
 				}
 
-				if (eventType === "response.function_call_arguments.delta" && chunk) {
-					buf.args += chunk;
-				} else if (chunk) {
+				if (eventType === "response.function_call_arguments.delta") {
+					if(chunk) buf.args += chunk;
+				} else {
 					// "done" events typically provide the full argument string.
 					buf.args = chunk;
 				}
 				this._toolCallBuffers.set(idx, buf);
 
 				await this.tryEmitBufferedToolCall(idx, progress);
-
-				if (eventType !== "response.function_call_arguments.delta") {
+				if (eventType === "response.function_call_arguments.done") {
 					await this.flushToolCallBuffers(progress, true);
 				}
 				return;
@@ -624,7 +509,20 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 				if (!item || item.type !== "function_call") {
 					return;
 				}
+
 				this.reportEndThinking(progress);
+
+				// SSEProcessor-like: if first tool call appears after text, emit a whitespace
+				// to ensure any UI buffers/linkifiers are flushed without adding visible noise.
+				if (!this._emittedBeginToolCallsHint && this._hasEmittedAssistantText) {
+					progress.report(new vscode.LanguageModelTextPart(" "));
+					this._emittedBeginToolCallsHint = true;
+				}
+
+				const idx = (event.output_index as number) ?? 0;
+				if (this._completedToolCallIndices.has(idx)) {
+					return;
+				}
 
 				const callId = this.getCallIdFromEvent(item);
 				const name =
@@ -644,153 +542,58 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 							? String((item.function as Record<string, unknown>).arguments)
 							: "";
 
-				if (!callId) {
-					return;
-				}
-
-				if (!this._emittedBeginToolCallsHint && this._hasEmittedAssistantText) {
-					progress.report(new vscode.LanguageModelTextPart(" "));
-					this._emittedBeginToolCallsHint = true;
-				}
-
-				const idx = this.getToolCallIndex(callId);
-				if (this._completedToolCallIndices.has(idx)) {
-					return;
-				}
-
 				const buf = this._toolCallBuffers.get(idx) ?? { args: "" };
-				buf.id = callId;
-				if (name) {
+				if (!buf.id && callId) {
+					buf.id = callId;
+				}
+				if (!buf.name && name) {
 					buf.name = name;
 				}
 				if (args) {
 					buf.args = args;
 				}
 				this._toolCallBuffers.set(idx, buf);
+
 				await this.tryEmitBufferedToolCall(idx, progress);
+				if (eventType == "response.output_item.done") {
+					await this.flushToolCallBuffers(progress, true);
+				}
 				return;
 			}
 
 			case "response.completed":
 			case "response.done": {
-				// Response complete (some gateways use `response.done`).
-				const responseObj =
-					event.response && typeof event.response === "object" ? (event.response as Record<string, unknown>) : null;
-
-				if (responseObj) {
-					const reasoning = this.extractReasoningFromResponse(responseObj);
-					if (reasoning) {
-						this.bufferReasoningChunk(reasoning, progress);
-					}
-
-					if (!this._hasEmittedAssistantText) {
-						const text = this.extractOutputText(responseObj);
-						if (text) {
-							this.processOutputTextChunk(text, progress);
-						}
-					}
-
-					const calls = this.extractToolCalls(responseObj);
-					if (calls.length > 0) {
-						this.reportEndThinking(progress);
-						if (!this._emittedBeginToolCallsHint && this._hasEmittedAssistantText) {
-							progress.report(new vscode.LanguageModelTextPart(" "));
-							this._emittedBeginToolCallsHint = true;
-						}
-					}
-
-					for (const call of calls) {
-						const idx = this.getToolCallIndex(call.callId);
-						if (this._completedToolCallIndices.has(idx)) {
-							continue;
-						}
-						const buf = this._toolCallBuffers.get(idx) ?? { args: "" };
-						buf.id = call.callId;
-						buf.name = call.name;
-						buf.args = call.args;
-						this._toolCallBuffers.set(idx, buf);
-						await this.tryEmitBufferedToolCall(idx, progress);
-					}
-				}
-
-				await this.flushToolCallBuffers(progress, true);
+				// End of message - ensure thinking is ended and flush all tool calls
+				await this.flushToolCallBuffers(progress, false);
+				this.reportEndThinking(progress);
 				return;
 			}
 		}
 	}
 
+	private processReasoningText(
+		event: Record<string, unknown>,
+		progress: vscode.Progress<vscode.LanguageModelResponsePart2>
+	) {
+		const candidates = [
+			this.coerceText(event.delta),
+			this.coerceText(event.text),
+			this.coerceText((event as Record<string, unknown>).reasoning),
+			this.coerceText((event as Record<string, unknown>).summary),
+		].filter(Boolean);
+
+		for (const chunk of candidates) {
+			if (this.looksLikeReasoningConfigValue(chunk)) {
+				continue;
+			}
+			this.bufferThinkingContent(chunk, progress);
+			break;
+		}
+	}
+
 	private getCallIdFromEvent(event: Record<string, unknown>): string {
-		const callIdRaw = event.call_id ?? event.callId ?? event.id;
+		const callIdRaw = event.call_id ?? event.callId ?? event.id ?? event.item_id;
 		return typeof callIdRaw === "string" ? callIdRaw : "";
-	}
-
-	private extractOutputText(response: Record<string, unknown>): string {
-		const outputText = response.output_text;
-		if (typeof outputText === "string" && outputText.trim()) {
-			return outputText;
-		}
-
-		const output = Array.isArray(response.output) ? response.output : [];
-		const parts: string[] = [];
-		for (const item of output) {
-			if (!item || typeof item !== "object") {
-				continue;
-			}
-			const itemObj = item as Record<string, unknown>;
-			const content = Array.isArray(itemObj.content) ? itemObj.content : [];
-			for (const c of content) {
-				if (!c || typeof c !== "object") {
-					continue;
-				}
-				const cObj = c as Record<string, unknown>;
-				if (cObj.type !== "output_text") {
-					continue;
-				}
-				if (typeof cObj.text === "string" && cObj.text) {
-					parts.push(cObj.text);
-				}
-			}
-		}
-		return parts.join("");
-	}
-
-	private extractToolCalls(response: Record<string, unknown>): Array<{ callId: string; name: string; args: string }> {
-		const output = Array.isArray(response.output) ? response.output : [];
-		const out: Array<{ callId: string; name: string; args: string }> = [];
-
-		for (const item of output) {
-			if (!item || typeof item !== "object") {
-				continue;
-			}
-			const itemObj = item as Record<string, unknown>;
-			if (itemObj.type !== "function_call") {
-				continue;
-			}
-
-			const callId = this.getCallIdFromEvent(itemObj);
-			if (!callId) {
-				continue;
-			}
-
-			const name = typeof itemObj.name === "string" ? itemObj.name : "";
-			const args = typeof itemObj.arguments === "string" ? itemObj.arguments : "";
-			if (!name || !args) {
-				continue;
-			}
-			out.push({ callId, name, args });
-		}
-
-		return out;
-	}
-
-	private _toolCallIdToIndex = new Map<string, number>();
-	private _nextToolCallIndex = 0;
-
-	private getToolCallIndex(callId: string): number {
-		if (!this._toolCallIdToIndex.has(callId)) {
-			this._toolCallIdToIndex.set(callId, this._nextToolCallIndex++);
-		}
-		return this._toolCallIdToIndex.get(callId)!;
 	}
 
 	async *createMessage(
