@@ -35,6 +35,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	private _lastRequestTime: number | null = null;
 
 	private readonly _geminiToolCallMetaByCallId = new Map<string, GeminiToolCallMeta>();
+	private readonly _openaiResponsesPreviousResponseIdUnsupportedBaseUrls = new Set<string>();
+
+	static readonly OPENAI_RESPONSES_STATEFUL_MARKER_MIME = "application/vnd.oaicopilot.stateful-marker";
 
 	/**
 	 * Create a provider using the given secret storage for the API key.
@@ -258,7 +261,29 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			} else if (apiMode === "openai-responses") {
 				// OpenAI Responses API mode
 				const openaiResponsesApi = new OpenaiResponsesApi();
-				const input = openaiResponsesApi.convertMessages(messages, modelConfig);
+				const normalizedBaseUrl = BASE_URL.replace(/\/+$/, "");
+				const statefulModelId = parsedModelId.baseId;
+
+				// Convert full history once (also extracts system `instructions`).
+				const fullInput = openaiResponsesApi.convertMessages(messages, modelConfig);
+
+				const marker = findLastOpenAIResponsesStatefulMarker(statefulModelId, messages);
+				let deltaInput: unknown[] | null = null;
+				if (marker && marker.index >= 0 && marker.index < messages.length - 1) {
+					const deltaMessages = messages.slice(marker.index + 1);
+					const converted = openaiResponsesApi.convertMessages(deltaMessages, modelConfig);
+					if (converted.length > 0) {
+						deltaInput = converted;
+					}
+				}
+
+				const canUsePreviousResponseId =
+					!!marker?.marker &&
+					!this._openaiResponsesPreviousResponseIdUnsupportedBaseUrls.has(normalizedBaseUrl) &&
+					Array.isArray(deltaInput) &&
+					deltaInput.length > 0;
+
+				const input = canUsePreviousResponseId ? deltaInput! : fullInput;
 
 				// requestBody
 				let requestBody: Record<string, unknown> = {
@@ -270,29 +295,73 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				requestBody = openaiResponsesApi.prepareRequestBody(requestBody, um, options);
 
 				// send Responses API request with retry
-				const url = `${BASE_URL.replace(/\/+$/, "")}/responses`;
-				const response = await executeWithRetry(async () => {
-					const res = await fetch(url, {
-						method: "POST",
-						headers: requestHeaders,
-						body: JSON.stringify(requestBody),
-					});
+				const url = `${normalizedBaseUrl}/responses`;
 
-					if (!res.ok) {
-						const errorText = await res.text();
-						console.error("[OAI Compatible Model Provider] Responses API error response", errorText);
-						throw new Error(
-							`Responses API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}\nURL: ${url}`
-						);
+				// If the user explicitly set `previous_response_id` via `extra`, don't apply stateful slicing.
+				let addedPreviousResponseId = false;
+				if (requestBody.previous_response_id !== undefined) {
+					requestBody.input = fullInput;
+				} else if (canUsePreviousResponseId) {
+					requestBody.previous_response_id = marker!.marker;
+					addedPreviousResponseId = true;
+				}
+
+				const sendRequest = async (body: Record<string, unknown>) =>
+					await executeWithRetry(async () => {
+						const res = await fetch(url, {
+							method: "POST",
+							headers: requestHeaders,
+							body: JSON.stringify(body),
+						});
+
+						if (!res.ok) {
+							const errorText = await res.text();
+							const error = new Error(
+								`Responses API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}\nURL: ${url}`
+							);
+							(error as { status?: number; errorText?: string }).status = res.status;
+							(error as { status?: number; errorText?: string }).errorText = errorText;
+							throw error;
+						}
+
+						return res;
+					}, retryConfig);
+
+				let response: Response;
+				try {
+					response = await sendRequest(requestBody);
+				} catch (err) {
+					// Some Responses-compatible gateways don't support `previous_response_id`.
+					// Fall back to sending full history when the previous-response attempt fails.
+					const status = (err as { status?: unknown })?.status;
+					const shouldFallback =
+						addedPreviousResponseId && typeof status === "number" && status >= 400 && status < 500 && status !== 429;
+					if (!shouldFallback) {
+						throw err;
 					}
 
-					return res;
-				}, retryConfig);
+					this._openaiResponsesPreviousResponseIdUnsupportedBaseUrls.add(normalizedBaseUrl);
+
+					let fallbackBody: Record<string, unknown> = {
+						model: parsedModelId.baseId,
+						input: fullInput,
+						stream: true,
+					};
+					fallbackBody = openaiResponsesApi.prepareRequestBody(fallbackBody, um, options);
+					delete fallbackBody.previous_response_id;
+					response = await sendRequest(fallbackBody);
+				}
 
 				if (!response.body) {
 					throw new Error("No response body from Responses API");
 				}
 				await openaiResponsesApi.processStreamingResponse(response.body, trackingProgress, token);
+
+				// Append a stateful marker so future requests can reuse `previous_response_id` (Copilot Chat style).
+				const responseId = openaiResponsesApi.responseId;
+				if (responseId) {
+					trackingProgress.report(createOpenAIResponsesStatefulMarkerPart(statefulModelId, responseId));
+				}
 			} else if (apiMode === "gemini") {
 				// Gemini native API mode
 				const geminiApi = new GeminiApi(this._geminiToolCallMetaByCallId);
@@ -452,4 +521,62 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		}
 		return apiKey;
 	}
+}
+
+type OpenAIResponsesStatefulMarkerLocation = { marker: string; index: number };
+
+function createOpenAIResponsesStatefulMarkerPart(modelId: string, marker: string): vscode.LanguageModelDataPart {
+	const payload = `${modelId}\\${marker}`;
+	const bytes = new TextEncoder().encode(payload);
+	return new vscode.LanguageModelDataPart(bytes, HuggingFaceChatModelProvider.OPENAI_RESPONSES_STATEFUL_MARKER_MIME);
+}
+
+function parseOpenAIResponsesStatefulMarkerPart(part: unknown): { modelId: string; marker: string } | null {
+	const maybe = part as { mimeType?: unknown; data?: unknown };
+	if (!maybe || typeof maybe !== "object") {
+		return null;
+	}
+	if (typeof maybe.mimeType !== "string") {
+		return null;
+	}
+	if (!(maybe.data instanceof Uint8Array)) {
+		return null;
+	}
+	if (maybe.mimeType !== HuggingFaceChatModelProvider.OPENAI_RESPONSES_STATEFUL_MARKER_MIME) {
+		return null;
+	}
+
+	try {
+		const decoded = new TextDecoder().decode(maybe.data);
+		const sep = decoded.indexOf("\\");
+		if (sep <= 0) {
+			return null;
+		}
+		const modelId = decoded.slice(0, sep).trim();
+		const marker = decoded.slice(sep + 1).trim();
+		if (!modelId || !marker) {
+			return null;
+		}
+		return { modelId, marker };
+	} catch {
+		return null;
+	}
+}
+
+function findLastOpenAIResponsesStatefulMarker(
+	modelId: string,
+	messages: readonly LanguageModelChatRequestMessage[]
+): OpenAIResponsesStatefulMarkerLocation | null {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		if (messages[i].role !== vscode.LanguageModelChatMessageRole.Assistant) {
+			continue;
+		}
+		for (const part of messages[i].content ?? []) {
+			const parsed = parseOpenAIResponsesStatefulMarkerPart(part);
+			if (parsed && parsed.modelId === modelId) {
+				return { marker: parsed.marker, index: i };
+			}
+		}
+	}
+	return null;
 }
