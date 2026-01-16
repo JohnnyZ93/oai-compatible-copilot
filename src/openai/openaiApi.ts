@@ -162,14 +162,12 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 			rb.top_p = um.top_p;
 		}
 
-		// max_tokens
-		if (um?.max_tokens !== undefined) {
-			rb.max_tokens = um.max_tokens;
-		}
-
-		// max_completion_tokens (OpenAI new standard parameter)
+		// max_tokens / max_completion_tokens (mutually exclusive)
+		// max_completion_tokens takes precedence (newer OpenAI standard for reasoning models)
 		if (um?.max_completion_tokens !== undefined) {
 			rb.max_completion_tokens = um.max_completion_tokens;
+		} else if (um?.max_tokens !== undefined) {
+			rb.max_tokens = um.max_tokens;
 		}
 
 		// OpenAI reasoning configuration
