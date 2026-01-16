@@ -685,6 +685,11 @@ function validateModelData(modelData) {
 		showModelError("Max Completion Tokens must be a positive number.");
 		return false;
 	}
+	// Prevent both max_tokens and max_completion_tokens from being set simultaneously
+	if (modelData.max_tokens !== undefined && modelData.max_completion_tokens !== undefined) {
+		showModelError("Cannot set both 'max_tokens' and 'max_completion_tokens'. Use 'max_completion_tokens' only.");
+		return false;
+	}
 	if (
 		modelData.temperature !== undefined &&
 		(isNaN(modelData.temperature) || modelData.temperature < 0 || modelData.temperature > 2)
@@ -833,7 +838,7 @@ function populateModelForm(model) {
 	modelBaseUrlInput.value = model.baseUrl || "";
 	modelFamilyInput.value = model.family || "";
 	modelContextLengthInput.value = model.context_length || "";
-	modelMaxTokensInput.value = model.max_tokens || model.max_completion_tokens || "";
+	modelMaxTokensInput.value = model.max_tokens || "";
 	modelVisionInput.value = model.vision !== undefined ? String(model.vision) : "";
 	modelApiModeInput.value = model.apiMode || "openai";
 	modelTemperatureInput.value = model.temperature !== undefined && model.temperature !== null ? model.temperature : "";
