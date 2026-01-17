@@ -67,8 +67,14 @@ export type ResponsesInputItem =
 	| ResponsesReasoning;
 
 export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<string, unknown>> {
+	private _responseId: string | null = null;
+
 	constructor() {
 		super();
+	}
+
+	get responseId(): string | null {
+		return this._responseId;
 	}
 
 	convertMessages(
@@ -283,6 +289,7 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 		progress: Progress<LanguageModelResponsePart2>,
 		token: CancellationToken
 	): Promise<void> {
+		this._responseId = null;
 		const reader = responseBody.getReader();
 		const decoder = new TextDecoder();
 		let buffer = "";
@@ -392,6 +399,8 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 		if (!eventType) {
 			return;
 		}
+
+		this.captureResponseIdFromEvent(event);
 
 		switch (eventType) {
 			case "error": {
@@ -573,6 +582,26 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 				await this.flushToolCallBuffers(progress, false);
 				this.reportEndThinking(progress);
 				return;
+			}
+		}
+	}
+
+	private captureResponseIdFromEvent(event: Record<string, unknown>): void {
+		if (this._responseId) {
+			return;
+		}
+
+		const responseId = event.response_id;
+		if (typeof responseId === "string" && responseId.trim()) {
+			this._responseId = responseId;
+			return;
+		}
+
+		const response = event.response;
+		if (response && typeof response === "object" && !Array.isArray(response)) {
+			const id = (response as Record<string, unknown>).id;
+			if (typeof id === "string" && id.trim()) {
+				this._responseId = id;
 			}
 		}
 	}
