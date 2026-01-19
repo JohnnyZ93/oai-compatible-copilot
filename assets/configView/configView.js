@@ -64,6 +64,7 @@ const saveModelBtn = document.getElementById("saveModel");
 const cancelModelBtn = document.getElementById("cancelModel");
 const toggleAdvancedSettingsBtn = document.getElementById("toggleAdvancedSettings");
 const commitModelInput = document.getElementById("commitModel");
+const commitLanguageInput = document.getElementById("commitLanguage");
 const advancedSettingsContent = document.getElementById("advancedSettingsContent");
 
 // Error message element
@@ -94,6 +95,7 @@ document.getElementById("saveBase").addEventListener("click", () => {
 		delay: parseInt(delayInput.value) || 0,
 		retry: retry,
 		commitModel: commitModelInput.value,
+		commitLanguage: commitLanguageInput.value,
 	});
 });
 
@@ -242,7 +244,7 @@ window.addEventListener("message", (event) => {
 
 	switch (message.type) {
 		case "init":
-			const { baseUrl, apiKey, delay, retry, commitModel, models, providerKeys } = message.payload;
+			const { baseUrl, apiKey, delay, retry, commitModel, models, providerKeys,commitLanguage } = message.payload;
 			state.baseUrl = baseUrl;
 			state.apiKey = apiKey;
 			state.delay = delay || 0;
@@ -268,6 +270,7 @@ window.addEventListener("message", (event) => {
 			// Populate commit model dropdown and select current commit model
 			populateCommitModelDropdown();
 			commitModelInput.value = state.commitModel || "";
+			commitLanguageInput.value = commitLanguage;
 
 			// Render provider and model management
 			renderProviders();

@@ -192,8 +192,11 @@ async function performCommitMsgGeneration(secrets: vscode.SecretStorage, gitDiff
 			throw new Error(`Invalid base URL configuration.`);
 		}
 
-		// Create a system prompt
-		const systemPrompt = PROMPT.system;
+		// Get commit language configuration
+		const commitLanguage = config.get<string>("oaicopilot.commitLanguage", "English");
+
+		// Create a system prompt with language instruction
+		const systemPrompt = PROMPT.system + ` Generate commit message in ${commitLanguage}.`;
 
 		// Create a message for the API
 		const messages = [{ role: "user", content: prompt }];

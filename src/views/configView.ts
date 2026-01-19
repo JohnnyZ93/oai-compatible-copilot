@@ -14,6 +14,7 @@ interface InitPayload {
 		status_codes?: number[];
 	};
 	commitModel: string;
+	commitLanguage: string;
 	models: HFModelItem[];
 	providerKeys: Record<string, string>;
 }
@@ -27,6 +28,7 @@ type IncomingMessage =
 			delay: number;
 			retry: { enabled?: boolean; max_attempts?: number; interval_ms?: number; status_codes?: number[] };
 			commitModel: string;
+			commitLanguage: string;
 	  }
 	| { type: "fetchModels"; baseUrl: string; apiKey: string }
 	| { type: "addProvider"; provider: string; baseUrl?: string; apiKey?: string; apiMode?: string }
@@ -123,7 +125,7 @@ export class ConfigViewPanel {
 				await this.sendInit();
 				break;
 			case "saveGlobalConfig":
-				await this.saveGlobalConfig(message.baseUrl, message.apiKey, message.delay, message.retry, message.commitModel);
+				await this.saveGlobalConfig(message.baseUrl, message.apiKey, message.delay, message.retry, message.commitModel, message.commitLanguage);
 				break;
 			case "fetchModels": {
 				const { models } = await fetchModels(message.baseUrl, message.apiKey);
@@ -215,7 +217,8 @@ export class ConfigViewPanel {
 
 		const foundModel = models.find((model) => model.useForCommitGeneration === true);
 		const commitModel = foundModel ? `${foundModel.id}${foundModel.configId ? "::" + foundModel.configId : ""}` : "";
-		const payload: InitPayload = { baseUrl, apiKey, delay, retry, commitModel, models, providerKeys };
+		const commitLanguage = config.get<string>("oaicopilot.commitLanguage", "English");
+		const payload: InitPayload = { baseUrl, apiKey, delay, retry, commitModel, commitLanguage, models, providerKeys };
 		this.panel.webview.postMessage({ type: "init", payload });
 	}
 
@@ -224,7 +227,8 @@ export class ConfigViewPanel {
 		rawApiKey: string,
 		delay: number,
 		retry: { enabled?: boolean; max_attempts?: number; interval_ms?: number; status_codes?: number[] },
-		commitModel: string
+		commitModel: string,
+		commitLanguage: string
 	) {
 		const baseUrl = rawBaseUrl.trim();
 		const apiKey = rawApiKey.trim();
@@ -232,6 +236,7 @@ export class ConfigViewPanel {
 		await config.update("oaicopilot.baseUrl", baseUrl, vscode.ConfigurationTarget.Global);
 		await config.update("oaicopilot.delay", delay, vscode.ConfigurationTarget.Global);
 		await config.update("oaicopilot.retry", retry, vscode.ConfigurationTarget.Global);
+		await config.update("oaicopilot.commitLanguage", commitLanguage, vscode.ConfigurationTarget.Global);
 		if (apiKey) {
 			await this.secrets.store("oaicopilot.apiKey", apiKey);
 		} else {
@@ -246,7 +251,7 @@ export class ConfigViewPanel {
 				if (fullModelId === commitModel) {
 					return { ...model, useForCommitGeneration: true };
 				} else {
-					const { useForCommitGeneration, ...rest } = model;
+					const { useForCommitGeneration: _useForCommitGeneration, ...rest } = model;
 					return rest;
 				}
 			});

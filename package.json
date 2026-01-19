@@ -387,6 +387,27 @@
 					"default": 0,
 					"minimum": 0,
 					"description": "Fixed delay in milliseconds between consecutive requests. Default is 0 (no delay)."
+				},
+				"oaicopilot.commitLanguage": {
+					"type": "string",
+					"default": "English",
+					"enum": [
+						"English",
+						"French",
+						"Italian",
+						"German",
+						"Spanish",
+						"Russian",
+						"Chinese (Simplified)",
+						"Chinese (Traditional)",
+						"Japanese",
+						"Korean",
+						"Czech",
+						"Portuguese (Brazil)",
+						"Turkish",
+						"Polish"
+					],
+					"description": "Language for generated Git commit messages. Default is English."
 				}
 			}
 		}
