@@ -187,6 +187,7 @@ modelProviderInput.addEventListener("change", () => {
 			type: "fetchModels",
 			baseUrl: state.providerInfo[selectedProvider].baseUrl || state.baseUrl,
 			apiKey: state.providerKeys[selectedProvider] || state.apiKey,
+			apiMode: state.providerInfo[selectedProvider].apiMode || modelApiModeInput.value || "openai",
 		});
 	}
 });
@@ -828,11 +829,17 @@ function populateModelForm(model) {
 		modelProviderInput.appendChild(newOption);
 	}
 
+	const providerInfo = state.providerInfo[currentProvider];
+	const fetchBaseUrl = model.baseUrl || state.baseUrl;
+	const fetchApiKey = state.providerKeys[currentProvider] || state.apiKey;
+	const fetchApiMode = providerInfo?.apiMode || model.apiMode || modelApiModeInput.value || "openai";
+
 	// Request to fetch remote models for the selected provider
 	vscode.postMessage({
 		type: "fetchModels",
-		baseUrl: state.providerInfo[currentProvider].baseUrl || state.baseUrl,
-		apiKey: state.providerKeys[currentProvider] || state.apiKey,
+		baseUrl: fetchBaseUrl,
+		apiKey: fetchApiKey,
+		apiMode: fetchApiMode,
 	});
 
 	modelProviderInput.value = currentProvider;

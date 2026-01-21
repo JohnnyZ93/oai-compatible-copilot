@@ -1,9 +1,10 @@
 import * as vscode from "vscode";
 import { CancellationToken, LanguageModelChatInformation } from "vscode";
 
-import type { HFModelItem, HFModelsResponse } from "./types";
+import type { HFApiMode, HFModelItem, HFModelsResponse } from "./types";
 import { normalizeUserModels } from "./utils";
 import { VersionManager } from "./versionManager";
+import { fetchGeminiModels } from "./gemini/geminiApi";
 
 const DEFAULT_CONTEXT_LENGTH = 128000;
 const DEFAULT_MAX_TOKENS = 4096;
@@ -131,7 +132,17 @@ export async function prepareLanguageModelChatInformation(
 /**
  * Fetch the list of models and supplementary metadata from Provider.
  */
-export async function fetchModels(baseUrl: string, apiKey: string): Promise<{ models: HFModelItem[] }> {
+export async function fetchModels(
+	baseUrl: string,
+	apiKey: string,
+	apiMode?: HFApiMode | string
+): Promise<{ models: HFModelItem[] }> {
+	const normalizedApiMode = apiMode ?? "openai";
+	if (normalizedApiMode === "gemini") {
+		const models = await fetchGeminiModels(baseUrl, apiKey);
+		return { models };
+	}
+
 	const modelsList = (async () => {
 		const resp = await fetch(`${baseUrl.replace(/\/+$/, "")}/models`, {
 			method: "GET",
