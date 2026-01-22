@@ -5,6 +5,7 @@ import type { HFApiMode, HFModelItem, HFModelsResponse } from "./types";
 import { normalizeUserModels } from "./utils";
 import { VersionManager } from "./versionManager";
 import { fetchGeminiModels } from "./gemini/geminiApi";
+import { fetchOllamaModels } from "./ollama/ollamaApi";
 
 const DEFAULT_CONTEXT_LENGTH = 128000;
 const DEFAULT_MAX_TOKENS = 4096;
@@ -140,6 +141,9 @@ export async function fetchModels(
 	const normalizedApiMode = apiMode ?? "openai";
 	if (normalizedApiMode === "gemini") {
 		const models = await fetchGeminiModels(baseUrl, apiKey);
+		return { models };
+	} else if (normalizedApiMode === "ollama") {
+		const models = await fetchOllamaModels(baseUrl, apiKey);
 		return { models };
 	}
 

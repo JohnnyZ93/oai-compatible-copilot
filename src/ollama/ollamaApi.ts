@@ -260,3 +260,47 @@ export class OllamaApi extends CommonApi<OllamaMessage, OllamaRequestBody> {
 		throw new Error("Method not implemented.");
 	}
 }
+
+/**
+ * Fetch available models from Ollama API endpoint.
+ * Uses /api/tags endpoint to list local models.
+ * @param baseUrl The Ollama API base URL.
+ * @param _apiKey Ollama doesn't require authentication (ignored).
+ * @returns A promise that resolves to an array of model items.
+ */
+export async function fetchOllamaModels(baseUrl: string, _apiKey: string): Promise<HFModelItem[]> {
+	const trimmed = baseUrl.replace(/\/+$/, "");
+	const url = `${trimmed}/api/tags`;
+
+	const resp = await fetch(url, {
+		method: "GET",
+		headers: { Accept: "application/json" },
+	});
+
+	if (!resp.ok) {
+		let errorText = "";
+		try {
+			errorText = await resp.text();
+		} catch (error) {
+			console.error("[OAI Compatible Model Provider] Failed to read response text", error);
+		}
+		throw new Error(
+			`Ollama API error: [${resp.status}] ${resp.statusText}${errorText ? `\n${errorText}` : ""}\nURL: ${url}`
+		);
+	}
+
+	const parsed = (await resp.json()) as import("./ollamaTypes").OllamaTagsResponse;
+	const entries = parsed.models ?? [];
+
+	const models: HFModelItem[] = [];
+	for (const entry of entries) {
+		models.push({
+			id: entry.model,
+			displayName: entry.name,
+			owned_by: "ollama",
+			apiMode: "ollama",
+		} as HFModelItem);
+	}
+
+	return models;
+}

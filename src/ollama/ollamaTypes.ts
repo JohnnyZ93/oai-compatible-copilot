@@ -67,3 +67,27 @@ export interface OllamaStreamChunk {
 	done: boolean;
 	done_reason?: string;
 }
+
+/**
+ * Ollama /api/tags response format
+ * @see https://github.com/ollama/ollama/blob/main/docs/api.md#list-local-models
+ */
+export interface OllamaTagModel {
+	name: string;
+	model: string;
+	modified_at: string;
+	size: number;
+	digest: string;
+	details?: {
+		parent_model: string;
+		format: string;
+		family: string;
+		families: string[];
+		parameter_size: string;
+		quantization_level: string;
+	};
+}
+
+export interface OllamaTagsResponse {
+	models: OllamaTagModel[];
+}
