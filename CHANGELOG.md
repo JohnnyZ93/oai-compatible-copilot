@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.2.6 (2026-01-23)
+
+- Feat(ollama): Add Ollama model fetching support via `/api/tags` endpoint.
+- Feat(gemini): Add apiMode-aware model discovery with Gemini support via `fetchGeminiModels()`.
+
+Thanks to:
+  - @matchs for contributing the [PR #127](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/127).
+
 ## 0.2.5 (2026-01-19)
 
 - Fix: Prevent simultaneous `max_tokens` and `max_completion_tokens` configuration to avoid API conflicts.
@@ -7,8 +15,8 @@
 - Feat: Add `oaicopilot.commitLanguage` configuration for commit messages. Users can now select from 14 supported languages via the settings interface.
 
 Thanks to:
- - @matchs for contributing the [PR #118](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/118).
- - @Andy963 for contributing the [PR #119](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/119).
+  - @matchs for contributing the [PR #118](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/118).
+  - @Andy963 for contributing the [PR #119](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/119).
 
 ## 0.2.4 (2026-01-15)
 

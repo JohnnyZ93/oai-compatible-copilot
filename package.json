@@ -20,7 +20,7 @@
 		"type": "git",
 		"url": "https://github.com/JohnnyZ93/oai-compatible-copilot"
 	},
-	"version": "0.2.5",
+	"version": "0.2.6",
 	"engines": {
 		"vscode": "^1.104.0"
 	},
