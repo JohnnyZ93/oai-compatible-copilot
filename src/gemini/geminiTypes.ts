@@ -80,3 +80,15 @@ export interface GeminiGenerateContentResponse {
 	usageMetadata?: unknown;
 	[key: string]: unknown;
 }
+
+export interface GeminiModelListResponse {
+	models?: GeminiModelEntry[];
+	nextPageToken?: string;
+}
+
+export interface GeminiModelEntry {
+	name?: string;
+	displayName?: string;
+	inputTokenLimit?: number;
+	outputTokenLimit?: number;
+}

@@ -30,7 +30,7 @@ type IncomingMessage =
 			commitModel: string;
 			commitLanguage: string;
 	  }
-	| { type: "fetchModels"; baseUrl: string; apiKey: string }
+	| { type: "fetchModels"; baseUrl: string; apiKey: string; apiMode?: HFApiMode | string }
 	| { type: "addProvider"; provider: string; baseUrl?: string; apiKey?: string; apiMode?: string }
 	| { type: "updateProvider"; provider: string; baseUrl?: string; apiKey?: string; apiMode?: string }
 	| { type: "deleteProvider"; provider: string }
@@ -128,7 +128,7 @@ export class ConfigViewPanel {
 				await this.saveGlobalConfig(message.baseUrl, message.apiKey, message.delay, message.retry, message.commitModel, message.commitLanguage);
 				break;
 			case "fetchModels": {
-				const { models } = await fetchModels(message.baseUrl, message.apiKey);
+				const { models } = await fetchModels(message.baseUrl, message.apiKey, message.apiMode);
 				this.panel.webview.postMessage({ type: "modelsFetched", models });
 				break;
 			}
