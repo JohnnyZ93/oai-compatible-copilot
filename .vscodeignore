@@ -13,3 +13,4 @@ vsc-extension-quickstart.md
 .prettierignore
 .vscode-test.mjs
 eslint.config.mjs
+AGENTS.md
