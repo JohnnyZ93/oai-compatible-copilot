@@ -408,6 +408,13 @@
 						"Polish"
 					],
 					"description": "Language for generated Git commit messages. Default is English."
+				},
+				"oaicopilot.readFileLines": {
+					"type": "number",
+					"default": 0,
+					"minimum": 0,
+					"maximum": 10000,
+					"description": "Number of lines to read when using `read_file` tool. Large lines may cost more tokens. Default is 0, let model decide lines."
 				}
 			}
 		}

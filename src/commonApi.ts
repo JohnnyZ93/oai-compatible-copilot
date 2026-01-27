@@ -125,7 +125,8 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 			return;
 		}
 		const id = buf.id ?? `call_${Math.random().toString(36).slice(2, 10)}`;
-		const parameters = canParse.value;
+		let parameters = canParse.value;
+		parameters = this.adjustReadFileParameters(buf.name, parameters);
 		progress.report(new LanguageModelToolCallPart(id, buf.name, parameters));
 		this._toolCallBuffers.delete(index);
 		this._completedToolCallIndices.add(index);
@@ -158,10 +159,36 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 			}
 			const id = buf.id ?? `call_${Math.random().toString(36).slice(2, 10)}`;
 			const name = buf.name ?? "unknown_tool";
-			progress.report(new LanguageModelToolCallPart(id, name, parsed.value));
+			let parameters = parsed.value;
+			parameters = this.adjustReadFileParameters(name, parameters);
+			progress.report(new LanguageModelToolCallPart(id, name, parameters));
 			this._toolCallBuffers.delete(idx);
 			this._completedToolCallIndices.add(idx);
 		}
+	}
+
+	/**
+	 * Adjust read_file tool parameters to default to reading configurable number of lines.
+	 * @param toolName The name of the tool being called.
+	 * @param parameters The tool parameters.
+	 * @returns Adjusted parameters.
+	 */
+	protected adjustReadFileParameters(toolName: string, parameters: Record<string, unknown>): Record<string, unknown> {
+		if (toolName !== "read_file") {
+			return parameters;
+		}
+		const config = vscode.workspace.getConfiguration();
+		const defaultLines = config.get<number>("oaicopilot.readFileLines", 0);
+		if (defaultLines <= 0) {
+			return parameters;
+		}
+
+		const startLine = typeof parameters.startLine === "number" ? parameters.startLine : 1;
+		const endLine = typeof parameters.endLine === "number" ? parameters.endLine : startLine;
+		if (endLine < startLine + defaultLines) {
+			return { ...parameters, endLine: startLine + defaultLines };
+		}
+		return parameters;
 	}
 
 	/**

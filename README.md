@@ -422,7 +422,11 @@ All parameters support individual configuration for different models, providing 
 - `max_tokens`: Maximum number of tokens to generate (range: [1, context_length]). Default value is 4096
 - `max_completion_tokens`: Maximum number of tokens to generate (OpenAI new standard parameter)
 - `vision`: Whether the model supports vision capabilities. Defaults to false
-- `temperature`: Sampling temperature (range: [0, 2]). Lower values make the output more deterministic, higher values more creative. Default value is 0
+- `temperature`: Sampling temperature (range: [0, 2]). Controls the randomness of the model's output:
+  - **Lower values (0.0-0.3)**: More focused, consistent, and deterministic. Ideal for precise code generation, debugging, and tasks requiring accuracy.
+  - **Moderate values (0.4-0.7)**: Balanced creativity and structure. Good for architecture design and brainstorming.
+  - **Higher values (0.7-2.0)**: More creative and varied responses. Suitable for open-ended questions and explanations.
+  - **Best Practice**: Set to `0` to align with GitHub Copilot's default deterministic behavior for consistent code suggestions. Thinking-enabled models suggest `1.0` to ensures optimal performance of the thinking mechanism.
 - `top_p`: Top-p sampling value (range: (0, 1]). Optional parameter
 - `top_k`: Top-k sampling value (range: [1, ∞)). Optional parameter
 - `min_p`: Minimum probability threshold (range: [0, 1]). Optional parameter
