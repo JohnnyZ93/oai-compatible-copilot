@@ -108,6 +108,15 @@ const handleRefresh = () => {
 	vscode.postMessage({ type: "requestInit" });
 };
 
+// Export and Import buttons event listeners
+document.getElementById("exportConfig").addEventListener("click", () => {
+	vscode.postMessage({ type: "exportConfig" });
+});
+
+document.getElementById("importConfig").addEventListener("click", () => {
+	vscode.postMessage({ type: "importConfig" });
+});
+
 // Refresh buttons event listeners
 document.getElementById("refreshGlobalConfig").addEventListener("click", handleRefresh);
 document.getElementById("refreshProviders").addEventListener("click", handleRefresh);
@@ -245,7 +254,7 @@ window.addEventListener("message", (event) => {
 
 	switch (message.type) {
 		case "init":
-			const { baseUrl, apiKey, delay, retry, commitModel, models, providerKeys,commitLanguage } = message.payload;
+			const { baseUrl, apiKey, delay, retry, commitModel, models, providerKeys, commitLanguage } = message.payload;
 			state.baseUrl = baseUrl;
 			state.apiKey = apiKey;
 			state.delay = delay || 0;

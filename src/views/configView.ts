@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import type { HFApiMode, HFModelItem } from "../types";
 import { normalizeUserModels, parseModelId } from "../utils";
 import { fetchModels } from "../provideModel";
+import { VersionManager } from "../versionManager";
 
 interface InitPayload {
 	baseUrl: string;
@@ -15,6 +16,24 @@ interface InitPayload {
 	};
 	commitModel: string;
 	commitLanguage: string;
+	models: HFModelItem[];
+	providerKeys: Record<string, string>;
+}
+
+interface ExportConfig {
+	version: string;
+	exportDate: string;
+	baseUrl: string;
+	apiKey: string;
+	delay: number;
+	retry: {
+		enabled?: boolean;
+		max_attempts?: number;
+		interval_ms?: number;
+		status_codes?: number[];
+	};
+	commitLanguage: string;
+	commitModel: string;
 	models: HFModelItem[];
 	providerKeys: Record<string, string>;
 }
@@ -37,7 +56,9 @@ type IncomingMessage =
 	| { type: "addModel"; model: HFModelItem }
 	| { type: "updateModel"; model: HFModelItem; originalModelId?: string; originalConfigId?: string }
 	| { type: "deleteModel"; modelId: string }
-	| { type: "requestConfirm"; id: string; message: string; action: string };
+	| { type: "requestConfirm"; id: string; message: string; action: string }
+	| { type: "exportConfig" }
+	| { type: "importConfig" };
 
 type OutgoingMessage =
 	| { type: "init"; payload: InitPayload }
@@ -125,7 +146,14 @@ export class ConfigViewPanel {
 				await this.sendInit();
 				break;
 			case "saveGlobalConfig":
-				await this.saveGlobalConfig(message.baseUrl, message.apiKey, message.delay, message.retry, message.commitModel, message.commitLanguage);
+				await this.saveGlobalConfig(
+					message.baseUrl,
+					message.apiKey,
+					message.delay,
+					message.retry,
+					message.commitModel,
+					message.commitLanguage
+				);
 				break;
 			case "fetchModels": {
 				const { models } = await fetchModels(message.baseUrl, message.apiKey, message.apiMode);
@@ -152,6 +180,12 @@ export class ConfigViewPanel {
 				break;
 			case "deleteModel":
 				await this.deleteModel(message.modelId);
+				break;
+			case "exportConfig":
+				await this.exportConfig();
+				break;
+			case "importConfig":
+				await this.importConfig();
 				break;
 			default:
 				break;
@@ -462,5 +496,131 @@ export class ConfigViewPanel {
 		vscode.window.showInformationMessage(`Model ${modelId} has been deleted.`);
 		// Send refresh signal to frontend
 		await this.sendInit();
+	}
+	
+	private async exportConfig() {
+		try {
+			const config = vscode.workspace.getConfiguration();
+			const baseUrl = config.get<string>("oaicopilot.baseUrl", "https://api.openai.com/v1");
+			const apiKey = (await this.secrets.get("oaicopilot.apiKey")) ?? "";
+			const delay = config.get<number>("oaicopilot.delay", 0);
+			const retry = config.get<{
+				enabled?: boolean;
+				max_attempts?: number;
+				interval_ms?: number;
+				status_codes?: number[];
+			}>("oaicopilot.retry", {
+				enabled: true,
+				max_attempts: 3,
+				interval_ms: 1000,
+			});
+			const commitLanguage = config.get<string>("oaicopilot.commitLanguage", "English");
+			const models = normalizeUserModels(config.get<unknown>("oaicopilot.models", []));
+
+			const foundModel = models.find((model) => model.useForCommitGeneration === true);
+			const commitModel = foundModel ? `${foundModel.id}${foundModel.configId ? "::" + foundModel.configId : ""}` : "";
+
+			const providerKeys: Record<string, string> = {};
+			const providers = Array.from(new Set(models.map((m) => m.owned_by).filter(Boolean)));
+			for (const provider of providers) {
+				const normalized = provider.toLowerCase();
+				const key = await this.secrets.get(`oaicopilot.apiKey.${normalized}`);
+				if (key) {
+					providerKeys[provider] = key;
+				}
+			}
+
+			const exportData: ExportConfig = {
+				version: VersionManager.getVersion(),
+				exportDate: new Date().toISOString(),
+				baseUrl,
+				apiKey,
+				delay,
+				retry,
+				commitLanguage,
+				commitModel,
+				models,
+				providerKeys,
+			};
+
+			const uri = await vscode.window.showSaveDialog({
+				defaultUri: vscode.Uri.file(`oaicopilot-config-${new Date().toISOString().split("T")[0]}.json`),
+				filters: { "JSON Files": ["json"] },
+				title: "Export OAICopilot Configuration",
+			});
+
+			if (!uri) {
+				vscode.window.showInformationMessage("Export configuration cancelled.");
+				return;
+			}
+
+			const encoder = new TextEncoder();
+			await vscode.workspace.fs.writeFile(uri, encoder.encode(JSON.stringify(exportData, null, 2)));
+
+			vscode.window.showInformationMessage(`Configuration exported to ${uri.fsPath}`);
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : "Unknown error";
+			vscode.window.showErrorMessage(`Failed to export configuration: ${errorMessage}`);
+		}
+	}
+
+	private async importConfig() {
+		try {
+			const uri = await vscode.window.showOpenDialog({
+				canSelectFiles: true,
+				canSelectFolders: false,
+				canSelectMany: false,
+				filters: { "JSON Files": ["json"] },
+				title: "Import OAICopilot Configuration",
+			});
+
+			if (!uri || uri.length === 0) {
+				vscode.window.showInformationMessage("Import configuration cancelled.");
+				return;
+			}
+
+			const content = await vscode.workspace.fs.readFile(uri[0]);
+			const decoder = new TextDecoder();
+			const jsonContent = decoder.decode(content);
+			const importData = JSON.parse(jsonContent) as ExportConfig;
+
+			if (!importData.version || !importData.exportDate) {
+				throw new Error("Invalid configuration file: missing version or exportDate");
+			}
+
+			if (!Array.isArray(importData.models)) {
+				throw new Error("Invalid configuration file: models must be an array");
+			}
+
+			const config = vscode.workspace.getConfiguration();
+
+			await config.update("oaicopilot.baseUrl", importData.baseUrl, vscode.ConfigurationTarget.Global);
+			await config.update("oaicopilot.delay", importData.delay, vscode.ConfigurationTarget.Global);
+			await config.update("oaicopilot.retry", importData.retry, vscode.ConfigurationTarget.Global);
+			await config.update("oaicopilot.commitLanguage", importData.commitLanguage, vscode.ConfigurationTarget.Global);
+
+			if (importData.apiKey) {
+				await this.secrets.store("oaicopilot.apiKey", importData.apiKey);
+			} else {
+				await this.secrets.delete("oaicopilot.apiKey");
+			}
+
+			await config.update("oaicopilot.models", importData.models, vscode.ConfigurationTarget.Global);
+
+			for (const [provider, key] of Object.entries(importData.providerKeys)) {
+				const normalized = provider.toLowerCase();
+				if (key) {
+					await this.secrets.store(`oaicopilot.apiKey.${normalized}`, key);
+				} else {
+					await this.secrets.delete(`oaicopilot.apiKey.${normalized}`);
+				}
+			}
+
+			vscode.window.showInformationMessage("Configuration imported successfully.");
+			await this.sendInit();
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : "Unknown error";
+			vscode.window.showErrorMessage(`Failed to import configuration: ${errorMessage}`);
+		}
 	}
 }
