@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.2.7 (2026-01-27)
+
+- Feat: Add configurable `read_file` tool line limit with new `oaicopilot.readFileLines` setting.
+- Doc: Enhance temperature parameter documentation with detailed usage guidelines
+
 ## 0.2.6 (2026-01-23)
 
 - Feat(ollama): Add Ollama model fetching support via `/api/tags` endpoint.
