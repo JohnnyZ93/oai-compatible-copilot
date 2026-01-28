@@ -10,17 +10,22 @@
 		"copilot",
 		"github-copilot",
 		"language-model",
+		"llm",
 		"openai",
 		"ollama",
 		"anthropic",
 		"claude",
-		"gemini"
+		"gemini",
+		"openai-compatible",
+		"openai-responses",
+		"git-commit",
+		"thinking"
 	],
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/JohnnyZ93/oai-compatible-copilot"
 	},
-	"version": "0.2.9",
+	"version": "0.3.0",
 	"engines": {
 		"vscode": "^1.104.0"
 	},

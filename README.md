@@ -3,21 +3,22 @@
 [![CI](https://github.com/JohnnyZ93/oai-compatible-copilot/actions/workflows/release.yml/badge.svg)](https://github.com/JohnnyZ93/oai-compatible-copilot/actions)
 [![License](https://img.shields.io/github/license/JohnnyZ93/oai-compatible-copilot?color=orange&label=License)](https://github.com/JohnnyZ93/oai-compatible-copilot/blob/main/LICENSE)
 
-Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.2, GLM 4.6 and more in VS Code with GitHub Copilot Chat powered by any OpenAI-compatible provider 🔥
+Use frontier open LLMs like GPT 5.2, Gemini 3, Kimi K2.5, DeepSeek V3.2, GLM 4.7, Minimax 2.1, Qwen3 Coder and more in VS Code with GitHub Copilot Chat powered by any OpenAI-compatible provider 🔥
 
 ‼️ **Important**: This extension is not currently available to Copilot Business or Copilot Enterprise users. [FYI](https://code.visualstudio.com/docs/copilot/customization/language-models#_bring-your-own-language-model-key)
 
 ## ✨ Features
-- Supports OpenAI/Ollama/Anthropic/Gemini API providers, such as ModelScope, SiliconFlow, DeepSeek...
-- Supports vision models.
-- Offers additional configuration options for chat requests.
-- Supports control model thinking and reasoning content show in chat interface.
-- Supports configuring models from multiple providers simultaneously, automatically managing API keys without switch them repeatedly.
-- Supports defining multiple configurations for the same model ID with different settings (e.g. thinking enable/disable for GLM-4.6).
-- Supports auto retry mechanism for handling api errors like [429, 500, 502, 503, 504].
-- Supports token usage count and set provider api keys in status bar.
-- Supports provider and model visual configuration ui.
-- Supports generate git commit message on source control.
+- **Multi-API support**: OpenAI/Ollama/Anthropic/Gemini APIs (ModelScope, SiliconFlow, DeepSeek...)
+- **Vision models**: Full support for image understanding capabilities
+- **Advanced configuration**: Flexible chat request options with thinking/reasoning control
+- **Multi-provider management**: Configure models from multiple providers simultaneously with automatic API key management
+- **Multi-config per model**: Define different settings for the same model (e.g., GLM-4.6 with/without thinking)
+- **Visual configuration UI**: Intuitive interface for managing providers and models
+- **Auto-retry**: Handles API errors (429, 500, 502, 503, 504) with exponential backoff
+- **Token usage**: Real-time token counting and provider API key management from status bar
+- **Git integration**: Generate commit messages directly from source control
+- **Import/export**: Easily share and backup configurations
+- **Tools optimization**: Optimize agent `read_file` tool handling, avoid to read small chunks for large file.
 
 ## Requirements
 - VS Code 1.104.0 or higher.
@@ -26,7 +27,7 @@ Use frontier open LLMs like Qwen3 Coder, Kimi K2, DeepSeek V3.2, GLM 4.6 and mor
 ## ⚡ Quick Start
 1. Install the OAI Compatible Provider for Copilot extension [here](https://marketplace.visualstudio.com/items?itemName=johnny-zhao.oai-compatible-copilot).
 2. Open VS Code Settings and configure `oaicopilot.baseUrl` and `oaicopilot.models`.
-3. Open Github Copilot Chat interface.
+3. Open GitHub Copilot Chat interface.
 4. Click the model picker and select "Manage Models...".
 5. Choose "OAI Compatible" provider.
 6. Enter your API key — it will be saved locally.
@@ -94,7 +95,7 @@ There are two ways to open the configuration interface:
 
 ### Tips & Best Practices
 
-- **Important**: If use configuration ui, then the global baseURL, APIKey is invalid.
+- **Important**: If you use the configuration UI, the global baseURL and API key become invalid.
 - **Provider IDs**: Use descriptive names that match the service (e.g., "modelscope", "iflow", "anthropic")
 - **Model IDs**: Use the exact model identifier from the provider's documentation
 - **Config IDs**: Use meaningful names like "thinking", "no-thinking", "fast", "accurate" for multiple configurations
@@ -117,7 +118,7 @@ Below are the model family settings supported by Copilot:
 
 </details>
 
-## ✨ Multi Api Mode
+## ✨ Multi-API Mode
 
 The extension supports five different API protocols to work with various model providers. You can specify which API mode to use for each model via the `apiMode` parameter.
 
@@ -184,11 +185,11 @@ Mixed configuration with multiple API modes:
 
 ## ✨ Multi-Provider Guide
 
-> `owned_by` (alias: `provider` / `provide`) in model config is used for grouping provider-specific apiKey. The storage key is `oaicopilot.apiKey.<providerIdLowercase>`.
+> `owned_by` (alias: `provider` / `provide`) in model config is used for grouping provider-specific API keys. The storage key is `oaicopilot.apiKey.<providerIdLowercase>`.
 
 1. Open VS Code Settings and configure `oaicopilot.models`.
-2. Open command center ( Ctrl + Shift + P ), and search "OAICopilot: Set OAI Compatible Multi-Provider Apikey" to configure provider-specific API keys.
-3. Open Github Copilot Chat interface.
+2. Open command center ( Ctrl+Shift+P ), and search "OAICopilot: Set OAI Compatible Multi-Provider API Key" to configure provider-specific API keys.
+3. Open GitHub Copilot Chat interface.
 4. Click the model picker and select "Manage Models...".
 5. Choose "OAI Compatible" provider.
 6. Select the models you want to add to the model picker.
@@ -426,7 +427,7 @@ All parameters support individual configuration for different models, providing 
   - **Lower values (0.0-0.3)**: More focused, consistent, and deterministic. Ideal for precise code generation, debugging, and tasks requiring accuracy.
   - **Moderate values (0.4-0.7)**: Balanced creativity and structure. Good for architecture design and brainstorming.
   - **Higher values (0.7-2.0)**: More creative and varied responses. Suitable for open-ended questions and explanations.
-  - **Best Practice**: Set to `0` to align with GitHub Copilot's default deterministic behavior for consistent code suggestions. Thinking-enabled models suggest `1.0` to ensures optimal performance of the thinking mechanism.
+  - **Best Practice**: Set to `0` to align with GitHub Copilot's default deterministic behavior for consistent code suggestions. Thinking-enabled models suggest `1.0` to ensure optimal performance of the thinking mechanism.
 - `top_p`: Top-p sampling value (range: (0, 1]). Optional parameter
 - `top_k`: Top-k sampling value (range: [1, ∞)). Optional parameter
 - `min_p`: Minimum probability threshold (range: [0, 1]). Optional parameter
@@ -445,7 +446,7 @@ All parameters support individual configuration for different models, providing 
 - `reasoning_effort`: Reasoning effort level (OpenAI reasoning configuration)
 - `headers`: Custom HTTP headers to be sent with every request to this model's provider (e.g., `{"X-API-Version": "v1", "X-Custom-Header": "value"}`). These headers will be merged with the default headers (Authorization, Content-Type, User-Agent)
 - `extra`: Extra request body parameters.
-- `include_reasoning_in_request`: Whether to include reasoning_content in assistant messages sent to the API. Support deepseek-v3.2 or others.
+- `include_reasoning_in_request`: Whether to include reasoning_content in assistant messages sent to the API. Supports deepseek-v3.2 and similar models.
 - `apiMode`: API mode: 'openai' (Default) for API (/chat/completions), 'openai-responses' for API (/responses), 'ollama' for API (/api/chat), 'anthropic' for API (/v1/messages), 'gemini' for API (/v1beta/models/{model}:streamGenerateContent?alt=sse).
 - `delay`: Model-specific delay in milliseconds between consecutive requests. If not specified, falls back to global `oaicopilot.delay` configuration.
 - `useForCommitGeneration`: Whether to be used for Git commit message generation. Only supports openai and anthropic apiMode.
