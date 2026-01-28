@@ -266,15 +266,22 @@ export class OllamaApi extends CommonApi<OllamaMessage, OllamaRequestBody> {
  * Uses /api/tags endpoint to list local models.
  * @param baseUrl The Ollama API base URL.
  * @param _apiKey Ollama doesn't require authentication (ignored).
+ * @param customHeaders Optional custom headers to merge with defaults.
  * @returns A promise that resolves to an array of model items.
  */
-export async function fetchOllamaModels(baseUrl: string, _apiKey: string): Promise<HFModelItem[]> {
+export async function fetchOllamaModels(
+	baseUrl: string,
+	_apiKey: string,
+	customHeaders?: Record<string, string>
+): Promise<HFModelItem[]> {
 	const trimmed = baseUrl.replace(/\/+$/, "");
 	const url = `${trimmed}/api/tags`;
 
+	const baseHeaders: Record<string, string> = { Accept: "application/json" };
+	const headers = customHeaders ? { ...baseHeaders, ...customHeaders } : baseHeaders;
 	const resp = await fetch(url, {
 		method: "GET",
-		headers: { Accept: "application/json" },
+		headers,
 	});
 
 	if (!resp.ok) {
