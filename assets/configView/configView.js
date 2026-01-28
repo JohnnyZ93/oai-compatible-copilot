@@ -193,12 +193,17 @@ modelProviderInput.addEventListener("change", () => {
 		modelBaseUrlInput.value = state.providerInfo[selectedProvider].baseUrl;
 		modelApiModeInput.value = state.providerInfo[selectedProvider].apiMode;
 
+		// Find headers from any model belonging to this provider
+		const providerModel = state.models.find((m) => m.owned_by === selectedProvider && m.headers);
+		const headers = providerModel?.headers || undefined;
+
 		// Request to fetch remote models for the selected provider
 		vscode.postMessage({
 			type: "fetchModels",
 			baseUrl: state.providerInfo[selectedProvider].baseUrl || state.baseUrl,
 			apiKey: state.providerKeys[selectedProvider] || state.apiKey,
 			apiMode: state.providerInfo[selectedProvider].apiMode || modelApiModeInput.value || "openai",
+			headers,
 		});
 	}
 });
@@ -293,6 +298,12 @@ window.addEventListener("message", (event) => {
 		case "modelsFetched":
 			// Handle the response from fetchModels
 			populateModelIdDropdown(message.models);
+			break;
+		case "modelsFetchError":
+			// Handle error from fetchModels
+			dropdownHeader.textContent = "Error fetching models";
+			dropdownContent.innerHTML = `<div class="dropdown-option error">Failed to fetch models. Check the Developer Console for details.</div>`;
+			console.error("[oaicopilot] Failed to fetch models:", message.error);
 			break;
 		case "confirmResponse":
 			// Handle confirmation responses
@@ -853,6 +864,7 @@ function populateModelForm(model) {
 		baseUrl: fetchBaseUrl,
 		apiKey: fetchApiKey,
 		apiMode: fetchApiMode,
+		headers: model.headers,
 	});
 
 	modelProviderInput.value = currentProvider;

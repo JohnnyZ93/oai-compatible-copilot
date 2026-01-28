@@ -52,7 +52,7 @@ type IncomingMessage =
 			commitModel: string;
 			commitLanguage: string;
 	  }
-	| { type: "fetchModels"; baseUrl: string; apiKey: string; apiMode?: HFApiMode | string }
+	| { type: "fetchModels"; baseUrl: string; apiKey: string; apiMode?: HFApiMode | string; headers?: Record<string, string> }
 	| { type: "addProvider"; provider: string; baseUrl?: string; apiKey?: string; apiMode?: string }
 	| { type: "updateProvider"; provider: string; baseUrl?: string; apiKey?: string; apiMode?: string }
 	| { type: "deleteProvider"; provider: string }
@@ -160,8 +160,14 @@ export class ConfigViewPanel {
 				);
 				break;
 			case "fetchModels": {
-				const { models } = await fetchModels(message.baseUrl, message.apiKey, message.apiMode);
-				this.panel.webview.postMessage({ type: "modelsFetched", models });
+				try {
+					const { models } = await fetchModels(message.baseUrl, message.apiKey, message.apiMode, message.headers);
+					this.panel.webview.postMessage({ type: "modelsFetched", models });
+				} catch (err) {
+					console.error("[oaicopilot] fetchModels failed", err);
+					const errorMessage = err instanceof Error ? err.message : String(err);
+					this.panel.webview.postMessage({ type: "modelsFetchError", error: errorMessage });
+				}
 				break;
 			}
 			case "addProvider":
