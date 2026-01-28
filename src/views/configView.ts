@@ -8,6 +8,7 @@ interface InitPayload {
 	baseUrl: string;
 	apiKey: string;
 	delay: number;
+	readFileLines: number;
 	retry: {
 		enabled?: boolean;
 		max_attempts?: number;
@@ -36,6 +37,7 @@ interface ExportConfig {
 	commitModel: string;
 	models: HFModelItem[];
 	providerKeys: Record<string, string>;
+	readFileLines: number;
 }
 
 type IncomingMessage =
@@ -45,6 +47,7 @@ type IncomingMessage =
 			baseUrl: string;
 			apiKey: string;
 			delay: number;
+			readFileLines: number;
 			retry: { enabled?: boolean; max_attempts?: number; interval_ms?: number; status_codes?: number[] };
 			commitModel: string;
 			commitLanguage: string;
@@ -150,6 +153,7 @@ export class ConfigViewPanel {
 					message.baseUrl,
 					message.apiKey,
 					message.delay,
+					message.readFileLines,
 					message.retry,
 					message.commitModel,
 					message.commitLanguage
@@ -252,7 +256,8 @@ export class ConfigViewPanel {
 		const foundModel = models.find((model) => model.useForCommitGeneration === true);
 		const commitModel = foundModel ? `${foundModel.id}${foundModel.configId ? "::" + foundModel.configId : ""}` : "";
 		const commitLanguage = config.get<string>("oaicopilot.commitLanguage", "English");
-		const payload: InitPayload = { baseUrl, apiKey, delay, retry, commitModel, commitLanguage, models, providerKeys };
+		const readFileLines = config.get<number>("oaicopilot.readFileLines", 0);
+		const payload: InitPayload = { baseUrl, apiKey, delay, readFileLines, retry, commitModel, commitLanguage, models, providerKeys };
 		this.panel.webview.postMessage({ type: "init", payload });
 	}
 
@@ -260,6 +265,7 @@ export class ConfigViewPanel {
 		rawBaseUrl: string,
 		rawApiKey: string,
 		delay: number,
+		readFileLines: number,
 		retry: { enabled?: boolean; max_attempts?: number; interval_ms?: number; status_codes?: number[] },
 		commitModel: string,
 		commitLanguage: string
@@ -269,6 +275,7 @@ export class ConfigViewPanel {
 		const config = vscode.workspace.getConfiguration();
 		await config.update("oaicopilot.baseUrl", baseUrl, vscode.ConfigurationTarget.Global);
 		await config.update("oaicopilot.delay", delay, vscode.ConfigurationTarget.Global);
+		await config.update("oaicopilot.readFileLines", readFileLines, vscode.ConfigurationTarget.Global);
 		await config.update("oaicopilot.retry", retry, vscode.ConfigurationTarget.Global);
 		await config.update("oaicopilot.commitLanguage", commitLanguage, vscode.ConfigurationTarget.Global);
 		if (apiKey) {
@@ -497,7 +504,7 @@ export class ConfigViewPanel {
 		// Send refresh signal to frontend
 		await this.sendInit();
 	}
-	
+
 	private async exportConfig() {
 		try {
 			const config = vscode.workspace.getConfiguration();
@@ -515,6 +522,7 @@ export class ConfigViewPanel {
 				interval_ms: 1000,
 			});
 			const commitLanguage = config.get<string>("oaicopilot.commitLanguage", "English");
+			const readFileLines = config.get<number>("oaicopilot.readFileLines", 0);
 			const models = normalizeUserModels(config.get<unknown>("oaicopilot.models", []));
 
 			const foundModel = models.find((model) => model.useForCommitGeneration === true);
@@ -540,6 +548,7 @@ export class ConfigViewPanel {
 				commitLanguage,
 				commitModel,
 				models,
+				readFileLines,
 				providerKeys,
 			};
 
@@ -584,10 +593,6 @@ export class ConfigViewPanel {
 			const jsonContent = decoder.decode(content);
 			const importData = JSON.parse(jsonContent) as ExportConfig;
 
-			if (!importData.version || !importData.exportDate) {
-				throw new Error("Invalid configuration file: missing version or exportDate");
-			}
-
 			if (!Array.isArray(importData.models)) {
 				throw new Error("Invalid configuration file: models must be an array");
 			}
@@ -597,6 +602,7 @@ export class ConfigViewPanel {
 			await config.update("oaicopilot.baseUrl", importData.baseUrl, vscode.ConfigurationTarget.Global);
 			await config.update("oaicopilot.delay", importData.delay, vscode.ConfigurationTarget.Global);
 			await config.update("oaicopilot.retry", importData.retry, vscode.ConfigurationTarget.Global);
+			await config.update("oaicopilot.readFileLines", importData.readFileLines, vscode.ConfigurationTarget.Global);
 			await config.update("oaicopilot.commitLanguage", importData.commitLanguage, vscode.ConfigurationTarget.Global);
 
 			if (importData.apiKey) {

@@ -17,6 +17,7 @@ const pendingConfirmations = new Map();
 const baseUrlInput = document.getElementById("baseUrl");
 const apiKeyInput = document.getElementById("apiKey");
 const delayInput = document.getElementById("delay");
+const readFileLinesInput = document.getElementById("readFileLines");
 const retryEnabledInput = document.getElementById("retryEnabled");
 const maxAttemptsInput = document.getElementById("maxAttempts");
 const intervalMsInput = document.getElementById("intervalMs");
@@ -93,6 +94,7 @@ document.getElementById("saveBase").addEventListener("click", () => {
 		baseUrl: baseUrlInput.value,
 		apiKey: apiKeyInput.value,
 		delay: parseInt(delayInput.value) || 0,
+		readFileLines: parseInt(readFileLinesInput.value) || 0,
 		retry: retry,
 		commitModel: commitModelInput.value,
 		commitLanguage: commitLanguageInput.value,
@@ -254,10 +256,11 @@ window.addEventListener("message", (event) => {
 
 	switch (message.type) {
 		case "init":
-			const { baseUrl, apiKey, delay, retry, commitModel, models, providerKeys, commitLanguage } = message.payload;
+			const { baseUrl, apiKey, delay, readFileLines, retry, commitModel, models, providerKeys, commitLanguage } = message.payload;
 			state.baseUrl = baseUrl;
 			state.apiKey = apiKey;
 			state.delay = delay || 0;
+			state.readFileLines = readFileLines || 0;
 			state.retry = retry || {
 				enabled: true,
 				max_attempts: 3,
@@ -272,6 +275,7 @@ window.addEventListener("message", (event) => {
 			baseUrlInput.value = baseUrl || "";
 			apiKeyInput.value = apiKey || "";
 			delayInput.value = state.delay;
+			readFileLinesInput.value = message.payload.readFileLines || 0;
 			retryEnabledInput.checked = state.retry.enabled !== false;
 			maxAttemptsInput.value = state.retry.max_attempts || 3;
 			intervalMsInput.value = state.retry.interval_ms || 1000;
