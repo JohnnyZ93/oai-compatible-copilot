@@ -25,7 +25,7 @@
 		"type": "git",
 		"url": "https://github.com/JohnnyZ93/oai-compatible-copilot"
 	},
-	"version": "0.3.0",
+	"version": "0.3.1",
 	"engines": {
 		"vscode": "^1.104.0"
 	},

@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.3.1 (2026-01-29)
+
+- Feat: Support custom headers in model listing requests.
+- Feat: Add custom headers field to provider configuration UI.
+
+Thanks to:
+  - @matchs for contributing the [PR #136](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/136).
+
 ## 0.3.0 (2026-01-28)
 
 - Feat: Add configurable `read_file` tool line limit with new `oaicopilot.readFileLines` setting.
