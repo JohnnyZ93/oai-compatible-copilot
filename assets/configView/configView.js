@@ -141,6 +141,7 @@ document.getElementById("addProvider").addEventListener("click", () => {
 				<option value="gemini">Gemini</option>
 			</select>
 		</td>
+		<td><textarea class="provider-input" data-field="headers" rows="2" placeholder='{"X-API-Version": "v1"}' style="width: 100%; font-family: monospace; font-size: 12px;"></textarea></td>
 		<td>
 			<button class="save-provider-btn secondary">Save</button>
 			<button class="cancel-provider-btn secondary">Cancel</button>
@@ -160,12 +161,22 @@ document.getElementById("addProvider").addEventListener("click", () => {
 			providerData[field] = input.value;
 		});
 
+		let headers = undefined;
+		if (providerData.headers && providerData.headers.trim()) {
+			try {
+				headers = JSON.parse(providerData.headers);
+			} catch (e) {
+				// ignore invalid JSON
+			}
+		}
+
 		vscode.postMessage({
 			type: "addProvider",
 			provider: providerData.provider,
 			baseUrl: providerData.baseUrl || undefined,
 			apiKey: providerData.apiKey || undefined,
 			apiMode: providerData.apiMode || undefined,
+			headers: headers,
 		});
 
 		newRow.remove();
@@ -193,9 +204,10 @@ modelProviderInput.addEventListener("change", () => {
 		modelBaseUrlInput.value = state.providerInfo[selectedProvider].baseUrl;
 		modelApiModeInput.value = state.providerInfo[selectedProvider].apiMode;
 
-		// Find headers from any model belonging to this provider
-		const providerModel = state.models.find((m) => m.owned_by === selectedProvider && m.headers);
-		const headers = providerModel?.headers || undefined;
+		// Use headers from provider info
+		const headers = state.providerInfo[selectedProvider].headers;
+		modelHeadersInput.value = headers ? JSON.stringify(headers, null, 2) : "";
+
 
 		// Request to fetch remote models for the selected provider
 		vscode.postMessage({
@@ -329,7 +341,7 @@ function renderProviders() {
 	);
 
 	if (!providers.length) {
-		providerTableBody.innerHTML = '<tr><td colspan="5" class="no-data">No providers</td></tr>';
+		providerTableBody.innerHTML = '<tr><td colspan="6" class="no-data">No providers</td></tr>';
 		// Clear the provider dropdown as well
 		modelProviderInput.innerHTML = '<option value="">Select Provider</option>';
 		return;
@@ -340,6 +352,7 @@ function renderProviders() {
 			// Get the provider's configuration information
 			const providerModels = state.models.filter((m) => m.owned_by === provider);
 			const firstModel = providerModels[0];
+			const headersJson = firstModel.headers ? JSON.stringify(firstModel.headers, null, 2) : "";
 
 			return `
 			<tr data-provider="${provider}">
@@ -355,6 +368,7 @@ function renderProviders() {
 						<option value="gemini" ${firstModel.apiMode === "gemini" ? "selected" : ""}>Gemini</option>
 					</select>
 				</td>
+				<td><textarea class="provider-input" data-field="headers" rows="2" placeholder='{"X-API-Version": "v1"}' style="width: 100%; font-family: monospace; font-size: 12px;">${headersJson}</textarea></td>
 				<td>
 					<button class="update-provider-btn" data-provider="${provider}">Save</button>
 					<button class="delete-provider-btn danger" data-provider="${provider}">Delete</button>
@@ -378,6 +392,7 @@ function renderProviders() {
 				baseUrl: firstModel.baseUrl || state.baseUrl,
 				apiMode: firstModel.apiMode || "openai",
 				apiKey: state.providerKeys[provider] || state.apiKey,
+				headers: firstModel.headers,
 			};
 
 			return `<option value="${provider}">${provider}</option>`;
@@ -397,12 +412,22 @@ function renderProviders() {
 				providerData[field] = input.value;
 			});
 
+			let headers = undefined;
+			if (providerData.headers && providerData.headers.trim()) {
+				try {
+					headers = JSON.parse(providerData.headers);
+				} catch (e) {
+					// ignore invalid JSON
+				}
+			}
+
 			vscode.postMessage({
 				type: "updateProvider",
 				provider: provider,
 				baseUrl: providerData.baseUrl || undefined,
 				apiKey: providerData.apiKey || undefined,
 				apiMode: providerData.apiMode || undefined,
+				headers: headers,
 			});
 		});
 	});
@@ -635,9 +660,8 @@ function parseJsonField(value) {
 	try {
 		return JSON.parse(value.trim());
 	} catch (error) {
-		// Return the raw value if JSON parsing fails
-		// This allows the backend to handle validation
-		return value.trim();
+		// ignore invalid JSON
+		return undefined;
 	}
 }
 

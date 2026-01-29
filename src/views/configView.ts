@@ -53,8 +53,8 @@ type IncomingMessage =
 			commitLanguage: string;
 	  }
 	| { type: "fetchModels"; baseUrl: string; apiKey: string; apiMode?: HFApiMode | string; headers?: Record<string, string> }
-	| { type: "addProvider"; provider: string; baseUrl?: string; apiKey?: string; apiMode?: string }
-	| { type: "updateProvider"; provider: string; baseUrl?: string; apiKey?: string; apiMode?: string }
+	| { type: "addProvider"; provider: string; baseUrl?: string; apiKey?: string; apiMode?: string; headers?: Record<string, string> }
+	| { type: "updateProvider"; provider: string; baseUrl?: string; apiKey?: string; apiMode?: string; headers?: Record<string, string> }
 	| { type: "deleteProvider"; provider: string }
 	| { type: "addModel"; model: HFModelItem }
 	| { type: "updateModel"; model: HFModelItem; originalModelId?: string; originalConfigId?: string }
@@ -171,10 +171,10 @@ export class ConfigViewPanel {
 				break;
 			}
 			case "addProvider":
-				await this.addProvider(message.provider, message.baseUrl, message.apiKey, message.apiMode);
+				await this.addProvider(message.provider, message.baseUrl, message.apiKey, message.apiMode, message.headers);
 				break;
 			case "updateProvider":
-				await this.updateProvider(message.provider, message.baseUrl, message.apiKey, message.apiMode);
+				await this.updateProvider(message.provider, message.baseUrl, message.apiKey, message.apiMode, message.headers);
 				break;
 			case "deleteProvider":
 				await this.deleteProvider(message.provider);
@@ -339,7 +339,7 @@ export class ConfigViewPanel {
 		return Array.from({ length: 16 }, () => Math.floor(Math.random() * 36).toString(36)).join("");
 	}
 
-	private async addProvider(provider: string, baseUrl?: string, apiKey?: string, apiMode?: string) {
+	private async addProvider(provider: string, baseUrl?: string, apiKey?: string, apiMode?: string, headers?: Record<string, string>) {
 		const trimmedProvider = provider.trim();
 		if (!trimmedProvider) {
 			vscode.window.showErrorMessage("Provider ID is required.");
@@ -366,6 +366,7 @@ export class ConfigViewPanel {
 				owned_by: trimmedProvider,
 				baseUrl: baseUrl,
 				apiMode: (apiMode as HFApiMode) || "openai",
+				headers: headers,
 			};
 			models.push(defaultModel);
 		}
@@ -376,7 +377,7 @@ export class ConfigViewPanel {
 		await this.sendInit();
 	}
 
-	private async updateProvider(provider: string, baseUrl?: string, apiKey?: string, apiMode?: string) {
+	private async updateProvider(provider: string, baseUrl?: string, apiKey?: string, apiMode?: string, headers?: Record<string, string>) {
 		const trimmedProvider = provider.trim();
 		if (!trimmedProvider) {
 			vscode.window.showErrorMessage("Provider ID is required.");
@@ -406,6 +407,8 @@ export class ConfigViewPanel {
 					...model,
 					baseUrl: baseUrl || model.baseUrl,
 					apiMode: (apiMode as HFApiMode) || model.apiMode,
+					// only update headers if provided
+					...(headers !== undefined && { headers }),
 				};
 			}
 			return model;
