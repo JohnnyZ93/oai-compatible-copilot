@@ -136,21 +136,27 @@ export async function prepareLanguageModelChatInformation(
 export async function fetchModels(
 	baseUrl: string,
 	apiKey: string,
-	apiMode?: HFApiMode | string
+	apiMode?: HFApiMode | string,
+	customHeaders?: Record<string, string>
 ): Promise<{ models: HFModelItem[] }> {
 	const normalizedApiMode = apiMode ?? "openai";
 	if (normalizedApiMode === "gemini") {
-		const models = await fetchGeminiModels(baseUrl, apiKey);
+		const models = await fetchGeminiModels(baseUrl, apiKey, customHeaders);
 		return { models };
 	} else if (normalizedApiMode === "ollama") {
-		const models = await fetchOllamaModels(baseUrl, apiKey);
+		const models = await fetchOllamaModels(baseUrl, apiKey, customHeaders);
 		return { models };
 	}
 
 	const modelsList = (async () => {
+		const baseHeaders: Record<string, string> = {
+			Authorization: `Bearer ${apiKey}`,
+			"User-Agent": VersionManager.getUserAgent(),
+		};
+		const headers = customHeaders ? { ...baseHeaders, ...customHeaders } : baseHeaders;
 		const resp = await fetch(`${baseUrl.replace(/\/+$/, "")}/models`, {
 			method: "GET",
-			headers: { Authorization: `Bearer ${apiKey}`, "User-Agent": VersionManager.getUserAgent() },
+			headers,
 		});
 		if (!resp.ok) {
 			let text = "";

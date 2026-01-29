@@ -1005,12 +1005,17 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
  * Supports both native Google Gemini and Langdock Google proxy endpoints.
  * @param baseUrl The Gemini API base URL.
  * @param apiKey The API key for authentication.
+ * @param customHeaders Optional custom headers to merge with defaults.
  * @returns A promise that resolves to an array of model items.
  */
-export async function fetchGeminiModels(baseUrl: string, apiKey: string): Promise<HFModelItem[]> {
+export async function fetchGeminiModels(
+	baseUrl: string,
+	apiKey: string,
+	customHeaders?: Record<string, string>
+): Promise<HFModelItem[]> {
 	const listUrl = buildGeminiModelsUrl(baseUrl);
 	const ownedBy = baseUrl.includes("langdock.com") ? "langdock" : "google";
-	const headers = CommonApi.prepareHeaders(apiKey, "gemini");
+	const headers = CommonApi.prepareHeaders(apiKey, "gemini", customHeaders);
 	headers["Accept"] = "application/json";
 
 	const models: HFModelItem[] = [];
