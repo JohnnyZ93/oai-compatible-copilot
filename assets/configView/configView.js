@@ -208,7 +208,6 @@ modelProviderInput.addEventListener("change", () => {
 		const headers = state.providerInfo[selectedProvider].headers;
 		modelHeadersInput.value = headers ? JSON.stringify(headers, null, 2) : "";
 
-
 		// Request to fetch remote models for the selected provider
 		vscode.postMessage({
 			type: "fetchModels",
@@ -273,7 +272,8 @@ window.addEventListener("message", (event) => {
 
 	switch (message.type) {
 		case "init":
-			const { baseUrl, apiKey, delay, readFileLines, retry, commitModel, models, providerKeys, commitLanguage } = message.payload;
+			const { baseUrl, apiKey, delay, readFileLines, retry, commitModel, models, providerKeys, commitLanguage } =
+				message.payload;
 			state.baseUrl = baseUrl;
 			state.apiKey = apiKey;
 			state.delay = delay || 0;

@@ -355,7 +355,8 @@
 					"default": {
 						"enabled": true,
 						"max_attempts": 3,
-						"interval_ms": 1000
+						"interval_ms": 1000,
+						"status_codes": []
 					},
 					"properties": {
 						"enabled": {

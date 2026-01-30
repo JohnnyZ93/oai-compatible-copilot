@@ -52,9 +52,29 @@ type IncomingMessage =
 			commitModel: string;
 			commitLanguage: string;
 	  }
-	| { type: "fetchModels"; baseUrl: string; apiKey: string; apiMode?: HFApiMode | string; headers?: Record<string, string> }
-	| { type: "addProvider"; provider: string; baseUrl?: string; apiKey?: string; apiMode?: string; headers?: Record<string, string> }
-	| { type: "updateProvider"; provider: string; baseUrl?: string; apiKey?: string; apiMode?: string; headers?: Record<string, string> }
+	| {
+			type: "fetchModels";
+			baseUrl: string;
+			apiKey: string;
+			apiMode?: HFApiMode | string;
+			headers?: Record<string, string>;
+	  }
+	| {
+			type: "addProvider";
+			provider: string;
+			baseUrl?: string;
+			apiKey?: string;
+			apiMode?: string;
+			headers?: Record<string, string>;
+	  }
+	| {
+			type: "updateProvider";
+			provider: string;
+			baseUrl?: string;
+			apiKey?: string;
+			apiMode?: string;
+			headers?: Record<string, string>;
+	  }
 	| { type: "deleteProvider"; provider: string }
 	| { type: "addModel"; model: HFModelItem }
 	| { type: "updateModel"; model: HFModelItem; originalModelId?: string; originalConfigId?: string }
@@ -263,7 +283,17 @@ export class ConfigViewPanel {
 		const commitModel = foundModel ? `${foundModel.id}${foundModel.configId ? "::" + foundModel.configId : ""}` : "";
 		const commitLanguage = config.get<string>("oaicopilot.commitLanguage", "English");
 		const readFileLines = config.get<number>("oaicopilot.readFileLines", 0);
-		const payload: InitPayload = { baseUrl, apiKey, delay, readFileLines, retry, commitModel, commitLanguage, models, providerKeys };
+		const payload: InitPayload = {
+			baseUrl,
+			apiKey,
+			delay,
+			readFileLines,
+			retry,
+			commitModel,
+			commitLanguage,
+			models,
+			providerKeys,
+		};
 		this.panel.webview.postMessage({ type: "init", payload });
 	}
 
@@ -339,7 +369,13 @@ export class ConfigViewPanel {
 		return Array.from({ length: 16 }, () => Math.floor(Math.random() * 36).toString(36)).join("");
 	}
 
-	private async addProvider(provider: string, baseUrl?: string, apiKey?: string, apiMode?: string, headers?: Record<string, string>) {
+	private async addProvider(
+		provider: string,
+		baseUrl?: string,
+		apiKey?: string,
+		apiMode?: string,
+		headers?: Record<string, string>
+	) {
 		const trimmedProvider = provider.trim();
 		if (!trimmedProvider) {
 			vscode.window.showErrorMessage("Provider ID is required.");
@@ -377,7 +413,13 @@ export class ConfigViewPanel {
 		await this.sendInit();
 	}
 
-	private async updateProvider(provider: string, baseUrl?: string, apiKey?: string, apiMode?: string, headers?: Record<string, string>) {
+	private async updateProvider(
+		provider: string,
+		baseUrl?: string,
+		apiKey?: string,
+		apiMode?: string,
+		headers?: Record<string, string>
+	) {
 		const trimmedProvider = provider.trim();
 		if (!trimmedProvider) {
 			vscode.window.showErrorMessage("Provider ID is required.");

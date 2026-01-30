@@ -8,6 +8,19 @@ const RETRY_INTERVAL_MS = 1000;
 // HTTP status codes that should trigger a retry
 const RETRYABLE_STATUS_CODES = [429, 500, 502, 503, 504];
 
+// Network error patterns to retry
+const networkErrorPatterns = [
+	"fetch failed",
+	"ECONNRESET",
+	"ETIMEDOUT",
+	"ENOTFOUND",
+	"ECONNREFUSED",
+	"timeout",
+	"TIMEOUT",
+	"network error",
+	"NetworkError",
+];
+
 // Model ID parsing helper
 export interface ParsedModelId {
 	baseId: string;
@@ -284,14 +297,18 @@ export async function executeWithRetry<T>(fn: () => Promise<T>, retryConfig: Ret
 			lastError = error instanceof Error ? error : new Error(String(error));
 
 			// Check if error is retryable based on status codes
-			const isRetryableError = retryableStatusCodes.some((code) => lastError?.message.includes(`[${code}]`));
+			const isRetryableStatusError = retryableStatusCodes.some((code) => lastError?.message.includes(`[${code}]`));
+			// Check if error is retryable based on network error patterns
+			const isRetryableNetworkError = networkErrorPatterns.some((pattern) => lastError?.message.includes(pattern));
+			const isRetryableError = isRetryableStatusError || isRetryableNetworkError;
 
 			if (!isRetryableError || attempt === maxAttempts) {
 				throw lastError;
 			}
 
 			console.error(
-				`[OAI Compatible Model Provider] Retryable error detected, retrying in ${intervalMs}ms (attempt ${attempt + 1}/${maxAttempts})`
+				`[OAI Compatible Model Provider] Retryable error detected, retrying in ${intervalMs}ms (attempt ${attempt + 1}/${maxAttempts}). Error:`,
+				lastError instanceof Error ? { name: lastError.name, message: lastError.message } : String(lastError)
 			);
 
 			// Wait for the specified interval before retrying
