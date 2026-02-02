@@ -12,17 +12,16 @@ import type { HFModelItem } from "../types";
 
 let commitGenerationAbortController: AbortController | undefined;
 
-const PROMPT = {
-	system:
-		"You are a helpful assistant that generates informative git commit messages based on git diffs output. Skip preamble and remove all backticks surrounding the commit message.",
-	user: "Notes from developer (ignore if not relevant): {{USER_CURRENT_INPUT}}",
-	instruction: `Based on the provided git diff, generate a concise and descriptive commit message.
-
+const DEFAULT_PROMPT = {
+	system: `
+	You are a helpful assistant that generates informative git commit messages based on git diffs output. Skip preamble and remove all backticks surrounding the commit message.
+	Based on the provided git diff, generate a concise and descriptive commit message.
 The commit message should:
 1. Has a short title (50-72 characters)
 2. The commit message should adhere to the conventional commit format
 3. Describe what was changed and why
 4. Be clear and informative`,
+	user: "Notes from developer (ignore if not relevant): {{USER_CURRENT_INPUT}}",
 };
 
 export async function generateCommitMsg(secrets: vscode.SecretStorage, scm?: vscode.SourceControl) {
@@ -151,8 +150,16 @@ async function generateCommitMsgForRepository(secrets: vscode.SecretStorage, rep
 async function performCommitMsgGeneration(secrets: vscode.SecretStorage, gitDiff: string, inputBox: any) {
 	try {
 		vscode.commands.executeCommand("setContext", "oaicopilot.isGeneratingCommit", true);
+		const config = vscode.workspace.getConfiguration();
 
-		const prompts = [PROMPT.instruction];
+		// Get custom prompts or use defaults
+		const customSystemPrompt = config.get<string>("oaicopilot.commitMessagePrompt", "");
+		const PROMPT = {
+			system: customSystemPrompt || DEFAULT_PROMPT.system,
+			user: DEFAULT_PROMPT.user,
+		};
+
+		const prompts: string[] = [];
 
 		const currentInput = inputBox.value?.trim() || "";
 		if (currentInput) {
@@ -165,7 +172,6 @@ async function performCommitMsgGeneration(secrets: vscode.SecretStorage, gitDiff
 		const prompt = prompts.join("\n\n");
 
 		// Get user models from configuration
-		const config = vscode.workspace.getConfiguration();
 		const userModels = normalizeUserModels(config.get<unknown>("oaicopilot.models", []));
 
 		// Filter models that are marked for commit generation

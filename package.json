@@ -345,8 +345,26 @@
 								"description": "Model-specific delay in milliseconds between consecutive requests. If not specified, falls back to global oaicopilot.delay configuration."
 							}
 						},
-						"required": ["id"],
-						"anyOf": [{ "required": ["owned_by"] }, { "required": ["provider"] }, { "required": ["provide"] }]
+						"required": [
+							"id"
+						],
+						"anyOf": [
+							{
+								"required": [
+									"owned_by"
+								]
+							},
+							{
+								"required": [
+									"provider"
+								]
+							},
+							{
+								"required": [
+									"provide"
+								]
+							}
+						]
 					},
 					"description": "A list of preferred models to use. If provided, these models will be used directly instead of fetching from the API."
 				},
@@ -412,6 +430,11 @@
 						"Polish"
 					],
 					"description": "Language for generated Git commit messages. Default is English."
+				},
+				"oaicopilot.commitMessagePrompt": {
+					"type": "string",
+					"default": "",
+					"description": "Custom system prompt for commit message generation. If not provided, uses the default prompt."
 				},
 				"oaicopilot.readFileLines": {
 					"type": "number",
