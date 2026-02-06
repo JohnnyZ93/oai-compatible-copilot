@@ -445,11 +445,11 @@ export class ConfigViewPanel {
 
 		const updatedModels = models.map((model) => {
 			if (model.owned_by === trimmedProvider) {
+				const { headers: _, ...rest } = model;
 				return {
-					...model,
+					...rest,
 					baseUrl: baseUrl || model.baseUrl,
 					apiMode: (apiMode as HFApiMode) || model.apiMode,
-					// only update headers if provided
 					...(headers !== undefined && { headers }),
 				};
 			}
