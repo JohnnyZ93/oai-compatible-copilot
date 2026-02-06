@@ -6,7 +6,20 @@ import { ConfigViewPanel } from "./views/configView";
 import { normalizeUserModels } from "./utils";
 import { abortCommitGeneration, generateCommitMsg } from "./gitCommit/commitMessageGenerator";
 
+interface OaicopilotConfig {
+	allowProgrammaticApiKey?: boolean;
+}
+
+function getExtensionConfig(): OaicopilotConfig {
+	const extension = vscode.extensions.getExtension("johnny-zhao.oai-compatible-copilot");
+	const packageJson = extension?.packageJSON;
+	return packageJson?.oaicopilotConfig ?? {};
+}
+
 export function activate(context: vscode.ExtensionContext) {
+	const extensionConfig = getExtensionConfig();
+	const ALLOW_PROGRAMMATIC_API_KEY = extensionConfig.allowProgrammaticApiKey ?? false;
+
 	const tokenCountStatusBarItem: vscode.StatusBarItem = initStatusBar(context);
 	const provider = new HuggingFaceChatModelProvider(context.secrets, tokenCountStatusBarItem);
 	// Register the Hugging Face provider under the vendor id used in package.json
@@ -14,7 +27,12 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Management command to configure API key
 	context.subscriptions.push(
-		vscode.commands.registerCommand("oaicopilot.setApikey", async () => {
+		vscode.commands.registerCommand("oaicopilot.setApikey", async (key?: string) => {
+			if (ALLOW_PROGRAMMATIC_API_KEY && key !== undefined) {
+				await context.secrets.store("oaicopilot.apiKey", key.trim());
+				return;
+			}
+
 			const existing = await context.secrets.get("oaicopilot.apiKey");
 			const apiKey = await vscode.window.showInputBox({
 				title: "OAI Compatible Provider API Key",
@@ -38,7 +56,42 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Management command to configure provider-specific API keys
 	context.subscriptions.push(
-		vscode.commands.registerCommand("oaicopilot.setProviderApikey", async () => {
+		vscode.commands.registerCommand("oaicopilot.setProviderApikey", async (key?: string, prov?: string) => {
+			if (ALLOW_PROGRAMMATIC_API_KEY && key !== undefined) {
+				let provider = prov;
+				if (!provider) {
+					// Get provider list from configuration for suggestions
+					const config = vscode.workspace.getConfiguration();
+					const userModels = normalizeUserModels(config.get<HFModelItem[]>("oaicopilot.models", []));
+					const providers = Array.from(
+						new Set(userModels.map((m) => m.owned_by.toLowerCase()).filter((p) => p && p.trim() !== ""))
+					).sort();
+
+					if (providers.length > 0) {
+						const selected = await vscode.window.showQuickPick(providers, {
+							title: "Select Provider",
+							placeHolder: "Select a provider for the API key",
+						});
+						if (!selected) {
+							return; // user canceled
+						}
+						provider = selected;
+					} else {
+						const entered = await vscode.window.showInputBox({
+							title: "Enter Provider Name",
+							prompt: "Enter the provider name (will be converted to lowercase)",
+							ignoreFocusOut: true,
+						});
+						if (!entered || !entered.trim()) {
+							return; // user canceled
+						}
+						provider = entered.trim();
+					}
+				}
+				await context.secrets.store(`oaicopilot.apiKey.${provider.toLowerCase()}`, key.trim());
+				return;
+			}
+
 			// Get provider list from configuration
 			const config = vscode.workspace.getConfiguration();
 			const userModels = normalizeUserModels(config.get<HFModelItem[]>("oaicopilot.models", []));
