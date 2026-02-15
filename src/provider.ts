@@ -55,25 +55,38 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	 * @returns A promise that resolves to the list of available language models
 	 */
 	async provideLanguageModelChatInformation(
-		options: { silent: boolean },
+		options: { silent: boolean; configuration?: { apiKey?: string; [key: string]: any } },
 		_token: CancellationToken
 	): Promise<LanguageModelChatInformation[]> {
-		return prepareLanguageModelChatInformation({ silent: options.silent ?? false }, _token, this.secrets);
+		const models = await prepareLanguageModelChatInformation({ silent: options.silent ?? false }, _token, this.secrets);
+		
+		// Attach configuration and apiKey to each model for the new API (Copilot Chat 0.37.6+)
+		if (options.configuration) {
+			return models.map(m => ({
+				...m,
+				configuration: options.configuration,
+				apiKey: options.configuration?.apiKey
+			}));
+		}
+		
+		return models;
 	}
 
 	/**
 	 * Returns the number of tokens for a given text using the model specific tokenizer logic
-	 * @param model The language model to use
+	 * @param model The language model to use (may contain configuration from new API)
 	 * @param text The text to count tokens for
 	 * @param token A cancellation token for the request
 	 * @returns A promise that resolves to the number of tokens
 	 */
 	async provideTokenCount(
-		model: LanguageModelChatInformation,
+		model: LanguageModelChatInformation & { configuration?: any; apiKey?: string },
 		text: string | LanguageModelChatRequestMessage,
 		_token: CancellationToken
 	): Promise<number> {
-		return prepareTokenCount(model, text, _token, { includeReasoningInRequest: false });
+		// Extract base model info, removing properties added by new API
+		const { configuration, apiKey, ...baseModel } = model as any;
+		return prepareTokenCount(baseModel as LanguageModelChatInformation, text, _token, { includeReasoningInRequest: false });
 	}
 
 	/**
@@ -87,7 +100,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	 * @returns A promise that resolves when the response is complete. Results are actually passed to the progress callback.
 	 */
 	async provideLanguageModelChatResponse(
-		model: LanguageModelChatInformation,
+		model: LanguageModelChatInformation & { configuration?: any; apiKey?: string },
 		messages: readonly LanguageModelChatRequestMessage[],
 		options: ProvideLanguageModelChatResponseOptions,
 		progress: Progress<LanguageModelResponsePart2>,
@@ -106,6 +119,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			},
 		};
 		try {
+			// Handle new API where model may contain configuration and apiKey (from Copilot Chat 0.37.6+)
+			const modelApiKeyFromInfo = model.apiKey;
+			
 			// get model config from user settings
 			const config = vscode.workspace.getConfiguration();
 			const userModels = normalizeUserModels(config.get<unknown>("oaicopilot.models", []));
@@ -155,9 +171,13 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			}
 
 			// Get API key for the model's provider
+			// Priority: 1) apiKey from model (new API), 2) provider-specific key, 3) generic key
 			const provider = um?.owned_by;
 			const useGenericKey = !um?.baseUrl;
-			const modelApiKey = await this.ensureApiKey(useGenericKey, provider);
+			let modelApiKey = modelApiKeyFromInfo;
+			if (!modelApiKey) {
+				modelApiKey = await this.ensureApiKey(useGenericKey, provider);
+			}
 			if (!modelApiKey) {
 				throw new Error("OAI Compatible API key not found");
 			}
