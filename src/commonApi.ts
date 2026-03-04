@@ -120,11 +120,7 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 		if (!buf.name) {
 			return;
 		}
-		// [FIX] Normalize empty args to "{}" for tools without parameters
-		// (e.g. take_screenshot). Anthropic may not send any input_json_delta,
-		// leaving buf.args as "". Without this, the tool call is silently dropped.
-		const argsText = buf.args.trim() || "{}";
-		const canParse = tryParseJSONObject(argsText);
+		const canParse = tryParseJSONObject(buf.args);
 		if (!canParse.ok) {
 			return;
 		}
