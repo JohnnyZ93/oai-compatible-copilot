@@ -9,6 +9,7 @@ import { fetchOllamaModels } from "./ollama/ollamaApi";
 
 const DEFAULT_CONTEXT_LENGTH = 128000;
 const DEFAULT_MAX_TOKENS = 4096;
+const EXTENSION_LABEL = "OAICopilot";
 
 /**
  * Get the list of available language models contributed by this provider
@@ -43,6 +44,7 @@ export async function prepareLanguageModelChatInformation(
 				return {
 					id: modelId,
 					name: modelName,
+					detail: m.owned_by ? `${m.owned_by} (${EXTENSION_LABEL})` : EXTENSION_LABEL,
 					tooltip: m.configId
 						? `OAI Compatible ${m.id} (config: ${m.configId}) via ${m.owned_by}`
 						: `OAI Compatible via ${m.owned_by}`,
@@ -50,6 +52,7 @@ export async function prepareLanguageModelChatInformation(
 					version: "1.0.0",
 					maxInputTokens: maxInput,
 					maxOutputTokens: maxOutput,
+					category: { label: EXTENSION_LABEL, order: Number.MAX_SAFE_INTEGER },
 					capabilities: {
 						toolCalling: true,
 						imageInput: m?.vision ?? false,
@@ -90,11 +93,13 @@ export async function prepareLanguageModelChatInformation(
 				entries.push({
 					id: `${m.id}:${p.provider}`,
 					name: `${m.id} via ${p.provider}`,
+					detail: p.provider ? `${p.provider} (${EXTENSION_LABEL})` : EXTENSION_LABEL,
 					tooltip: `OAI Compatible via ${p.provider}`,
 					family: m.family ?? "oai-compatible",
 					version: "1.0.0",
 					maxInputTokens: maxInput,
 					maxOutputTokens: maxOutput,
+					category: { label: EXTENSION_LABEL, order: Number.MAX_SAFE_INTEGER },
 					capabilities: {
 						toolCalling: true,
 						imageInput: vision,
@@ -109,12 +114,14 @@ export async function prepareLanguageModelChatInformation(
 				const maxInput = Math.max(1, contextLen - maxOutput);
 				entries.push({
 					id: `${m.id}`,
-					name: `${m.id} via OAI Compatible`,
-					tooltip: "OAI Compatible",
+					name: `${m.id} via ${EXTENSION_LABEL}`,
+					detail: EXTENSION_LABEL,
+					tooltip: EXTENSION_LABEL,
 					family: m.family ?? "oai-compatible",
 					version: "1.0.0",
 					maxInputTokens: maxInput,
 					maxOutputTokens: maxOutput,
+					category: { label: EXTENSION_LABEL, order: Number.MAX_SAFE_INTEGER },
 					capabilities: {
 						toolCalling: true,
 						imageInput: true,
