@@ -1,5 +1,20 @@
 # Change Log
 
+## 0.3.2 (2026-03-04)
+
+- Feat: Group models under "OAICopilot" provider with detail labels.
+- Feat: Add configurable commit message system prompt via `oaicopilot.commitSystemPrompt` setting.
+- Feat: Supports retry when fetch failed.
+- Fix: Handle empty tool call arguments for parameterless tools.
+- Fix: Remove flex layout in config view table to avoid misalignment issues.
+- Fix: Remove headers from provider update logic in configuration UI.
+
+Thanks for your contributing:
+  - @pzhlkj6612 [PR #154](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/154).
+  - @mangjuned [PR #151](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/151).
+  - @pzhlkj6612 [PR #147](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/147).
+  - @AAAkater [PR #141](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/141).
+
 ## 0.3.1 (2026-01-29)
 
 - Feat: Support custom headers in model listing requests.
