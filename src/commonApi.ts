@@ -120,7 +120,11 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 		if (!buf.name) {
 			return;
 		}
-		const canParse = tryParseJSONObject(buf.args);
+		// [FIX] Normalize empty args to "{}" for tools without parameters
+		// (e.g. take_screenshot). Anthropic may not send any input_json_delta,
+		// leaving buf.args as "". Without this, the tool call is silently dropped.
+		const argsText = buf.args.trim() || "{}";
+		const canParse = tryParseJSONObject(argsText);
 		if (!canParse.ok) {
 			return;
 		}
@@ -145,7 +149,9 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 			return;
 		}
 		for (const [idx, buf] of Array.from(this._toolCallBuffers.entries())) {
-			const parsed = tryParseJSONObject(buf.args);
+			// [FIX] Normalize empty args to "{}" for parameterless tool calls
+			const argsText = buf.args.trim() || "{}";
+			const parsed = tryParseJSONObject(argsText);
 			if (!parsed.ok) {
 				if (throwOnInvalid) {
 					console.error("[OAI Compatible Model Provider] Invalid JSON for tool call", {
