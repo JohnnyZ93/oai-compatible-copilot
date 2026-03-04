@@ -38,21 +38,18 @@ export async function prepareLanguageModelChatInformation(
 
 				// 使用配置ID（如果存在）来生成唯一的模型ID
 				const modelId = m.configId ? `${m.id}::${m.configId}` : m.id;
-				const modelName =
-					m.displayName || (m.configId ? `${m.id}::${m.configId} via ${m.owned_by}` : `${m.id} via ${m.owned_by}`);
+				const modelName = m.displayName || (m.configId ? `${m.id}::${m.configId}` : `${m.id}`);
+				const detail = m.owned_by ? `${m.owned_by} (${EXTENSION_LABEL})` : EXTENSION_LABEL;
 
 				return {
 					id: modelId,
 					name: modelName,
-					detail: m.owned_by ? `${m.owned_by} (${EXTENSION_LABEL})` : EXTENSION_LABEL,
-					tooltip: m.configId
-						? `OAI Compatible ${m.id} (config: ${m.configId}) via ${m.owned_by}`
-						: `OAI Compatible via ${m.owned_by}`,
-					family: m.family ?? "oai-compatible",
+					detail: detail,
+					tooltip: detail,
+					family: m.family ?? EXTENSION_LABEL,
 					version: "1.0.0",
 					maxInputTokens: maxInput,
 					maxOutputTokens: maxOutput,
-					category: { label: EXTENSION_LABEL, order: Number.MAX_SAFE_INTEGER },
 					capabilities: {
 						toolCalling: true,
 						imageInput: m?.vision ?? false,
@@ -90,16 +87,16 @@ export async function prepareLanguageModelChatInformation(
 				const contextLen = p?.context_length ?? DEFAULT_CONTEXT_LENGTH;
 				const maxOutput = DEFAULT_MAX_TOKENS;
 				const maxInput = Math.max(1, contextLen - maxOutput);
+				const detail = p.provider ? `${p.provider} (${EXTENSION_LABEL})` : EXTENSION_LABEL;
 				entries.push({
 					id: `${m.id}:${p.provider}`,
-					name: `${m.id} via ${p.provider}`,
-					detail: p.provider ? `${p.provider} (${EXTENSION_LABEL})` : EXTENSION_LABEL,
-					tooltip: `OAI Compatible via ${p.provider}`,
-					family: m.family ?? "oai-compatible",
+					name: `${m.id}`,
+					detail: detail,
+					tooltip: detail,
+					family: m.family ?? EXTENSION_LABEL,
 					version: "1.0.0",
 					maxInputTokens: maxInput,
 					maxOutputTokens: maxOutput,
-					category: { label: EXTENSION_LABEL, order: Number.MAX_SAFE_INTEGER },
 					capabilities: {
 						toolCalling: true,
 						imageInput: vision,
@@ -114,14 +111,13 @@ export async function prepareLanguageModelChatInformation(
 				const maxInput = Math.max(1, contextLen - maxOutput);
 				entries.push({
 					id: `${m.id}`,
-					name: `${m.id} via ${EXTENSION_LABEL}`,
+					name: `${m.id}`,
 					detail: EXTENSION_LABEL,
 					tooltip: EXTENSION_LABEL,
-					family: m.family ?? "oai-compatible",
+					family: m.family ?? EXTENSION_LABEL,
 					version: "1.0.0",
 					maxInputTokens: maxInput,
 					maxOutputTokens: maxOutput,
-					category: { label: EXTENSION_LABEL, order: Number.MAX_SAFE_INTEGER },
 					capabilities: {
 						toolCalling: true,
 						imageInput: true,
