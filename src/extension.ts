@@ -1,14 +1,12 @@
 import * as vscode from "vscode";
 import { HuggingFaceChatModelProvider } from "./provider";
 import type { HFModelItem } from "./types";
-import { initStatusBar } from "./statusBar";
 import { ConfigViewPanel } from "./views/configView";
 import { normalizeUserModels } from "./utils";
 import { abortCommitGeneration, generateCommitMsg } from "./gitCommit/commitMessageGenerator";
 
 export function activate(context: vscode.ExtensionContext) {
-	const tokenCountStatusBarItem: vscode.StatusBarItem = initStatusBar(context);
-	const provider = new HuggingFaceChatModelProvider(context.secrets, tokenCountStatusBarItem);
+	const provider = new HuggingFaceChatModelProvider(context.secrets);
 	// Register the Hugging Face provider under the vendor id used in package.json
 	vscode.lm.registerLanguageModelChatProvider("oaicopilot", provider);
 

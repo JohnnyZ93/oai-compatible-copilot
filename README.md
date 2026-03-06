@@ -15,7 +15,6 @@ Use frontier open LLMs like GPT 5.2, Gemini 3, Kimi K2.5, DeepSeek V3.2, GLM 4.7
 - **Multi-config per model**: Define different settings for the same model (e.g., GLM-4.6 with/without thinking)
 - **Visual configuration UI**: Intuitive interface for managing providers and models
 - **Auto-retry**: Handles API errors (429, 500, 502, 503, 504) with exponential backoff
-- **Token usage**: Real-time token counting and provider API key management from status bar
 - **Git integration**: Generate commit messages directly from source control
 - **Import/export**: Easily share and backup configurations
 - **Tools optimization**: Optimize agent `read_file` tool handling, avoid to read small chunks for large file.
@@ -55,15 +54,11 @@ The extension provides a visual configuration interface that makes it easy to ma
 
 ### Opening the Configuration UI
 
-There are two ways to open the configuration interface:
+Open the configuration interface from the Command Palette:
 
-1. **From the Command Palette**:
-   - Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS)
-   - Search for "OAICopilot: Open Configuration UI"
-   - Select the command to open the configuration panel
-
-2. **From the Status Bar**:
-   - Click on the "OAICopilot" status bar item in the bottom-right corner of VS Code
+- Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS)
+- Search for "OAICopilot: Open Configuration UI"
+- Select the command to open the configuration panel
 
 <details>
 <summary>Click Here for Details</summary>
