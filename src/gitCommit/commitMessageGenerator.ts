@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { getGitDiff } from "./gitUtils";
 import { OpenaiApi } from "../openai/openaiApi";
 import { AnthropicApi } from "../anthropic/anthropicApi";
+import { OllamaApi } from "../ollama/ollamaApi";
 import { normalizeUserModels } from "../utils";
 import type { HFModelItem } from "../types";
 
@@ -13,7 +14,8 @@ import type { HFModelItem } from "../types";
 let commitGenerationAbortController: AbortController | undefined;
 
 const DEFAULT_PROMPT = {
-	system: "You are a helpful assistant that generates informative git commit messages based on git diffs output. Skip preamble and remove all backticks surrounding the commit message.\nBased on the provided git diff, generate a conventional format commit message.",
+	system:
+		"You are a helpful assistant that generates informative git commit messages based on git diffs output. Skip preamble and remove all backticks surrounding the commit message.\nBased on the provided git diff, generate a conventional format commit message.",
 	user: "Notes from developer (ignore if not relevant): {{USER_CURRENT_INPUT}}",
 };
 
@@ -206,6 +208,8 @@ async function performCommitMsgGeneration(secrets: vscode.SecretStorage, gitDiff
 
 		if (apiMode === "anthropic") {
 			apiInstance = new AnthropicApi();
+		} else if (apiMode === "ollama") {
+			apiInstance = new OllamaApi();
 		} else {
 			// Default to OpenAI-compatible API
 			apiInstance = new OpenaiApi();

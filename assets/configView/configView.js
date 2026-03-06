@@ -821,7 +821,10 @@ function populateCommitModelDropdown() {
 	const commitCompatibleModels = state.models
 		.filter((model) => {
 			const apiMode = model.apiMode || "openai";
-			return (apiMode === "openai" || apiMode === "anthropic") && !model.id.startsWith("__provider__");
+			return (
+				(apiMode === "openai" || apiMode === "anthropic" || apiMode === "ollama") &&
+				!model.id.startsWith("__provider__")
+			);
 		})
 		.sort((a, b) => a.id.localeCompare(b.id));
 

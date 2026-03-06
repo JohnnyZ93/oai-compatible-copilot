@@ -257,7 +257,83 @@ export class OllamaApi extends CommonApi<OllamaMessage, OllamaRequestBody> {
 		baseUrl: string,
 		apiKey: string
 	): AsyncGenerator<{ type: "text"; text: string }> {
-		throw new Error("Method not implemented.");
+		// Convert to Ollama message format
+		const ollamaMessages: OllamaMessage[] = [];
+
+		// Add system prompt first if provided
+		if (systemPrompt) {
+			ollamaMessages.push({ role: "system", content: systemPrompt });
+		}
+
+		// Add user/assistant messages
+		for (const msg of messages) {
+			const role = msg.role === "user" || msg.role === "assistant" ? msg.role : "user";
+			ollamaMessages.push({ role, content: msg.content });
+		}
+
+		// Build request body
+		let requestBody: OllamaRequestBody = {
+			model: model.id,
+			messages: ollamaMessages,
+			stream: true,
+		};
+
+		requestBody = this.prepareRequestBody(requestBody, model, undefined);
+
+		const headers = CommonApi.prepareHeaders(apiKey, model.apiMode ?? "ollama", model.headers);
+
+		const url = `${baseUrl.replace(/\/+$/, "")}/api/chat`;
+
+		// Make the API request
+		const response = await fetch(url, {
+			method: "POST",
+			headers,
+			body: JSON.stringify(requestBody),
+		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(`Ollama API request failed: [${response.status}] ${response.statusText}\n${errorText}`);
+		}
+
+		if (!response.body) {
+			throw new Error("No response body from Ollama API");
+		}
+
+		// Process JSON lines streaming response
+		const reader = response.body.getReader();
+		const decoder = new TextDecoder();
+		let buffer = "";
+
+		try {
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+
+				buffer += decoder.decode(value, { stream: true });
+				const lines = buffer.split("\n");
+				buffer = lines.pop() || "";
+
+				for (const line of lines) {
+					if (!line.trim()) continue;
+
+					try {
+						const chunk: OllamaStreamChunk = JSON.parse(line);
+						if (chunk.message?.content) {
+							yield { type: "text", text: chunk.message.content };
+						}
+
+						if (chunk.done) {
+							break;
+						}
+					} catch {
+						// Silently ignore malformed JSON lines
+					}
+				}
+			}
+		} finally {
+			reader.releaseLock();
+		}
 	}
 }
 
