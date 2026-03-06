@@ -2,6 +2,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { getGitDiff } from "./gitUtils";
 import { OpenaiApi } from "../openai/openaiApi";
+import { OpenaiResponsesApi } from "../openai/openaiResponsesApi";
 import { AnthropicApi } from "../anthropic/anthropicApi";
 import { OllamaApi } from "../ollama/ollamaApi";
 import { normalizeUserModels } from "../utils";
@@ -210,6 +211,8 @@ async function performCommitMsgGeneration(secrets: vscode.SecretStorage, gitDiff
 			apiInstance = new AnthropicApi();
 		} else if (apiMode === "ollama") {
 			apiInstance = new OllamaApi();
+		} else if (apiMode === "openai-responses") {
+			apiInstance = new OpenaiResponsesApi();
 		} else {
 			// Default to OpenAI-compatible API
 			apiInstance = new OpenaiApi();

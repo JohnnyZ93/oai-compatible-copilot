@@ -336,7 +336,7 @@
 							"useForCommitGeneration": {
 								"type": "boolean",
 								"default": false,
-								"description": "Whether to be used for Git commit message generation. Supports openai, anthropic and ollama apiMode."
+								"description": "Whether to be used for Git commit message generation. Not supports gemini apiMode."
 							},
 							"delay": {
 								"type": "number",

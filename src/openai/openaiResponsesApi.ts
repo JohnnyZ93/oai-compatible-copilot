@@ -638,6 +638,122 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 		baseUrl: string,
 		apiKey: string
 	): AsyncGenerator<{ type: "text"; text: string }> {
-		throw new Error("Method not implemented.");
+		// Convert to Responses API format
+		const input: ResponsesInputItem[] = [];
+
+		// Add system prompt as a system message or via instructions
+		if (systemPrompt) {
+			input.push({
+				role: "system",
+				content: [{ type: "input_text", text: systemPrompt }],
+				type: "message",
+				id: `msg_sys_${Date.now()}`,
+				status: "completed",
+			});
+		}
+
+		// Add user/assistant messages
+		for (let i = 0; i < messages.length; i++) {
+			const msg = messages[i];
+			const role = msg.role === "user" || msg.role === "assistant" || msg.role === "system" ? msg.role : "user";
+			input.push({
+				role,
+				content: [{ type: "input_text", text: msg.content }],
+				type: "message",
+				id: `msg_${Date.now()}_${i}`,
+				status: "completed",
+			});
+		}
+
+		// Build request body
+		let requestBody: Record<string, unknown> = {
+			model: model.id,
+			input,
+			stream: true,
+		};
+
+		requestBody = this.prepareRequestBody(requestBody, model, undefined);
+
+		const headers = CommonApi.prepareHeaders(apiKey, model.apiMode ?? "openai-responses", model.headers);
+
+		const url = `${baseUrl.replace(/\/+$/, "")}/responses`;
+
+		// Make the API request
+		const response = await fetch(url, {
+			method: "POST",
+			headers,
+			body: JSON.stringify(requestBody),
+		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(`OpenAI Responses API request failed: [${response.status}] ${response.statusText}\n${errorText}`);
+		}
+
+		if (!response.body) {
+			throw new Error("No response body from OpenAI Responses API");
+		}
+
+		// Process SSE streaming response
+		const reader = response.body.getReader();
+		const decoder = new TextDecoder();
+		let buffer = "";
+
+		try {
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+
+				buffer += decoder.decode(value, { stream: true });
+				const lines = buffer.split("\n");
+				buffer = lines.pop() || "";
+
+				for (const line of lines) {
+					if (!line.startsWith("data:")) {
+						continue;
+					}
+					const data = line.slice(5).trim();
+					if (data === "[DONE]") continue;
+
+					try {
+						const parsed = JSON.parse(data);
+						const eventType = typeof parsed.type === "string" ? parsed.type : "";
+
+						// Only handle text output events, skip reasoning/thinking events
+						const textOutputEvents = [
+							"response.output_text.delta"
+						];
+
+						const isTextEvent = textOutputEvents.includes(eventType) || !eventType; // Also support events without explicit type
+
+						if (isTextEvent) {
+							// Extract text from various possible locations
+							const textSources = [
+								parsed.delta,
+								parsed.text,
+								parsed.content,
+								parsed.output?.[0]?.content?.[0]?.text,
+							];
+
+							for (const textSource of textSources) {
+								if (typeof textSource === "string" && textSource) {
+									yield { type: "text", text: textSource };
+									break;
+								}
+							}
+						}
+
+						// Check for completion
+						if (parsed.done || parsed.type === "response.completed" || parsed.type === "response.done") {
+							break;
+						}
+					} catch {
+						// Silently ignore malformed SSE lines
+					}
+				}
+			}
+		} finally {
+			reader.releaseLock();
+		}
 	}
 }

@@ -444,7 +444,7 @@ All parameters support individual configuration for different models, providing 
 - `include_reasoning_in_request`: Whether to include reasoning_content in assistant messages sent to the API. Supports deepseek-v3.2 and similar models.
 - `apiMode`: API mode: 'openai' (Default) for API (/chat/completions), 'openai-responses' for API (/responses), 'ollama' for API (/api/chat), 'anthropic' for API (/v1/messages), 'gemini' for API (/v1beta/models/{model}:streamGenerateContent?alt=sse).
 - `delay`: Model-specific delay in milliseconds between consecutive requests. If not specified, falls back to global `oaicopilot.delay` configuration.
-- `useForCommitGeneration`: Whether to be used for Git commit message generation. Supports openai, anthropic and ollama apiMode.
+- `useForCommitGeneration`: Whether to be used for Git commit message generation. Not supports gemini apiMode.
 
 ## Thanks to
 

@@ -817,12 +817,12 @@ function populateCommitModelDropdown() {
 		commitModelInput.removeChild(commitModelInput.lastChild);
 	}
 
-	// Filter models that support commit generation (openai or anthropic apiMode)
+	// Filter models that support commit generation (openai, openai-responses, anthropic, ollama apiMode)
 	const commitCompatibleModels = state.models
 		.filter((model) => {
 			const apiMode = model.apiMode || "openai";
 			return (
-				(apiMode === "openai" || apiMode === "anthropic" || apiMode === "ollama") &&
+				apiMode !== "gemini" &&
 				!model.id.startsWith("__provider__")
 			);
 		})
