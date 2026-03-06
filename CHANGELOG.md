@@ -1,5 +1,12 @@
 # Change Log
 
+## 0.3.3 (2026-03-06)
+
+- Feat: Add openai-responses API support for commit message generation.
+- Feat: Add Ollama API support for commit message generation.
+- Feat: Remove token usage status bar and simplify configuration UI access.
+- Feat: Reduce system prompts for commit message generation to improve efficiency.
+
 ## 0.3.2 (2026-03-04)
 
 - Feat: Group models under "OAICopilot" provider with detail labels.
