@@ -17,6 +17,7 @@ import { parseModelId, createRetryConfig, executeWithRetry, normalizeUserModels 
 
 import { prepareLanguageModelChatInformation } from "./provideModel";
 import { prepareTokenCount } from "./provideToken";
+import { updateContextStatusBar } from "./statusBar";
 import { OllamaApi } from "./ollama/ollamaApi";
 import { OpenaiApi } from "./openai/openaiApi";
 import { OpenaiResponsesApi } from "./openai/openaiResponsesApi";
@@ -42,7 +43,10 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	 * Create a provider using the given secret storage for the API key.
 	 * @param secrets VS Code secret storage.
 	 */
-	constructor(private readonly secrets: vscode.SecretStorage) {}
+	constructor(
+		private readonly secrets: vscode.SecretStorage,
+		private readonly statusBarItem: vscode.StatusBarItem
+	) {}
 
 	/**
 	 * Get the list of available language models contributed by this provider
@@ -128,6 +132,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			const modelConfig = {
 				includeReasoningInRequest: um?.include_reasoning_in_request ?? false,
 			};
+
+			// Update Token Usage
+			updateContextStatusBar(messages, model, this.statusBarItem, modelConfig);
 
 			// Apply delay between consecutive requests
 			const modelDelay = um?.delay;
