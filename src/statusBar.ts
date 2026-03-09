@@ -35,14 +35,14 @@ export function formatTokenCount(value: number): string {
  * Create a visual progress bar showing token usage
  * @param usedTokens Tokens used
  * @param maxTokens Maximum tokens available
- * @returns Progress bar string (e.g., "▆ 75%")
+ * @returns Progress bar string (e.g., "▆ 75.2%")
  */
 export function createProgressBar(usedTokens: number, maxTokens: number): string {
 	const blocks = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
 	const usagePercentage = Math.min((usedTokens / maxTokens) * 100, 100);
 	const blockIndex = Math.min(Math.floor((usagePercentage / 100) * blocks.length), blocks.length - 1);
 
-	return `${blocks[blockIndex]} ${Math.round(usagePercentage)}%`;
+	return `${blocks[blockIndex]} ${usagePercentage.toFixed(1)}%`;
 }
 
 /**

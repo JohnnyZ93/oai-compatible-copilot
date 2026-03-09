@@ -1,5 +1,8 @@
 import * as vscode from "vscode";
 import { CancellationToken, LanguageModelChatInformation, LanguageModelChatRequestMessage } from "vscode";
+import { getTokenizer } from "./tokenizer/tokenizerManager";
+import { getImageDimensions } from "./tokenizer/imageUtils";
+import { createDataUrl } from "./utils";
 
 /**
  * Returns the number of tokens for a given text using the model specific tokenizer logic
@@ -24,12 +27,13 @@ export async function prepareTokenCount(
 		for (const part of text.content) {
 			if (part instanceof vscode.LanguageModelTextPart) {
 				// Estimate tokens directly for plain text
-				totalTokens += estimateTextTokens(part.value);
+				totalTokens += await estimateTextTokens(part.value);
 			} else if (part instanceof vscode.LanguageModelDataPart) {
 				// Estimate tokens for image or data parts based on type
 				if (part.mimeType.startsWith("image/")) {
-					// Images are approximately 170 tokens
-					totalTokens += 170;
+					totalTokens += calculateImageTokenCost(createDataUrl(part));
+				} else if (part.mimeType === "cache_control") {
+					/* ignore */
 				} else {
 					// For other binary data, use a more conservative estimate
 					totalTokens += Math.ceil(part.data.length / 4);
@@ -37,16 +41,16 @@ export async function prepareTokenCount(
 			} else if (part instanceof vscode.LanguageModelToolCallPart) {
 				// Tool call token calculation
 				const toolCallText = `${part.name}(${JSON.stringify(part.input)})`;
-				totalTokens += estimateTextTokens(toolCallText);
+				totalTokens += await estimateTextTokens(toolCallText);
 			} else if (part instanceof vscode.LanguageModelToolResultPart) {
 				// Tool result token calculation
 				const resultText = typeof part.content === "string" ? part.content : JSON.stringify(part.content);
-				totalTokens += estimateTextTokens(resultText);
+				totalTokens += await estimateTextTokens(resultText);
 			} else if (part instanceof vscode.LanguageModelThinkingPart) {
 				// Thinking Token
 				if (modelConfig.includeReasoningInRequest) {
 					const thinkingText = Array.isArray(part.value) ? part.value.join("") : part.value;
-					totalTokens += estimateTextTokens(thinkingText);
+					totalTokens += await estimateTextTokens(thinkingText);
 				}
 			}
 		}
@@ -58,40 +62,29 @@ export async function prepareTokenCount(
 	}
 }
 
-/** Roughly estimate tokens for VS Code chat messages (text only) */
-export function estimateMessagesTokens(msgs: readonly vscode.LanguageModelChatRequestMessage[]): number {
-	let total = 0;
-	for (const m of msgs) {
-		for (const part of m.content) {
-			if (part instanceof vscode.LanguageModelTextPart) {
-				total += estimateTextTokens(part.value);
-			}
-		}
-	}
-	return total;
+/**
+ * Count tokens using real tokenizer
+ */
+export async function estimateTextTokens(text: string): Promise<number> {
+	return getTokenizer.countTokens(text);
 }
 
-/** 针对不同内容类型的 token 估算 */
-export function estimateTextTokens(text: string): number {
-	const chineseChars = (text.match(/[\u4e00-\u9fff]/g) || []).length;
-	const englishWords = (text.match(/\b[a-zA-Z]+\b/g) || []).length;
-	const symbols = text.length - chineseChars - englishWords;
+// https://platform.openai.com/docs/guides/vision#calculating-costs
+export function calculateImageTokenCost(imageUrl: string): number {
+	let { width, height } = getImageDimensions(imageUrl);
 
-	// 中文字符约1.5个token，英文单词约1个token，符号约0.5个token
-	return Math.ceil(chineseChars * 1.5 + englishWords + symbols * 0.5);
-}
+	// Scale image to fit within a 2048 x 2048 square if necessary.
+	if (width > 2048 || height > 2048) {
+		const scaleFactor = 2048 / Math.max(width, height);
+		width = Math.round(width * scaleFactor);
+		height = Math.round(height * scaleFactor);
+	}
 
-/** Rough token estimate for tool definitions by JSON size */
-export function estimateToolTokens(
-	tools: { type: string; function: { name: string; description?: string; parameters?: object } }[] | undefined
-): number {
-	if (!tools || tools.length === 0) {
-		return 0;
-	}
-	try {
-		const json = JSON.stringify(tools);
-		return Math.ceil(json.length / 4);
-	} catch {
-		return 0;
-	}
+	const scaleFactor = 768 / Math.min(width, height);
+	width = Math.round(width * scaleFactor);
+	height = Math.round(height * scaleFactor);
+
+	const tiles = Math.ceil(width / 512) * Math.ceil(height / 512);
+
+	return tiles * 170 + 85;
 }

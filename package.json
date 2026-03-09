@@ -457,7 +457,9 @@
 		"test": "npm run compile && vscode-test",
 		"build": "npx @vscode/vsce package -o extension.vsix"
 	},
-	"dependencies": {},
+	"dependencies": {
+		"@microsoft/tiktokenizer": "^1.0.10"
+	},
 	"devDependencies": {
 		"@eslint/js": "^9.13.0",
 		"@stylistic/eslint-plugin": "^2.9.0",
