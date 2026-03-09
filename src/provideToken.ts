@@ -69,6 +69,28 @@ export async function estimateTextTokens(text: string): Promise<number> {
 	return getTokenizer.countTokens(text);
 }
 
+/**
+ * Count tokens for tool definitions using real tokenizer
+ */
+export async function estimateToolTokens(
+	tools: readonly vscode.LanguageModelChatTool[]
+): Promise<number> {
+	const baseToolTokens = 16;
+	let numTokens = 0;
+	if (tools.length) {
+		numTokens += baseToolTokens;
+	}
+
+	const baseTokensPerTool = 8;
+	for (const tool of tools) {
+		numTokens += baseTokensPerTool;
+		numTokens += await estimateTextTokens(JSON.stringify(tool));
+	}
+
+	// This is an estimate, so give a little safety margin
+	return Math.floor(numTokens * 1.1);
+}
+
 // https://platform.openai.com/docs/guides/vision#calculating-costs
 export function calculateImageTokenCost(imageUrl: string): number {
 	let { width, height } = getImageDimensions(imageUrl);

@@ -134,7 +134,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			};
 
 			// Update Token Usage
-			updateContextStatusBar(messages, model, this.statusBarItem, modelConfig);
+			updateContextStatusBar(messages, options.tools, model, this.statusBarItem, modelConfig);
 
 			// Apply delay between consecutive requests
 			const modelDelay = um?.delay;
