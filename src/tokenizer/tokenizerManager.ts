@@ -1,10 +1,15 @@
-import { TikTokenizer, createByEncoderName } from "@microsoft/tiktokenizer";
+import * as vscode from "vscode";
+import { TikTokenizer, createTokenizer, getRegexByEncoder, getSpecialTokensByEncoder } from "@microsoft/tiktokenizer";
+
+const TOKENIZER_ENCODER = "o200k_base";
+const CACHE_MAX_ENTRIES = 5000;
+const CACHE_MAX_SIZE_BYTES = 5_000_000; // 5MB
 
 // Simple LRU Cache for token counts
 class TokenCache {
 	private cache = new Map<string, number>();
-	private maxSize = 5000;
-	private maxSizeBytes = 5_000_000; // 5MB
+	private maxSize = CACHE_MAX_ENTRIES;
+	private maxSizeBytes = CACHE_MAX_SIZE_BYTES;
 	private currentSize = 0;
 
 	get(key: string): number | undefined {
@@ -22,10 +27,15 @@ class TokenCache {
 		const entrySize = key.length * 2 + 8; // Approximate size in bytes
 
 		// Evict if would exceed limits
-		while ((this.cache.size >= this.maxSize || this.currentSize + entrySize > this.maxSizeBytes) && this.cache.size > 0) {
+		while (
+			(this.cache.size >= this.maxSize || this.currentSize + entrySize > this.maxSizeBytes) &&
+			this.cache.size > 0
+		) {
 			const firstKey = this.cache.keys().next().value;
 			if (firstKey === undefined) break;
+			const evictedSize = firstKey.length * 2 + 8;
 			this.cache.delete(firstKey);
+			this.currentSize -= evictedSize;
 		}
 
 		this.cache.set(key, value);
@@ -38,9 +48,22 @@ export class TokenizerManager {
 	private static instance: TokenizerManager | null = null;
 	private tokenizer: TikTokenizer | null = null;
 	private cache = new TokenCache();
-	private tokenizerReady: Promise<void> | null = null;
+	private tokenizerReady: Promise<TikTokenizer> | null = null;
+	private static extensionPath: string | null = null;
 
 	private constructor() {}
+
+	/**
+	 * Initialize the tokenizer with extension path (call from activate)
+	 */
+	static initialize(extensionPath: string): TokenizerManager {
+		TokenizerManager.extensionPath = extensionPath;
+		return TokenizerManager.getInstance();
+	}
+
+	static setExtensionPath(path: string): void {
+		TokenizerManager.extensionPath = path;
+	}
 
 	static getInstance(): TokenizerManager {
 		if (!TokenizerManager.instance) {
@@ -50,17 +73,27 @@ export class TokenizerManager {
 	}
 
 	async getTokenizer(): Promise<TikTokenizer> {
-		if (!this.tokenizer) {
-			if (!this.tokenizerReady) {
-				this.tokenizerReady = (async () => {
-					this.tokenizer = await createByEncoderName("o200k_base");
-				})();
-			}
-			await this.tokenizerReady;
-			if (!this.tokenizer) {
-				throw new Error("Failed to initialize tokenizer");
-			}
+		if (this.tokenizer) {
+			return this.tokenizer;
 		}
+
+		if (!this.tokenizerReady) {
+			this.tokenizerReady = (async () => {
+				if (!TokenizerManager.extensionPath) {
+					throw new Error("Extension path not initialized. Call TokenizerManager.setExtensionPath() first.");
+				}
+				const basePath = vscode.Uri.file(TokenizerManager.extensionPath);
+				const tokenizerPath = vscode.Uri.joinPath(basePath, "assets", "model", `${TOKENIZER_ENCODER}.tiktoken`).fsPath;
+				return createTokenizer(
+					tokenizerPath,
+					getSpecialTokensByEncoder(TOKENIZER_ENCODER),
+					getRegexByEncoder(TOKENIZER_ENCODER),
+					64000
+				);
+			})();
+		}
+
+		this.tokenizer = await this.tokenizerReady;
 		return this.tokenizer;
 	}
 
@@ -73,7 +106,7 @@ export class TokenizerManager {
 		}
 
 		const tokenizer = await this.getTokenizer();
-		const tokens = tokenizer.encode(text, ["<|im_start|>", "<|im_end|>", "<|im_sep|>"]);
+		const tokens = tokenizer.encode(text);
 		const count = tokens.length;
 
 		this.cache.set(text, count);
@@ -82,4 +115,4 @@ export class TokenizerManager {
 }
 
 // Export singleton instance
-export const getTokenizer = TokenizerManager.getInstance();
+export const tokenizerManager = TokenizerManager.getInstance();

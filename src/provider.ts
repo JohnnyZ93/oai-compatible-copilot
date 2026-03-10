@@ -16,7 +16,7 @@ import type { OllamaRequestBody } from "./ollama/ollamaTypes";
 import { parseModelId, createRetryConfig, executeWithRetry, normalizeUserModels } from "./utils";
 
 import { prepareLanguageModelChatInformation } from "./provideModel";
-import { prepareTokenCount } from "./provideToken";
+import { countMessageTokens } from "./provideToken";
 import { updateContextStatusBar } from "./statusBar";
 import { OllamaApi } from "./ollama/ollamaApi";
 import { OpenaiApi } from "./openai/openaiApi";
@@ -69,11 +69,11 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	 * @returns A promise that resolves to the number of tokens
 	 */
 	async provideTokenCount(
-		model: LanguageModelChatInformation,
+		_model: LanguageModelChatInformation,
 		text: string | LanguageModelChatRequestMessage,
 		_token: CancellationToken
 	): Promise<number> {
-		return prepareTokenCount(model, text, _token, { includeReasoningInRequest: false });
+		return countMessageTokens(text, { includeReasoningInRequest: true });
 	}
 
 	/**

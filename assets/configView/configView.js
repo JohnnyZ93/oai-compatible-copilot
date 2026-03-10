@@ -821,10 +821,7 @@ function populateCommitModelDropdown() {
 	const commitCompatibleModels = state.models
 		.filter((model) => {
 			const apiMode = model.apiMode || "openai";
-			return (
-				apiMode !== "gemini" &&
-				!model.id.startsWith("__provider__")
-			);
+			return apiMode !== "gemini" && !model.id.startsWith("__provider__");
 		})
 		.sort((a, b) => a.id.localeCompare(b.id));
 

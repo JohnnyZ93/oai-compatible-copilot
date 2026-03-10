@@ -1,33 +1,32 @@
 import * as vscode from "vscode";
-import { CancellationToken, LanguageModelChatInformation, LanguageModelChatRequestMessage } from "vscode";
-import { getTokenizer } from "./tokenizer/tokenizerManager";
+import { LanguageModelChatRequestMessage, LanguageModelChatTool } from "vscode";
+import { tokenizerManager } from "./tokenizer/tokenizerManager";
 import { getImageDimensions } from "./tokenizer/imageUtils";
 import { createDataUrl } from "./utils";
 
-/**
- * Returns the number of tokens for a given text using the model specific tokenizer logic
- * @param model The language model to use
- * @param text The text to count tokens for
- * @param token A cancellation token for the request
- * @returns A promise that resolves to the number of tokens
+/*
+ * Each message comes with 3 tokens per message due to special characters
  */
-export async function prepareTokenCount(
-	model: LanguageModelChatInformation,
+export const BaseTokensPerMessage = 3;
+/*
+ * Each name costs 1 token
+ */
+export const BaseTokensPerName = 1;
+
+export async function countMessageTokens(
 	text: string | LanguageModelChatRequestMessage,
-	_token: CancellationToken,
 	modelConfig: { includeReasoningInRequest: boolean }
 ): Promise<number> {
 	if (typeof text === "string") {
-		// Estimate tokens directly for plain text
-		return estimateTextTokens(text);
+		return textTokenLength(text);
 	} else {
 		// For complex messages, calculate tokens for each part separately
-		let totalTokens = 0;
+		let totalTokens = BaseTokensPerMessage + BaseTokensPerName;
 
 		for (const part of text.content) {
 			if (part instanceof vscode.LanguageModelTextPart) {
 				// Estimate tokens directly for plain text
-				totalTokens += await estimateTextTokens(part.value);
+				totalTokens += await textTokenLength(part.value);
 			} else if (part instanceof vscode.LanguageModelDataPart) {
 				// Estimate tokens for image or data parts based on type
 				if (part.mimeType.startsWith("image/")) {
@@ -36,45 +35,38 @@ export async function prepareTokenCount(
 					/* ignore */
 				} else {
 					// For other binary data, use a more conservative estimate
-					totalTokens += Math.ceil(part.data.length / 4);
+					totalTokens += calculateNonImageBinaryTokens(part.data.byteLength);
 				}
 			} else if (part instanceof vscode.LanguageModelToolCallPart) {
 				// Tool call token calculation
-				const toolCallText = `${part.name}(${JSON.stringify(part.input)})`;
-				totalTokens += await estimateTextTokens(toolCallText);
+				totalTokens += BaseTokensPerName;
+				totalTokens += await textTokenLength(JSON.stringify(part.input));
 			} else if (part instanceof vscode.LanguageModelToolResultPart) {
 				// Tool result token calculation
-				const resultText = typeof part.content === "string" ? part.content : JSON.stringify(part.content);
-				totalTokens += await estimateTextTokens(resultText);
+				totalTokens += await textTokenLength(JSON.stringify(part.content));
 			} else if (part instanceof vscode.LanguageModelThinkingPart) {
 				// Thinking Token
 				if (modelConfig.includeReasoningInRequest) {
 					const thinkingText = Array.isArray(part.value) ? part.value.join("") : part.value;
-					totalTokens += await estimateTextTokens(thinkingText);
+					totalTokens += await textTokenLength(thinkingText);
 				}
+			} else {
+				console.warn(`Unknown part type: ${JSON.stringify(part)}`);
 			}
 		}
-
-		// Add fixed overhead for roles and structure
-		totalTokens += 4;
-
 		return totalTokens;
 	}
 }
 
-/**
- * Count tokens using real tokenizer
- */
-export async function estimateTextTokens(text: string): Promise<number> {
-	return getTokenizer.countTokens(text);
+export async function textTokenLength(text: string): Promise<number> {
+	try {
+		return tokenizerManager.countTokens(text);
+	} catch (e) {
+		return 0;
+	}
 }
 
-/**
- * Count tokens for tool definitions using real tokenizer
- */
-export async function estimateToolTokens(
-	tools: readonly vscode.LanguageModelChatTool[]
-): Promise<number> {
+export async function countToolTokens(tools: readonly LanguageModelChatTool[]): Promise<number> {
 	const baseToolTokens = 16;
 	let numTokens = 0;
 	if (tools.length) {
@@ -84,16 +76,19 @@ export async function estimateToolTokens(
 	const baseTokensPerTool = 8;
 	for (const tool of tools) {
 		numTokens += baseTokensPerTool;
-		numTokens += await estimateTextTokens(JSON.stringify(tool));
+		numTokens += await textTokenLength(JSON.stringify(tool));
 	}
 
-	// This is an estimate, so give a little safety margin
-	return Math.floor(numTokens * 1.1);
+	return numTokens;
 }
 
 // https://platform.openai.com/docs/guides/vision#calculating-costs
-export function calculateImageTokenCost(imageUrl: string): number {
+function calculateImageTokenCost(imageUrl: string): number {
 	let { width, height } = getImageDimensions(imageUrl);
+
+	if (width <= 0 || height <= 0) {
+		return 0;
+	}
 
 	// Scale image to fit within a 2048 x 2048 square if necessary.
 	if (width > 2048 || height > 2048) {
@@ -109,4 +104,13 @@ export function calculateImageTokenCost(imageUrl: string): number {
 	const tiles = Math.ceil(width / 512) * Math.ceil(height / 512);
 
 	return tiles * 170 + 85;
+}
+
+function calculateNonImageBinaryTokens(byteLength: number): number {
+	if (!byteLength) {
+		return 0;
+	}
+	const base = 20;
+	const per16Kb = Math.ceil(byteLength / 16384);
+	return Math.min(200, base + per16Kb);
 }

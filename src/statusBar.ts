@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import { LanguageModelChatInformation, LanguageModelChatRequestMessage, LanguageModelChatTool, CancellationTokenSource } from "vscode";
-import { prepareTokenCount, estimateToolTokens } from "./provideToken";
+import { LanguageModelChatInformation, LanguageModelChatRequestMessage, LanguageModelChatTool } from "vscode";
+import { countMessageTokens, countToolTokens } from "./provideToken";
 
 export function initStatusBar(context: vscode.ExtensionContext): vscode.StatusBarItem {
 	// Create status bar item for token count display
@@ -60,13 +60,8 @@ export async function updateContextStatusBar(
 	statusBarItem: vscode.StatusBarItem,
 	modelConfig: { includeReasoningInRequest: boolean }
 ): Promise<void> {
-	// Create a single CancellationTokenSource for all token count operations
-	const cancellationTokenSource = new CancellationTokenSource();
-
 	// Calculate tokens for all messages in parallel
-	const tokenCountPromises = messages.map((message) =>
-		prepareTokenCount(model, message, cancellationTokenSource.token, modelConfig)
-	);
+	const tokenCountPromises = messages.map((message) => countMessageTokens(message, modelConfig));
 
 	const tokenCounts = await Promise.all(tokenCountPromises);
 	const messagesTokens = tokenCounts.reduce((sum, count) => sum + count, 0);
@@ -74,14 +69,11 @@ export async function updateContextStatusBar(
 	// Calculate tool definition tokens
 	let toolTokens = 0;
 	if (tools && tools.length > 0) {
-		toolTokens = await estimateToolTokens(tools);
+		toolTokens = await countToolTokens(tools);
 	}
 
-	// Reserved output tokens
-	const reservedOutputTokens = model.maxOutputTokens;
-
 	// Total tokens: messages + tool definitions + reserved output
-	const totalTokenCount = messagesTokens + toolTokens + reservedOutputTokens;
+	const totalTokenCount = messagesTokens + toolTokens;
 	const maxTokens = model.maxInputTokens + model.maxOutputTokens;
 
 	// Create visual progress bar with single progressive block
@@ -89,10 +81,9 @@ export async function updateContextStatusBar(
 	const displayText = `$(symbol-parameter) ${progressBar}`;
 	statusBarItem.text = displayText;
 	statusBarItem.tooltip = `Token Usage: ${formatTokenCount(totalTokenCount)} / ${formatTokenCount(maxTokens)}\n
-* Messages: ${formatTokenCount(messagesTokens)}
-* Tool Definitions: ${formatTokenCount(toolTokens)}
-* Reserved Output: ${formatTokenCount(reservedOutputTokens)}\n
 ${progressBar}\n
+  - Messages: ${formatTokenCount(messagesTokens)}  (${Math.min((messagesTokens / maxTokens) * 100, 100).toFixed(1)}%)
+  - Tools: ${formatTokenCount(toolTokens)}  (${Math.min((toolTokens / maxTokens) * 100, 100).toFixed(1)}%) \n
 Click to Open Configuration UI`;
 
 	// Add color coding based on token usage

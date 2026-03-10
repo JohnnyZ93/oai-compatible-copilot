@@ -5,8 +5,12 @@ import { initStatusBar } from "./statusBar";
 import { ConfigViewPanel } from "./views/configView";
 import { normalizeUserModels } from "./utils";
 import { abortCommitGeneration, generateCommitMsg } from "./gitCommit/commitMessageGenerator";
+import { TokenizerManager } from "./tokenizer/tokenizerManager";
 
 export function activate(context: vscode.ExtensionContext) {
+	// Initialize TokenizerManager with extension path
+	TokenizerManager.initialize(context.extensionPath);
+
 	const tokenCountStatusBarItem: vscode.StatusBarItem = initStatusBar(context);
 	const provider = new HuggingFaceChatModelProvider(context.secrets, tokenCountStatusBarItem);
 	// Register the Hugging Face provider under the vendor id used in package.json

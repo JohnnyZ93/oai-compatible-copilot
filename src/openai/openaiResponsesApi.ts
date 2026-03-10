@@ -720,20 +720,13 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 						const eventType = typeof parsed.type === "string" ? parsed.type : "";
 
 						// Only handle text output events, skip reasoning/thinking events
-						const textOutputEvents = [
-							"response.output_text.delta"
-						];
+						const textOutputEvents = ["response.output_text.delta"];
 
 						const isTextEvent = textOutputEvents.includes(eventType) || !eventType; // Also support events without explicit type
 
 						if (isTextEvent) {
 							// Extract text from various possible locations
-							const textSources = [
-								parsed.delta,
-								parsed.text,
-								parsed.content,
-								parsed.output?.[0]?.content?.[0]?.text,
-							];
+							const textSources = [parsed.delta, parsed.text, parsed.content, parsed.output?.[0]?.content?.[0]?.text];
 
 							for (const textSource of textSources) {
 								if (typeof textSource === "string" && textSource) {
