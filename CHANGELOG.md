@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.3.4 (2026-03-10)
+
+- Feat: Re-enable the token usage status bar because VS Code's native statistics are inaccurate for BYOK providers.
+
 ## 0.3.3 (2026-03-06)
 
 - Feat: Add openai-responses API support for commit message generation.
