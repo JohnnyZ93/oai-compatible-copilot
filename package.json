@@ -157,6 +157,47 @@
 								"type": "string",
 								"description": "Base URL for the model provider. If not provided, the global oaicopilot.baseUrl will be used."
 							},
+							"fallbacks": {
+								"type": "array",
+								"items": {
+									"oneOf": [
+										{
+											"type": "string",
+											"description": "Fallback model reference. Use 'model-id', 'model-id::config-id', or 'provider|model-id' to disambiguate the same model ID across providers."
+										},
+										{
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "string",
+													"description": "Fallback model ID. Supports 'model-id::config-id'."
+												},
+												"modelId": {
+													"type": "string",
+													"description": "Fallback model ID. Supports 'model-id::config-id'."
+												},
+												"configId": {
+													"type": "string",
+													"description": "Optional fallback config ID when the same model is configured multiple times."
+												},
+												"owned_by": {
+													"type": "string",
+													"description": "Optional provider hint to disambiguate the fallback target."
+												},
+												"provider": {
+													"type": "string",
+													"description": "Alias of owned_by for the fallback target."
+												},
+												"provide": {
+													"type": "string",
+													"description": "Alias of owned_by for the fallback target."
+												}
+											}
+										}
+									]
+								},
+								"description": "Ordered fallback chain for this model. Each entry must reference another model configured in oaicopilot.models. Use 'provider|model-id' or an object with owned_by/provider when the same model ID exists under multiple providers."
+							},
 							"context_length": {
 								"type": "number",
 								"default": 128000,

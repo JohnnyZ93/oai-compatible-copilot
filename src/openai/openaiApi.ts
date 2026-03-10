@@ -302,10 +302,17 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 
 					try {
 						const parsed = JSON.parse(data);
+						const errorMessage = this.extractStreamingError(parsed);
+						if (errorMessage) {
+							throw new Error(`OAI Compatible API streaming error: ${errorMessage}`);
+						}
 						// console.debug("[OAI Compatible Model Provider] data:", JSON.stringify(parsed));
 
 						await this.processDelta(parsed, progress);
-					} catch {
+					} catch (error) {
+						if (error instanceof Error && /streaming error/i.test(error.message)) {
+							throw error;
+						}
 						// Silently ignore malformed SSE lines temporarily
 					}
 				}
@@ -315,6 +322,24 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 			// If there's an active thinking sequence, end it first
 			this.reportEndThinking(progress);
 		}
+	}
+
+	private extractStreamingError(payload: Record<string, unknown>): string | undefined {
+		const error = payload.error;
+		if (!error) {
+			return undefined;
+		}
+		if (typeof error === "string") {
+			return error;
+		}
+		if (typeof error === "object") {
+			const obj = error as Record<string, unknown>;
+			const message = typeof obj.message === "string" ? obj.message : "";
+			const type = typeof obj.type === "string" ? obj.type : "";
+			const code = typeof obj.code === "string" ? obj.code : "";
+			return [type, code, message].filter(Boolean).join(": ");
+		}
+		return undefined;
 	}
 
 	/**

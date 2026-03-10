@@ -25,6 +25,10 @@ export async function prepareLanguageModelChatInformation(
 	// Check for user-configured models first
 	const config = vscode.workspace.getConfiguration();
 	const userModels = normalizeUserModels(config.get<unknown>("oaicopilot.models", []));
+	const modelIdCounts = new Map<string, number>();
+	for (const userModel of userModels) {
+		modelIdCounts.set(userModel.id, (modelIdCounts.get(userModel.id) ?? 0) + 1);
+	}
 
 	let infos: LanguageModelChatInformation[];
 	if (userModels && userModels.length > 0) {
@@ -38,7 +42,14 @@ export async function prepareLanguageModelChatInformation(
 
 				// 使用配置ID（如果存在）来生成唯一的模型ID
 				const modelId = m.configId ? `${m.id}::${m.configId}` : m.id;
-				const modelName = m.displayName || (m.configId ? `${m.id}::${m.configId}` : `${m.id}`);
+				const hasDuplicateModelId = (modelIdCounts.get(m.id) ?? 0) > 1;
+				const modelName =
+					m.displayName ||
+					(m.configId
+						? `${m.id}::${m.configId}`
+						: hasDuplicateModelId && m.owned_by
+							? `${m.id} (${m.owned_by})`
+							: `${m.id}`);
 				const detail = m.owned_by ? `${m.owned_by} (${EXTENSION_LABEL})` : EXTENSION_LABEL;
 
 				return {

@@ -1,4 +1,6 @@
 .vscode/**
+.vscode-local-ext/**
+.vscode-local-user/**
 .vscode-test/**
 src/**
 .gitignore
@@ -14,3 +16,4 @@ vsc-extension-quickstart.md
 .vscode-test.mjs
 eslint.config.mjs
 AGENTS.md
+extension.vsix

@@ -321,8 +321,14 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 
 					try {
 						const parsed = JSON.parse(data) as Record<string, unknown>;
+						if (parsed.error) {
+							throw new Error(`Responses API streaming error: ${JSON.stringify(parsed.error)}`);
+						}
 						await this.processEvent(parsed, progress);
-					} catch {
+					} catch (error) {
+						if (error instanceof Error && /Responses API streaming error/i.test(error.message)) {
+							throw error;
+						}
 						// Silently ignore malformed SSE lines
 					}
 				}
@@ -406,7 +412,7 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 			case "error": {
 				const errorText = JSON.stringify(event);
 				console.error("[OAI Compatible Model Provider] Responses API streaming process error:", errorText);
-				return;
+				throw new Error(`Responses API streaming error: ${errorText}`);
 			}
 
 			// Output text delta events

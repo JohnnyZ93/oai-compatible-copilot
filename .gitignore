@@ -2,6 +2,8 @@ out
 dist
 node_modules
 .vscode-test/
+.vscode-local-ext/
+.vscode-local-user/
 *.vsix
 .DS_Store
 CLAUDE.md

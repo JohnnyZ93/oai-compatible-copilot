@@ -17,6 +17,15 @@ export interface HFArchitecture {
 	output_modalities?: string[];
 }
 
+export interface FallbackModelRef {
+	id?: string;
+	modelId?: string;
+	configId?: string;
+	owned_by?: string;
+	provider?: string;
+	provide?: string;
+}
+
 export interface HFModelItem {
 	id: string;
 	object?: string;
@@ -29,6 +38,7 @@ export interface HFModelItem {
 	architecture?: HFArchitecture;
 	context_length?: number;
 	vision?: boolean;
+	fallbacks?: FallbackModelRef[];
 	max_tokens?: number;
 	// OpenAI new standard parameter
 	max_completion_tokens?: number;
@@ -139,6 +149,13 @@ export interface RetryConfig {
 	interval_ms?: number;
 	status_codes?: number[];
 }
+
+export type RuntimeResponsePart =
+	| import("vscode").LanguageModelResponsePart2
+	| import("vscode").LanguageModelTextPart
+	| import("vscode").LanguageModelDataPart
+	| import("vscode").LanguageModelThinkingPart
+	| import("vscode").LanguageModelToolCallPart;
 
 /** Supports API mode. */
 export type HFApiMode = "openai" | "openai-responses" | "ollama" | "anthropic" | "gemini";

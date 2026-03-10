@@ -804,6 +804,10 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 					if (!payload) {
 						continue;
 					}
+					const payloadRecord = payload as Record<string, unknown>;
+					if (payloadRecord.error) {
+						throw new Error(`Gemini API streaming error: ${JSON.stringify(payloadRecord.error)}`);
+					}
 
 					const candidates = Array.isArray(payload.candidates) ? payload.candidates : [];
 					const cand = candidates.length > 0 ? candidates[0] : null;

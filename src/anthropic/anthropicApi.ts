@@ -289,8 +289,7 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 			const errorType = chunk.error?.type || "unknown_error";
 			const errorMessage = chunk.error?.message || "Anthropic API streaming error";
 			console.error(`[Anthropic Provider] Streaming error: ${errorType} - ${errorMessage}`);
-			// We could throw here, but for now just log and continue
-			return;
+			throw new Error(`Anthropic API streaming error: ${errorType} - ${errorMessage}`);
 		}
 
 		if (chunk.type === "message_start" && chunk.message) {

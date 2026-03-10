@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { HFModelItem, RetryConfig } from "./types";
+import type { FallbackModelRef, HFModelItem, RetryConfig } from "./types";
 import { OpenAIFunctionToolDef } from "./openai/openaiTypes";
 
 const RETRY_MAX_ATTEMPTS = 3;
@@ -19,7 +19,32 @@ const networkErrorPatterns = [
 	"TIMEOUT",
 	"network error",
 	"NetworkError",
+	"rate limit",
+	"rate_limit",
+	"too many requests",
+	"quota",
+	"insufficient_quota",
+	"resource_exhausted",
+	"RESOURCE_EXHAUSTED",
+	"exceeded your current quota",
+	"usage limit",
+	"overloaded",
 ];
+
+export function buildConfiguredModelId(modelId: string, configId?: string): string {
+	return configId ? `${modelId}::${configId}` : modelId;
+}
+
+export function buildResolvedModelKey(provider: string | undefined, modelId: string, configId?: string): string {
+	const configuredModelId = buildConfiguredModelId(modelId, configId);
+	return provider ? `${provider}|${configuredModelId}` : configuredModelId;
+}
+
+interface ParsedFallbackRef {
+	provider?: string;
+	modelId: string;
+	configId?: string;
+}
 
 // Model ID parsing helper
 export interface ParsedModelId {
@@ -43,6 +68,70 @@ export function getModelProviderId(model: unknown): string {
 	);
 }
 
+export function parseFallbackRefString(value: string): ParsedFallbackRef | undefined {
+	const trimmed = value.trim();
+	if (!trimmed) {
+		return undefined;
+	}
+
+	const providerSeparator = trimmed.indexOf("|");
+	const provider = providerSeparator >= 0 ? trimmed.slice(0, providerSeparator).trim() : "";
+	const modelRef = providerSeparator >= 0 ? trimmed.slice(providerSeparator + 1).trim() : trimmed;
+	const parsedModel = parseModelId(modelRef);
+	if (!parsedModel.baseId) {
+		return undefined;
+	}
+
+	return {
+		provider: provider || undefined,
+		modelId: parsedModel.baseId,
+		configId: parsedModel.configId,
+	};
+}
+
+export function normalizeFallbackRefs(fallbacks: unknown): FallbackModelRef[] {
+	const list = Array.isArray(fallbacks) ? fallbacks : [];
+	const out: FallbackModelRef[] = [];
+
+	for (const item of list) {
+		if (typeof item === "string") {
+			const parsed = parseFallbackRefString(item);
+			if (!parsed) {
+				continue;
+			}
+			out.push({ modelId: parsed.modelId, configId: parsed.configId, owned_by: parsed.provider });
+			continue;
+		}
+
+		if (!item || typeof item !== "object") {
+			continue;
+		}
+
+		const raw = item as Record<string, unknown>;
+		const rawModelId =
+			typeof raw.id === "string"
+				? raw.id.trim()
+				: typeof raw.modelId === "string"
+					? raw.modelId.trim()
+					: "";
+		const parsed = parseFallbackRefString(rawModelId);
+		const configId = typeof raw.configId === "string" ? raw.configId.trim() : parsed?.configId;
+		const provider = getModelProviderId(item) || parsed?.provider || undefined;
+
+		if (!parsed?.modelId) {
+			continue;
+		}
+
+		out.push({
+			modelId: parsed.modelId,
+			configId: configId || undefined,
+			owned_by: provider,
+		});
+	}
+
+	return out;
+}
+
 export function normalizeUserModels(models: unknown): HFModelItem[] {
 	const list = Array.isArray(models) ? models : [];
 	const out: HFModelItem[] = [];
@@ -51,7 +140,11 @@ export function normalizeUserModels(models: unknown): HFModelItem[] {
 			continue;
 		}
 		const provider = getModelProviderId(item);
-		out.push({ ...(item as HFModelItem), owned_by: provider });
+		out.push({
+			...(item as HFModelItem),
+			owned_by: provider,
+			fallbacks: normalizeFallbackRefs((item as { fallbacks?: unknown }).fallbacks),
+		});
 	}
 	return out;
 }
@@ -270,6 +363,19 @@ export function createRetryConfig(): RetryConfig {
 	};
 }
 
+export function getRetryableStatusCodes(retryConfig: RetryConfig, extraStatusCodes: number[] = []): number[] {
+	return retryConfig.status_codes
+		? [...new Set([...RETRYABLE_STATUS_CODES, ...retryConfig.status_codes, ...extraStatusCodes])]
+		: [...new Set([...RETRYABLE_STATUS_CODES, ...extraStatusCodes])];
+}
+
+export function isRetryableError(error: Error, retryConfig: RetryConfig, extraStatusCodes: number[] = []): boolean {
+	const retryableStatusCodes = getRetryableStatusCodes(retryConfig, extraStatusCodes);
+	const isRetryableStatusError = retryableStatusCodes.some((code) => error.message.includes(`[${code}]`));
+	const isRetryableNetworkError = networkErrorPatterns.some((pattern) => error.message.includes(pattern));
+	return isRetryableStatusError || isRetryableNetworkError;
+}
+
 /**
  * Execute a function with retry logic for rate limiting.
  * @param fn The async function to execute
@@ -284,10 +390,6 @@ export async function executeWithRetry<T>(fn: () => Promise<T>, retryConfig: Ret
 
 	const maxAttempts = retryConfig.max_attempts ?? RETRY_MAX_ATTEMPTS;
 	const intervalMs = retryConfig.interval_ms ?? RETRY_INTERVAL_MS;
-	// Merge user-configured status codes with default ones, removing duplicates
-	const retryableStatusCodes = retryConfig.status_codes
-		? [...new Set([...RETRYABLE_STATUS_CODES, ...retryConfig.status_codes])]
-		: RETRYABLE_STATUS_CODES;
 	let lastError: Error | undefined;
 
 	for (let attempt = 0; attempt <= maxAttempts; attempt++) {
@@ -296,13 +398,7 @@ export async function executeWithRetry<T>(fn: () => Promise<T>, retryConfig: Ret
 		} catch (error) {
 			lastError = error instanceof Error ? error : new Error(String(error));
 
-			// Check if error is retryable based on status codes
-			const isRetryableStatusError = retryableStatusCodes.some((code) => lastError?.message.includes(`[${code}]`));
-			// Check if error is retryable based on network error patterns
-			const isRetryableNetworkError = networkErrorPatterns.some((pattern) => lastError?.message.includes(pattern));
-			const isRetryableError = isRetryableStatusError || isRetryableNetworkError;
-
-			if (!isRetryableError || attempt === maxAttempts) {
+			if (!isRetryableError(lastError, retryConfig) || attempt === maxAttempts) {
 				throw lastError;
 			}
 
