@@ -246,7 +246,7 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 						continue;
 					}
 
-					const data = line.slice(6);
+					const data = line.slice(5).trim();
 					if (data === "[DONE]") {
 						// Do not throw on [DONE]; any incomplete/empty buffers are ignored.
 						await this.flushToolCallBuffers(progress, /*throwOnInvalid*/ false);
@@ -423,9 +423,9 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 
 				for (const line of lines) {
 					if (line.trim() === "") continue;
-					if (!line.startsWith("data: ")) continue;
+					if (!line.startsWith("data:")) continue;
 
-					const data = line.slice(6);
+					const data = line.slice(5).trim();
 					if (data === "[DONE]") continue;
 
 					try {
