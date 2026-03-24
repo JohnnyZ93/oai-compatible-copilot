@@ -242,7 +242,7 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 					if (line.trim() === "") {
 						continue;
 					}
-					if (!line.startsWith("data: ")) {
+					if (!line.startsWith("data:")) {
 						continue;
 					}
 
