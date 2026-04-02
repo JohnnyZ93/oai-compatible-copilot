@@ -230,6 +230,8 @@ async function performCommitMsgGeneration(secrets: vscode.SecretStorage, gitDiff
 			}
 		}
 
+		inputBox.value = removeThinkTags(inputBox.value);
+
 		if (!inputBox.value) {
 			throw new Error("empty API response");
 		}
@@ -258,6 +260,12 @@ function extractCommitMessage(str: string): string {
 		.replace(/^```[^\n]*\n?|```$/g, "")
 		.trim();
 }
+
+function removeThinkTags(text: string): string {
+  const regex = /<think>.*?<\/think>/gs;
+  return text.replace(regex, '').trim();
+}
+
 
 /**
  * Ensure an API key exists in SecretStorage
