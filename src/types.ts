@@ -32,6 +32,8 @@ export interface HFModelItem {
 	max_tokens?: number;
 	// OpenAI new standard parameter
 	max_completion_tokens?: number;
+	// Optional explicit max input tokens. If not set, calculated as: context_length - max_output_tokens
+	max_input_tokens?: number;
 	reasoning_effort?: string;
 	enable_thinking?: boolean;
 	thinking_budget?: number;

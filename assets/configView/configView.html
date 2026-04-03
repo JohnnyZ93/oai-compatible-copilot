@@ -244,6 +244,13 @@
 							</div>
 							<input id="modelMaxCompletionTokens" type="number" class="model-input" placeholder="4096" min="1" />
 						</div>
+						<div class="field">
+							<label for="modelMaxInputTokens">Max Input Tokens</label>
+							<div class="field-description">
+								Maximum input tokens. If not set, calculated as: context_length - max output tokens.
+							</div>
+							<input id="modelMaxInputTokens" type="number" class="model-input" placeholder="Auto" min="1" />
+						</div>
 					</div>
 					<div class="row">
 						<div class="field">

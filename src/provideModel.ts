@@ -34,7 +34,7 @@ export async function prepareLanguageModelChatInformation(
 			.map((m) => {
 				const contextLen = m?.context_length ?? DEFAULT_CONTEXT_LENGTH;
 				const maxOutput = m?.max_completion_tokens ?? m?.max_tokens ?? DEFAULT_MAX_TOKENS;
-				const maxInput = Math.max(1, contextLen - maxOutput);
+				const maxInput = m?.max_input_tokens ?? Math.max(1, contextLen - maxOutput);
 
 				// 使用配置ID（如果存在）来生成唯一的模型ID
 				const modelId = m.configId ? `${m.id}::${m.configId}` : m.id;

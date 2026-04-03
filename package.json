@@ -183,6 +183,12 @@
 								"maximum": 10000000,
 								"description": "Maximum number of tokens to generate (OpenAI new standard parameter)."
 							},
+							"max_input_tokens": {
+								"type": "number",
+								"minimum": 1,
+								"maximum": 10000000,
+								"description": "Maximum number of input tokens. If not set, calculated as context_length minus max output tokens."
+							},
 							"reasoning_effort": {
 								"type": "string",
 								"default": "medium",
