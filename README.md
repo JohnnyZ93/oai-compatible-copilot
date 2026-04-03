@@ -422,6 +422,7 @@ All parameters support individual configuration for different models, providing 
 - `context_length`: The context length supported by the model. Default value is 128000
 - `max_tokens`: Maximum number of tokens to generate (range: [1, context_length]). Default value is 4096
 - `max_completion_tokens`: Maximum number of tokens to generate (OpenAI new standard parameter)
+- `max_input_tokens`: Maximum number of input tokens. If not set, calculated as `context_length` minus max output tokens
 - `vision`: Whether the model supports vision capabilities. Defaults to false
 - `temperature`: Sampling temperature (range: [0, 2]). Controls the randomness of the model's output:
   - **Lower values (0.0-0.3)**: More focused, consistent, and deterministic. Ideal for precise code generation, debugging, and tasks requiring accuracy.
