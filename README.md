@@ -237,6 +237,11 @@ To use this feature:
 2. Each configuration with the same `id` must have a unique `configId`
 3. The model will appear as separate entries in the VS Code model picker
 
+`configId` only selects which configuration variant is used. Whether assistant
+`reasoning_content` is sent or restored is controlled by the model parameters of that
+variant, such as `include_reasoning_in_request` for OpenAI-compatible
+`/chat/completions` providers.
+
 ### Settings Example
 
 ```json
@@ -264,7 +269,7 @@ To use this feature:
 ]
 ```
 
-In this example, you'll have three different configurations of the glm-4.6 model available in VS Code:
+In this example, you'll have two different configurations of the glm-4.6 model available in VS Code:
 - `glm-4.6::thinking` - use GLM-4.6 with thinking
 - `glm-4.6::no-thinking` - use GLM-4.6 without thinking
 
@@ -364,6 +369,32 @@ The `extra` field allows you to add arbitrary parameters to the API request body
 ### Show thinking in Copilot
 These are provider-specific parameters that can make Copilot show a **Thinking** block (if the provider/model supports it).
 
+#### OpenAI-compatible Chat Completions
+Use `apiMode: "openai"` together with `include_reasoning_in_request: true` for providers
+that expect `reasoning_content` on replayed assistant turns (for example GLM and some
+DeepSeek-compatible gateways):
+
+```json
+{
+    "id": "glm-4.6",
+    "owned_by": "zai",
+    "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
+    "apiMode": "openai",
+    "thinking": {
+        "type": "enabled"
+    },
+    "include_reasoning_in_request": true
+}
+```
+
+Notes:
+- This switch applies only to OpenAI-compatible `/chat/completions` requests.
+- The extension persists assistant reasoning locally and replays it on later turns so
+    providers that rely on `reasoning_content` can preserve thinking across turns and
+    VS Code restarts.
+- If `include_reasoning_in_request` is `false`, the extension will not restore or send
+    `reasoning_content` for that config variant.
+
 #### OpenAI Responses
 Use `apiMode: "openai-responses"` and set the reasoning summary mode:
 
@@ -446,10 +477,27 @@ All parameters support individual configuration for different models, providing 
 - `reasoning_effort`: Reasoning effort level (OpenAI reasoning configuration)
 - `headers`: Custom HTTP headers to be sent with every request to this model's provider (e.g., `{"X-API-Version": "v1", "X-Custom-Header": "value"}`). These headers will be merged with the default headers (Authorization, Content-Type, User-Agent)
 - `extra`: Extra request body parameters.
-- `include_reasoning_in_request`: Whether to include reasoning_content in assistant messages sent to the API. Supports deepseek-v3.2 and similar models.
+- `include_reasoning_in_request`: Whether to include `reasoning_content` in assistant messages sent to OpenAI-compatible `/chat/completions` APIs. When enabled, the extension also restores locally persisted reasoning for replayed assistant turns. Supports deepseek-v3.2, GLM, and similar providers.
 - `apiMode`: API mode: 'openai' (Default) for API (/chat/completions), 'openai-responses' for API (/responses), 'ollama' for API (/api/chat), 'anthropic' for API (/v1/messages), 'gemini' for API (/v1beta/models/{model}:streamGenerateContent?alt=sse).
 - `delay`: Model-specific delay in milliseconds between consecutive requests. If not specified, falls back to global `oaicopilot.delay` configuration.
 - `useForCommitGeneration`: Whether to be used for Git commit message generation. Not supports gemini apiMode.
+
+## Development Verification
+
+If you modify reasoning replay or tool serialization behavior, run these checks before
+submitting:
+
+```bash
+npm run compile
+node scripts/verify_persistent_reasoning_restart.mjs
+node scripts/verify_tool_reasoning_shape.mjs
+npm run verify:reasoning-tools
+```
+
+Coverage:
+- `verify_persistent_reasoning_restart.mjs`: validates persisted reasoning replay across turns and restart boundaries for `/chat/completions`.
+- `verify_tool_reasoning_shape.mjs`: validates request serialization for assistant text, `reasoning_content`, `tool_calls`, and tool results.
+- `verify_tool_reasoning_replay.mjs`: validates reasoning replay together with tool calls, and ensures configs with `include_reasoning_in_request=false` do not leak `reasoning_content`.
 
 ## Thanks to
 

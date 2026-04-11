@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { gzipSync, gunzipSync } from "node:zlib";
 import {
 	CancellationToken,
 	LanguageModelChatInformation,
@@ -13,7 +14,15 @@ import type { HFModelItem } from "./types";
 
 import type { OllamaRequestBody } from "./ollama/ollamaTypes";
 
-import { parseModelId, createRetryConfig, executeWithRetry, normalizeUserModels } from "./utils";
+import {
+	parseModelId,
+	createRetryConfig,
+	executeWithRetry,
+	normalizeUserModels,
+	mapRole,
+	isToolResultPart,
+	collectToolResultText,
+} from "./utils";
 
 import { prepareLanguageModelChatInformation } from "./provideModel";
 import { countMessageTokens } from "./provideToken";
@@ -36,6 +45,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 	private readonly _geminiToolCallMetaByCallId = new Map<string, GeminiToolCallMeta>();
 	private readonly _openaiResponsesPreviousResponseIdUnsupportedBaseUrls = new Set<string>();
+	private readonly _openaiChatReasoningCache: PersistentOpenAIChatReasoningCache;
 
 	static readonly OPENAI_RESPONSES_STATEFUL_MARKER_MIME = "application/vnd.oaicopilot.stateful-marker";
 
@@ -45,8 +55,11 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	 */
 	constructor(
 		private readonly secrets: vscode.SecretStorage,
-		private readonly statusBarItem: vscode.StatusBarItem
-	) {}
+		private readonly statusBarItem: vscode.StatusBarItem,
+		reasoningState: vscode.Memento
+	) {
+		this._openaiChatReasoningCache = new PersistentOpenAIChatReasoningCache(reasoningState);
+	}
 
 	/**
 	 * Get the list of available language models contributed by this provider
@@ -123,8 +136,10 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 						(!parsedModelId.configId && !um.configId))
 			);
 
-			// If still no model found, try to find any model matching the base ID (most lenient match, for backward compatibility)
-			if (!um) {
+			// Only allow base-id fallback for legacy single-config models.
+			// When a configId is present, falling back can incorrectly pick another variant
+			// of the same base model and re-enable reasoning_content unexpectedly.
+			if (!um && !parsedModelId.configId) {
 				um = userModels.find((um) => um.id === parsedModelId.baseId);
 			}
 
@@ -425,7 +440,15 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			} else {
 				// OpenAI compatible API mode (default)
 				const openaiApi = new OpenaiApi();
-				const openaiMessages = openaiApi.convertMessages(messages, modelConfig);
+				const restoredMessages = modelConfig.includeReasoningInRequest
+					? restoreOpenAIChatReasoningMessages(
+							parsedModelId.baseId,
+							options.requestInitiator,
+							messages,
+							this._openaiChatReasoningCache
+						)
+					: messages;
+				const openaiMessages = openaiApi.convertMessages(restoredMessages, modelConfig);
 
 				// requestBody
 				let requestBody: Record<string, unknown> = {
@@ -460,7 +483,38 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				if (!response.body) {
 					throw new Error("No response body from OAI Compatible API");
 				}
-				await openaiApi.processStreamingResponse(response.body, trackingProgress, token);
+
+				let aggregatedReasoning = "";
+				let aggregatedAssistantText = "";
+				const responseToolCalls: OpenAIChatToolCallSignature[] = [];
+				const openaiTrackingProgress: Progress<LanguageModelResponsePart2> = {
+					report: (part) => {
+						if (part instanceof vscode.LanguageModelThinkingPart) {
+							const text = Array.isArray(part.value) ? part.value.join("") : part.value;
+							if (text) {
+								aggregatedReasoning += text;
+							}
+						} else if (part instanceof vscode.LanguageModelTextPart) {
+							aggregatedAssistantText += part.value;
+						} else if (part instanceof vscode.LanguageModelToolCallPart) {
+							responseToolCalls.push(createOpenAIChatToolCallSignature(part));
+						}
+						trackingProgress.report(part);
+					},
+				};
+
+				await openaiApi.processStreamingResponse(response.body, openaiTrackingProgress, token);
+
+				if (modelConfig.includeReasoningInRequest && aggregatedReasoning.trim()) {
+					await this._openaiChatReasoningCache.remember(
+						parsedModelId.baseId,
+						options.requestInitiator,
+						messages,
+						aggregatedAssistantText,
+						responseToolCalls,
+						aggregatedReasoning
+					);
+				}
 			}
 		} catch (err) {
 			console.error("[OAI Compatible Model Provider] Chat request failed", {
@@ -524,6 +578,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 }
 
 type OpenAIResponsesStatefulMarkerLocation = { marker: string; index: number };
+type OpenAIChatToolCallSignature = { callId: string; name: string; inputJson: string };
+
+const OPENAI_CHAT_REASONING_CACHE_LIMIT = 256;
 
 function createOpenAIResponsesStatefulMarkerPart(modelId: string, marker: string): vscode.LanguageModelDataPart {
 	const payload = `${modelId}\\${marker}`;
@@ -580,3 +637,262 @@ function findLastOpenAIResponsesStatefulMarker(
 	}
 	return null;
 }
+
+function restoreOpenAIChatReasoningMessages(
+	modelId: string,
+	requestInitiator: string,
+	messages: readonly LanguageModelChatRequestMessage[],
+	reasoningCache: PersistentOpenAIChatReasoningCache
+): readonly LanguageModelChatRequestMessage[] {
+	return messages.map((message, messageIndex) => {
+		if (message.role !== vscode.LanguageModelChatMessageRole.Assistant) {
+			return message;
+		}
+
+		const content = [...(message.content ?? [])];
+		const hasThinking = content.some((part) => {
+			if (!(part instanceof vscode.LanguageModelThinkingPart)) {
+				return false;
+			}
+			const value = Array.isArray(part.value) ? part.value.join("") : part.value;
+			return !!value.trim();
+		});
+		if (hasThinking) {
+			return message;
+		}
+
+		const { assistantText, toolCalls } = extractAssistantMessageSignature(content);
+		const restoredReasoning = reasoningCache.recall(
+			modelId,
+			requestInitiator,
+			messages.slice(0, messageIndex),
+			assistantText,
+			toolCalls
+		);
+		if (!restoredReasoning) {
+			return message;
+		}
+
+		return {
+			...message,
+			content: [...content, new vscode.LanguageModelThinkingPart(restoredReasoning)],
+		} as LanguageModelChatRequestMessage;
+	});
+}
+
+function createOpenAIChatToolCallSignature(part: vscode.LanguageModelToolCallPart): OpenAIChatToolCallSignature {
+	return {
+		callId: part.callId || "",
+		name: part.name,
+		inputJson: stableStringify(part.input ?? {}),
+	};
+}
+
+function extractAssistantMessageSignature(content: readonly unknown[]): {
+	assistantText: string;
+	toolCalls: OpenAIChatToolCallSignature[];
+} {
+	let assistantText = "";
+	const toolCalls: OpenAIChatToolCallSignature[] = [];
+	for (const part of content) {
+		if (part instanceof vscode.LanguageModelTextPart) {
+			assistantText += part.value;
+		} else if (part instanceof vscode.LanguageModelToolCallPart) {
+			toolCalls.push(createOpenAIChatToolCallSignature(part));
+		}
+	}
+	return { assistantText, toolCalls };
+}
+
+function extractOpenAIChatReasoningAnchor(
+	prefixMessages: readonly LanguageModelChatRequestMessage[]
+): Record<string, unknown> | null {
+	for (let index = prefixMessages.length - 1; index >= 0; index--) {
+		const message = prefixMessages[index];
+		if (message.role === vscode.LanguageModelChatMessageRole.Assistant) {
+			continue;
+		}
+		const normalized = normalizeMessageForReasoningCache(message);
+		const normalizedContent = normalized.content;
+		if (Array.isArray(normalizedContent) && normalizedContent.length > 0) {
+			return normalized;
+		}
+	}
+	return null;
+}
+
+function buildOpenAIChatReasoningTurnCacheKey(
+	modelId: string,
+	requestInitiator: string,
+	prefixMessages: readonly LanguageModelChatRequestMessage[],
+	assistantText: string,
+	toolCalls: readonly OpenAIChatToolCallSignature[]
+): string {
+	return stableStringify({
+		modelId,
+		requestInitiator,
+		recentAnchor: extractOpenAIChatReasoningAnchor(prefixMessages),
+		assistantText,
+		toolCalls,
+	});
+}
+
+function buildOpenAIChatReasoningFallbackCacheKey(
+	modelId: string,
+	requestInitiator: string,
+	assistantText: string,
+	toolCalls: readonly OpenAIChatToolCallSignature[]
+): string {
+	return stableStringify({
+		modelId,
+		requestInitiator,
+		assistantText,
+		toolCalls,
+	});
+}
+
+function normalizeMessageForReasoningCache(message: LanguageModelChatRequestMessage): Record<string, unknown> {
+	const normalizedContent: Array<Record<string, unknown>> = [];
+	for (const part of message.content ?? []) {
+		if (part instanceof vscode.LanguageModelTextPart) {
+			if (part.value) {
+				normalizedContent.push({ type: "text", value: part.value });
+			}
+			continue;
+		}
+		if (part instanceof vscode.LanguageModelToolCallPart) {
+			normalizedContent.push({ type: "tool_call", ...createOpenAIChatToolCallSignature(part) });
+			continue;
+		}
+		if (isToolResultPart(part)) {
+			normalizedContent.push({
+				type: "tool_result",
+				callId: part.callId,
+				content: collectToolResultText(part),
+			});
+			continue;
+		}
+		if (part instanceof vscode.LanguageModelDataPart) {
+			normalizedContent.push({ type: "data", mimeType: part.mimeType, byteLength: part.data.byteLength });
+		}
+	}
+	return {
+		role: mapRole(message),
+		content: normalizedContent,
+	};
+}
+
+function stableStringify(value: unknown): string {
+	if (Array.isArray(value)) {
+		return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+	}
+	if (value && typeof value === "object") {
+		const entries = Object.entries(value as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right));
+		return `{${entries.map(([key, entryValue]) => `${JSON.stringify(key)}:${stableStringify(entryValue)}`).join(",")}}`;
+	}
+	return JSON.stringify(value);
+}
+
+type PersistentReasoningEntry = {
+	key: string;
+	payload: string;
+	updatedAt: number;
+};
+
+class PersistentOpenAIChatReasoningCache {
+	private static readonly STORAGE_KEY = "oaicopilot.openaiChatReasoningCache.v2";
+	private readonly entries = new Map<string, PersistentReasoningEntry>();
+
+	constructor(private readonly state: vscode.Memento) {
+		const stored = state.get<PersistentReasoningEntry[]>(PersistentOpenAIChatReasoningCache.STORAGE_KEY, []);
+		for (const entry of stored) {
+			if (entry?.key && entry?.payload) {
+				this.entries.set(entry.key, entry);
+			}
+		}
+	}
+
+	recall(
+		modelId: string,
+		requestInitiator: string,
+		prefixMessages: readonly LanguageModelChatRequestMessage[],
+		assistantText: string,
+		toolCalls: readonly OpenAIChatToolCallSignature[]
+	): string {
+		const key = buildOpenAIChatReasoningTurnCacheKey(
+			modelId,
+			requestInitiator,
+			prefixMessages,
+			assistantText,
+			toolCalls
+		);
+		const fallbackKey = buildOpenAIChatReasoningFallbackCacheKey(
+			modelId,
+			requestInitiator,
+			assistantText,
+			toolCalls
+		);
+		const matchedKey = this.entries.has(key) ? key : this.entries.has(fallbackKey) ? fallbackKey : "";
+		const entry = matchedKey ? this.entries.get(matchedKey) : undefined;
+		if (!entry) {
+			return "";
+		}
+		try {
+			return gunzipSync(Buffer.from(entry.payload, "base64url")).toString("utf8");
+		} catch {
+			this.entries.delete(matchedKey);
+			void this.flush();
+			return "";
+		}
+	}
+
+	async remember(
+		modelId: string,
+		requestInitiator: string,
+		prefixMessages: readonly LanguageModelChatRequestMessage[],
+		assistantText: string,
+		toolCalls: readonly OpenAIChatToolCallSignature[],
+		reasoning: string
+	): Promise<void> {
+		const key = buildOpenAIChatReasoningTurnCacheKey(
+			modelId,
+			requestInitiator,
+			prefixMessages,
+			assistantText,
+			toolCalls
+		);
+		const fallbackKey = buildOpenAIChatReasoningFallbackCacheKey(
+			modelId,
+			requestInitiator,
+			assistantText,
+			toolCalls
+		);
+		const payload = gzipSync(reasoning).toString("base64url");
+		const upsert = (entryKey: string) => {
+			if (this.entries.has(entryKey)) {
+				this.entries.delete(entryKey);
+			}
+			this.entries.set(entryKey, { key: entryKey, payload, updatedAt: Date.now() });
+		};
+		upsert(key);
+		if (fallbackKey !== key) {
+			upsert(fallbackKey);
+		}
+		while (this.entries.size > OPENAI_CHAT_REASONING_CACHE_LIMIT) {
+			const oldestKey = this.entries.keys().next().value;
+			if (!oldestKey) {
+				break;
+			}
+			this.entries.delete(oldestKey);
+		}
+		await this.flush();
+	}
+
+	private async flush(): Promise<void> {
+		await this.state.update(
+			PersistentOpenAIChatReasoningCache.STORAGE_KEY,
+			Array.from(this.entries.values())
+		);
+	}
+}
+
