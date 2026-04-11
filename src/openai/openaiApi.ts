@@ -339,6 +339,7 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 			let maybeThinking =
 				(choice as Record<string, unknown> | undefined)?.thinking ??
 				(deltaObj as Record<string, unknown> | undefined)?.thinking ??
+				(deltaObj as Record<string, unknown> | undefined)?.reasoning ??
 				(deltaObj as Record<string, unknown> | undefined)?.reasoning_content;
 
 			// OpenRouter/Claude reasoning_details array handling (new)
