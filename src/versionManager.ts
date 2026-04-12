@@ -15,10 +15,21 @@ export class VersionManager {
 	}
 
 	/**
-	 * Build a descriptive User-Agent to help quantify API usage
-	 * Keep UA minimal: only extension version and VS Code version
+	 * Build a User-Agent for API requests.
+	 * By default, uses the extension identifier. When useBrowserUserAgent setting is enabled,
+	 * uses a Chrome-like User-Agent to avoid Cloudflare 1010 blocking.
 	 */
 	static getUserAgent(): string {
+		const config = vscode.workspace.getConfiguration("oaicopilot");
+		const useBrowserUA = config.get<boolean>("useBrowserUserAgent", false);
+
+		if (useBrowserUA) {
+			// Use a standard Chrome User-Agent to avoid Cloudflare 1010 errors
+			// that block non-browser signatures
+			return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.0";
+		}
+
+		// Default: use extension identifier
 		const vscodeVersion = vscode.version;
 		return `oai-compatible-copilot/${this.getVersion()} VSCode/${vscodeVersion}`;
 	}

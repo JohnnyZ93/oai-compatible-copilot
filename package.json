@@ -442,6 +442,11 @@
 					"minimum": 0,
 					"maximum": 10000,
 					"description": "Number of lines to read when using `read_file` tool. Large lines may cost more tokens. Default is 0, let model decide lines."
+				},
+				"oaicopilot.useBrowserUserAgent": {
+					"type": "boolean",
+					"default": false,
+					"description": "Use a browser-like User-Agent string to avoid Cloudflare 1010 errors. When enabled, requests will use a Chrome User-Agent instead of the default extension identifier."
 				}
 			}
 		}
