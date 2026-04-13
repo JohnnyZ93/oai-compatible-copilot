@@ -16,22 +16,28 @@ export class VersionManager {
 
 	/**
 	 * Build a User-Agent for API requests.
-	 * By default, uses the extension identifier. When useBrowserUserAgent setting is enabled,
-	 * uses a Chrome-like User-Agent to avoid Cloudflare 1010 blocking.
+	 * Master switch: useBrowserUserAgent
+	 * - When false: Always use default extension identifier UA
+	 * - When true: Use customUserAgent if set, otherwise Chrome-like UA
 	 */
 	static getUserAgent(): string {
 		const config = vscode.workspace.getConfiguration("oaicopilot");
 		const useBrowserUA = config.get<boolean>("useBrowserUserAgent", false);
 
-		if (useBrowserUA) {
-			// Use a standard Chrome User-Agent to avoid Cloudflare 1010 errors
-			// that block non-browser signatures
-			return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.0";
+		// Master switch off: always use default extension UA
+		if (!useBrowserUA) {
+			const vscodeVersion = vscode.version;
+			return `oai-compatible-copilot/${this.getVersion()} VSCode/${vscodeVersion}`;
 		}
 
-		// Default: use extension identifier
-		const vscodeVersion = vscode.version;
-		return `oai-compatible-copilot/${this.getVersion()} VSCode/${vscodeVersion}`;
+		// Master switch on: check for custom UA first
+		const customUA = config.get<string>("customUserAgent", "");
+		if (customUA && customUA.trim()) {
+			return customUA.trim();
+		}
+
+		// Fallback to Chrome User-Agent to avoid Cloudflare 1010 errors
+		return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.0";
 	}
 
 	/**

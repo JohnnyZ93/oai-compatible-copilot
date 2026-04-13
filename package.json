@@ -446,7 +446,12 @@
 				"oaicopilot.useBrowserUserAgent": {
 					"type": "boolean",
 					"default": false,
-					"description": "Use a browser-like User-Agent string to avoid Cloudflare 1010 errors. When enabled, requests will use a Chrome User-Agent instead of the default extension identifier."
+					"description": "Master switch for custom User-Agent. When disabled, always uses the default extension identifier. When enabled, uses customUserAgent if set, otherwise uses a Chrome-like User-Agent."
+				},
+				"oaicopilot.customUserAgent": {
+					"type": "string",
+					"default": "",
+					"description": "Custom User-Agent string for API requests. Only used when useBrowserUserAgent is enabled. Leave empty to use the default Chrome User-Agent."
 				}
 			}
 		}
