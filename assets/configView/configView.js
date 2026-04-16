@@ -54,6 +54,7 @@ const modelEnableThinkingInput = document.getElementById("modelEnableThinking");
 const modelThinkingBudgetInput = document.getElementById("modelThinkingBudget");
 const modelIncludeReasoningInput = document.getElementById("modelIncludeReasoning");
 const modelMaxCompletionTokensInput = document.getElementById("modelMaxCompletionTokens");
+const modelMaxInputTokensInput = document.getElementById("modelMaxInputTokens");
 const modelReasoningEnabledInput = document.getElementById("modelReasoningEnabled");
 const modelReasoningExcludeInput = document.getElementById("modelReasoningExclude");
 const modelReasoningEffortORInput = document.getElementById("modelReasoningEffortOR");
@@ -541,6 +542,7 @@ function resetModelForm() {
 	modelFamilyInput.value = "";
 	modelContextLengthInput.value = 128000;
 	modelMaxTokensInput.value = 4096;
+	modelMaxInputTokensInput.value = "";
 	modelVisionInput.value = "";
 	modelApiModeInput.value = "openai";
 	modelTemperatureInput.value = 0;
@@ -589,6 +591,7 @@ function collectModelFormData() {
 		family: modelFamilyInput.value.trim() || undefined,
 		context_length: modelContextLengthInput.value ? parseInt(modelContextLengthInput.value) : undefined,
 		max_tokens: modelMaxTokensInput.value ? parseInt(modelMaxTokensInput.value) : undefined,
+		max_input_tokens: modelMaxInputTokensInput.value ? parseInt(modelMaxInputTokensInput.value) : undefined,
 		vision: modelVisionInput.value ? modelVisionInput.value === "true" : undefined,
 		apiMode: modelApiModeInput.value || undefined,
 		temperature: modelTemperatureInput.value !== "" ? parseFloat(modelTemperatureInput.value) : undefined,
@@ -735,6 +738,13 @@ function validateModelData(modelData) {
 		(isNaN(modelData.max_completion_tokens) || modelData.max_completion_tokens <= 0)
 	) {
 		showModelError("Max Completion Tokens must be a positive number.");
+		return false;
+	}
+	if (
+		modelData.max_input_tokens !== undefined &&
+		(isNaN(modelData.max_input_tokens) || modelData.max_input_tokens <= 0)
+	) {
+		showModelError("Max Input Tokens must be a positive number.");
 		return false;
 	}
 	// Prevent both max_tokens and max_completion_tokens from being set simultaneously
@@ -898,6 +908,7 @@ function populateModelForm(model) {
 	modelFamilyInput.value = model.family || "";
 	modelContextLengthInput.value = model.context_length || "";
 	modelMaxTokensInput.value = model.max_tokens || "";
+	modelMaxInputTokensInput.value = model.max_input_tokens || "";
 	modelVisionInput.value = model.vision !== undefined ? String(model.vision) : "";
 	modelApiModeInput.value = model.apiMode || "openai";
 	modelTemperatureInput.value = model.temperature !== undefined && model.temperature !== null ? model.temperature : "";
