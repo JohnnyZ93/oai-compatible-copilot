@@ -279,5 +279,10 @@ async function ensureApiKey(secrets: vscode.SecretStorage, provider: string): Pr
 		apiKey = await secrets.get(providerKey);
 	}
 
+	// Fall back to generic API key
+	if (!apiKey) {
+		apiKey = await secrets.get("oaicopilot.apiKey");
+	}
+
 	return apiKey;
 }
