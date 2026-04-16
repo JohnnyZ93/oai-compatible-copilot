@@ -1,5 +1,20 @@
 # Change Log
 
+## 0.3.5 (2026-04-16)
+
+- Feat(openai-responses): Add `prompt_cache_key` to enable OpenAI prompt caching.
+- Feat(openai): Support `reasoning` field as thinking content in streaming responses.
+- Feat: Remove `<think>` tags from generated commit messages.
+- Fix(anthropic): Handle SSE `data:` lines without space after colon.
+- Fix: Retry with exponential backoff instead of fixed interval.
+- Fix: Fall back to generic API key when provider-specific key is missing in commit message generation.
+
+Thanks for your contributing:
+  - @ODtian [PR #167](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/167).
+  - @270556660 [PR #176](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/176).
+  - @ruokuanwu [PR #179](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/179).
+  - @TooYoungTooSimp [PR #185](https://github.com/JohnnyZ93/oai-compatible-copilot/pull/185).
+
 ## 0.3.4 (2026-03-10)
 
 - Feat: Re-enable the token usage status bar because VS Code's native statistics are inaccurate for BYOK providers.
