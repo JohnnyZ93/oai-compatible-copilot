@@ -294,6 +294,11 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 				requestBody = openaiResponsesApi.prepareRequestBody(requestBody, um, options);
 
+				// Add prompt_cache_key to enable OpenAI prompt caching.
+				// Without this parameter, cached_tokens is always 0 even with identical requests.
+				if (!requestBody.prompt_cache_key) {
+					requestBody.prompt_cache_key = `oaicopilot-${parsedModelId.baseId}`;
+				}
 				// send Responses API request with retry
 				const url = `${normalizedBaseUrl}/responses`;
 
