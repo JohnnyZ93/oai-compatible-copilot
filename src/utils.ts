@@ -4,6 +4,8 @@ import { OpenAIFunctionToolDef } from "./openai/openaiTypes";
 
 const RETRY_MAX_ATTEMPTS = 3;
 const RETRY_INTERVAL_MS = 1000;
+const RETRY_BACKOFF_FACTOR = 2;
+const RETRY_MAX_INTERVAL_MS = 60000;
 
 // HTTP status codes that should trigger a retry
 const RETRYABLE_STATUS_CODES = [429, 500, 502, 503, 504];
@@ -283,7 +285,7 @@ export async function executeWithRetry<T>(fn: () => Promise<T>, retryConfig: Ret
 	}
 
 	const maxAttempts = retryConfig.max_attempts ?? RETRY_MAX_ATTEMPTS;
-	const intervalMs = retryConfig.interval_ms ?? RETRY_INTERVAL_MS;
+	const baseIntervalMs = retryConfig.interval_ms ?? RETRY_INTERVAL_MS;
 	// Merge user-configured status codes with default ones, removing duplicates
 	const retryableStatusCodes = retryConfig.status_codes
 		? [...new Set([...RETRYABLE_STATUS_CODES, ...retryConfig.status_codes])]
@@ -306,13 +308,16 @@ export async function executeWithRetry<T>(fn: () => Promise<T>, retryConfig: Ret
 				throw lastError;
 			}
 
+			// Exponential backoff: interval doubles each attempt, capped at 60s
+			const delayMs = Math.min(baseIntervalMs * Math.pow(RETRY_BACKOFF_FACTOR, attempt), RETRY_MAX_INTERVAL_MS);
+
 			console.error(
-				`[OAI Compatible Model Provider] Retryable error detected, retrying in ${intervalMs}ms (attempt ${attempt + 1}/${maxAttempts}). Error:`,
+				`[OAI Compatible Model Provider] Retryable error detected, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxAttempts}). Error:`,
 				lastError instanceof Error ? { name: lastError.name, message: lastError.message } : String(lastError)
 			);
 
-			// Wait for the specified interval before retrying
-			await new Promise<void>((resolve) => setTimeout(resolve, intervalMs));
+			// Wait for the calculated interval before retrying
+			await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
 		}
 	}
 
