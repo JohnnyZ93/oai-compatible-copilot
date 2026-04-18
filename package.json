@@ -455,7 +455,8 @@
 		"format": "prettier --write .",
 		"watch": "tsc -watch -p ./",
 		"test": "npm run compile && vscode-test",
-		"build": "npx @vscode/vsce package -o extension.vsix"
+		"build": "npx @vscode/vsce package -o extension.vsix",
+		"verify:reasoning-tools": "node scripts/verify_tool_reasoning_replay.mjs"
 	},
 	"dependencies": {
 		"@microsoft/tiktokenizer": "^1.0.10"
