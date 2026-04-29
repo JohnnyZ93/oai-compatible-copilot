@@ -24,6 +24,21 @@ import { CommonApi } from "../commonApi";
 import { logger } from "../logger";
 
 export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBody> {
+	/**
+	 * Static cache that persists across AnthropicApi instances to store
+	 * thinking block signatures. VS Code does not reliably preserve
+	 * LanguageModelThinkingPart (id, metadata, or even the part itself)
+	 * across conversation turns, so we cache the complete thinking+signature
+	 * keyed by the assistant's TEXT content (which is always preserved).
+	 */
+	private static _assistantResponseCache = new Map<string, { thinking: string; signature: string }[]>();
+
+	/** Accumulated assistant text content during streaming. */
+	private _accumulatedAssistantText = "";
+
+	/** Pending thinking entries to be cached once full assistant text is known. */
+	private _pendingThinkingEntries: { thinking: string; signature: string }[] | undefined;
+
 	constructor(modelId: string) {
 		super(modelId);
 	}
@@ -47,6 +62,7 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 			const toolCalls: AnthropicToolUseBlock[] = [];
 			const toolResults: AnthropicToolResultBlock[] = [];
 			const thinkingParts: string[] = [];
+			const thinkingSignatures: (string | undefined)[] = [];
 
 			for (const part of m.content ?? []) {
 				if (part instanceof vscode.LanguageModelTextPart) {
@@ -112,10 +128,37 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 
 			// Add thinking content for assistant messages
 			if (role === "assistant" && modelConfig.includeReasoningInRequest) {
-				contentBlocks.push({
-					type: "thinking",
-					thinking: joinedThinking || "Next step.",
-				});
+				// Look up cached thinking+signature by assistant text content.
+				// VS Code may not preserve LanguageModelThinkingPart across turns, but always
+				// preserves the assistant text, so we use it as the cache key.
+				let cachedThinking: { thinking: string; signature: string }[] | undefined;
+				if (joinedText) {
+					cachedThinking = AnthropicApi._assistantResponseCache.get(joinedText);
+				}
+
+				if (cachedThinking && cachedThinking.length > 0) {
+					// Use cached thinking blocks with valid signatures
+					for (const entry of cachedThinking) {
+						contentBlocks.push({
+							type: "thinking",
+							thinking: entry.thinking,
+							signature: entry.signature,
+						});
+					}
+				} else if (thinkingSignatures.some((s) => s !== undefined)) {
+					// Some signatures were found from thinking parts (rare but possible)
+					const thinkingBlock: { type: "thinking"; thinking: string; signature?: string } = {
+						type: "thinking",
+						thinking: joinedThinking || "Next step.",
+					};
+					const sig = thinkingSignatures.find((s) => s !== undefined);
+					if (sig) {
+						thinkingBlock.signature = sig;
+					}
+					contentBlocks.push(thinkingBlock);
+				}
+				// If no cached thinking AND no thinking parts, skip thinking block entirely
+				// (sending without signature would cause a 400 error from Anthropic)
 			}
 
 			// Add tool calls for assistant messages
@@ -148,6 +191,21 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 		}
 
 		return out;
+	}
+
+	/**
+	 * Override to cache the thinking content + signature before the base class
+	 * clears state. The cache is static so it persists across instances.
+	 */
+	protected reportEndThinking(progress: Progress<LanguageModelResponsePart2>) {
+		if (this._currentThinkingSignature && this._thinkingContentAccumulator) {
+			this._pendingThinkingEntries = this._pendingThinkingEntries || [];
+			this._pendingThinkingEntries.push({
+				thinking: this._thinkingContentAccumulator,
+				signature: this._currentThinkingSignature,
+			});
+		}
+		super.reportEndThinking(progress);
 	}
 
 	prepareRequestBody(
@@ -284,6 +342,24 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 			reader.releaseLock();
 			// If there's an active thinking sequence, end it first
 			this.reportEndThinking(progress);
+			// Finalize: cache thinking+signature keyed by the full assistant text.
+			// This MUST happen after reportEndThinking so pending entries are populated.
+			if (this._pendingThinkingEntries && this._pendingThinkingEntries.length > 0 && this._accumulatedAssistantText.trim()) {
+				const key = this._accumulatedAssistantText.trim();
+				AnthropicApi._assistantResponseCache.set(key, this._pendingThinkingEntries);
+				// Prune old entries to prevent unbounded growth
+				if (AnthropicApi._assistantResponseCache.size > 500) {
+					const iter = AnthropicApi._assistantResponseCache.keys();
+					for (let i = 0; i < 100; i++) {
+						AnthropicApi._assistantResponseCache.delete(iter.next().value!);
+					}
+				}
+				logger.debug("anthropic.thinking.cached", {
+					modelId,
+					textKeyLength: key.length,
+					entries: this._pendingThinkingEntries.length,
+				});
+			}
 		}
 	}
 
@@ -325,6 +401,8 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 		if (chunk.type === "content_block_start" && chunk.content_block) {
 			// Start of a content block
 			if (chunk.content_block.type === "thinking") {
+				// Reset signature for new thinking block
+				this._currentThinkingSignature = null;
 				// Start thinking block
 				if (chunk.content_block.thinking) {
 					this.bufferThinkingContent(chunk.content_block.thinking, progress);
@@ -352,6 +430,8 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 				// Emit text content
 				progress.report(new vscode.LanguageModelTextPart(chunk.delta.text));
 				this._hasEmittedAssistantText = true;
+				// Track accumulated assistant text for signature cache
+				this._accumulatedAssistantText += chunk.delta.text;
 			} else if (chunk.delta.type === "thinking_delta" && chunk.delta.thinking) {
 				// Buffer thinking content
 				this.bufferThinkingContent(chunk.delta.thinking, progress);
@@ -367,8 +447,9 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 					await this.tryEmitBufferedToolCall(idx, progress);
 				}
 			} else if (chunk.delta.type === "signature_delta" && chunk.delta.signature) {
-				// Signature for thinking block - ignore for now
-				// Could store for verification if needed later
+				// Store signature for the current thinking block so it can be
+				// re-sent in follow-up requests (Anthropic requires this).
+				this._currentThinkingSignature = (this._currentThinkingSignature || "") + chunk.delta.signature;
 			}
 		} else if (chunk.type === "content_block_stop" || chunk.type === "message_stop") {
 			// End of message - ensure thinking is ended and flush all tool calls
