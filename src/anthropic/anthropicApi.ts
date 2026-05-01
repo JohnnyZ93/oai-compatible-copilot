@@ -61,8 +61,6 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 			const imageParts: vscode.LanguageModelDataPart[] = [];
 			const toolCalls: AnthropicToolUseBlock[] = [];
 			const toolResults: AnthropicToolResultBlock[] = [];
-			const thinkingParts: string[] = [];
-			const thinkingSignatures: (string | undefined)[] = [];
 
 			for (const part of m.content ?? []) {
 				if (part instanceof vscode.LanguageModelTextPart) {
@@ -85,14 +83,10 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 						tool_use_id: callId,
 						content,
 					});
-				} else if (part instanceof vscode.LanguageModelThinkingPart) {
-					const content = Array.isArray(part.value) ? part.value.join("") : part.value;
-					thinkingParts.push(content);
 				}
 			}
 
 			const joinedText = textParts.join("").trim();
-			const joinedThinking = thinkingParts.join("").trim();
 
 			// Handle system messages separately (Anthropic uses top-level system field)
 			if (role === "system") {
@@ -145,17 +139,6 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 							signature: entry.signature,
 						});
 					}
-				} else if (thinkingSignatures.some((s) => s !== undefined)) {
-					// Some signatures were found from thinking parts (rare but possible)
-					const thinkingBlock: { type: "thinking"; thinking: string; signature?: string } = {
-						type: "thinking",
-						thinking: joinedThinking || "Next step.",
-					};
-					const sig = thinkingSignatures.find((s) => s !== undefined);
-					if (sig) {
-						thinkingBlock.signature = sig;
-					}
-					contentBlocks.push(thinkingBlock);
 				}
 				// If no cached thinking AND no thinking parts, skip thinking block entirely
 				// (sending without signature would cause a 400 error from Anthropic)
@@ -346,7 +329,9 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 			// This MUST happen after reportEndThinking so pending entries are populated.
 			if (this._pendingThinkingEntries && this._pendingThinkingEntries.length > 0 && this._accumulatedAssistantText.trim()) {
 				const key = this._accumulatedAssistantText.trim();
+				const entryCount = this._pendingThinkingEntries.length;
 				AnthropicApi._assistantResponseCache.set(key, this._pendingThinkingEntries);
+				this._pendingThinkingEntries = undefined;
 				// Prune old entries to prevent unbounded growth
 				if (AnthropicApi._assistantResponseCache.size > 500) {
 					const iter = AnthropicApi._assistantResponseCache.keys();
@@ -357,7 +342,7 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 				logger.debug("anthropic.thinking.cached", {
 					modelId,
 					textKeyLength: key.length,
-					entries: this._pendingThinkingEntries.length,
+					entries: entryCount,
 				});
 			}
 		}
