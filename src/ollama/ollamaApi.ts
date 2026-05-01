@@ -11,7 +11,7 @@ import type { HFModelItem } from "../types";
 
 import type { OllamaMessage, OllamaRequestBody, OllamaStreamChunk, OllamaToolCall } from "./ollamaTypes";
 
-import { isToolResultPart, collectToolResultText, convertToolsToOpenAI, mapRole } from "../utils";
+import { isToolResultPart, collectToolResultText, convertToolsToOpenAI, convertMcpToolNameToStandard, convertMcpToolNameToVSCode, mapRole } from "../utils";
 
 import { CommonApi } from "../commonApi";
 import { logger } from "../logger";
@@ -57,7 +57,7 @@ export class OllamaApi extends CommonApi<OllamaMessage, OllamaRequestBody> {
 					// Capture tool calls from assistant
 					toolCalls.push({
 						function: {
-							name: part.name,
+							name: convertMcpToolNameToStandard(part.name),
 							arguments: (part.input as Record<string, unknown>) ?? {},
 						},
 					});
@@ -249,7 +249,7 @@ export class OllamaApi extends CommonApi<OllamaMessage, OllamaRequestBody> {
 
 			for (const tc of message.tool_calls) {
 				const id = `ollama_tc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-				progress.report(new vscode.LanguageModelToolCallPart(id, tc.function.name, tc.function.arguments));
+				progress.report(new vscode.LanguageModelToolCallPart(id, convertMcpToolNameToVSCode(tc.function.name), tc.function.arguments));
 			}
 		}
 

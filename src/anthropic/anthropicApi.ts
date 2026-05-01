@@ -18,7 +18,7 @@ import type {
 	AnthropicStreamChunk,
 } from "./anthropicTypes";
 
-import { isImageMimeType, isToolResultPart, collectToolResultText, convertToolsToOpenAI, mapRole } from "../utils";
+import { isImageMimeType, isToolResultPart, collectToolResultText, convertToolsToOpenAI, convertMcpToolNameToStandard, mapRole } from "../utils";
 
 import { CommonApi } from "../commonApi";
 import { logger } from "../logger";
@@ -58,7 +58,7 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 					toolCalls.push({
 						type: "tool_use",
 						id,
-						name: part.name,
+						name: convertMcpToolNameToStandard(part.name),
 						input: (part.input as Record<string, unknown>) ?? {},
 					});
 				} else if (isToolResultPart(part)) {

@@ -9,7 +9,7 @@ import {
 	CancellationToken,
 } from "vscode";
 import { HFModelItem } from "./types";
-import { tryParseJSONObject } from "./utils";
+import { tryParseJSONObject, convertMcpToolNameToVSCode } from "./utils";
 import { VersionManager } from "./versionManager";
 
 export abstract class CommonApi<TMessage, TRequestBody> {
@@ -132,7 +132,7 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 		const id = buf.id ?? `call_${Math.random().toString(36).slice(2, 10)}`;
 		let parameters = canParse.value;
 		parameters = this.adjustReadFileParameters(buf.name, parameters);
-		progress.report(new LanguageModelToolCallPart(id, buf.name, parameters));
+		progress.report(new LanguageModelToolCallPart(id, convertMcpToolNameToVSCode(buf.name), parameters));
 		this._toolCallBuffers.delete(index);
 		this._completedToolCallIndices.add(index);
 	}
@@ -168,7 +168,7 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 			const name = buf.name ?? "unknown_tool";
 			let parameters = parsed.value;
 			parameters = this.adjustReadFileParameters(name, parameters);
-			progress.report(new LanguageModelToolCallPart(id, name, parameters));
+			progress.report(new LanguageModelToolCallPart(id, convertMcpToolNameToVSCode(name), parameters));
 			this._toolCallBuffers.delete(idx);
 			this._completedToolCallIndices.add(idx);
 		}

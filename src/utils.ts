@@ -95,7 +95,62 @@ export function mapRole(message: vscode.LanguageModelChatRequestMessage): "user"
 }
 
 /**
+ * Convert a VS Code MCP tool name to standard MCP format.
+ * VS Code format: mcp_{server}_{tool} (single underscores)
+ * Standard format: mcp__{server}__{tool} (double underscores)
+ *
+ * Heuristic: most MCP server IDs have 2 segments (e.g. "io_github"),
+ * so we split after the 2nd segment when there are enough parts.
+ * The roundtrip is lossless because the reverse simply replaces "__" → "_".
+ *
+ * Only activates for names starting with `mcp_`. Non-MCP names are returned unchanged.
+ */
+export function convertMcpToolNameToStandard(name: string): string {
+	if (!name.startsWith("mcp_")) {
+		return name;
+	}
+	// Already in standard format (has at least 2 "__" separators)
+	if (name.startsWith("mcp__") && name.indexOf("__", 5) !== -1) {
+		return name;
+	}
+	const rest = name.slice(4); // strip "mcp_"
+	const parts = rest.split("_");
+	if (parts.length < 2) {
+		return name; // not enough segments to split
+	}
+	// 4+ segments: server takes 2 (e.g. "io_github"); otherwise 1
+	const serverSegments = parts.length >= 4 ? 2 : 1;
+	const serverName = parts.slice(0, serverSegments).join("_");
+	const toolName = parts.slice(serverSegments).join("_");
+	return `mcp__${serverName}__${toolName}`;
+}
+
+/**
+ * Convert a standard MCP tool name back to VS Code format.
+ * Standard format: mcp__{server}__{tool} (double underscores as separators)
+ * VS Code format: mcp_{server}_{tool} (single underscores)
+ *
+ * Only activates for names starting with `mcp__`. Non-MCP names are returned unchanged.
+ */
+export function convertMcpToolNameToVSCode(name: string): string {
+	if (!name.startsWith("mcp__")) {
+		return name;
+	}
+	// Only replace the two structural "__" separators, not any "__" inside the tool name itself
+	// "mcp__{server}__{tool}" → "mcp_{server}_{tool}"
+	const rest = name.slice(5); // strip "mcp__", leaves "{server}__{tool}"
+	const sep = rest.indexOf("__");
+	if (sep === -1) {
+		return name; // no second separator, return as-is
+	}
+	const server = rest.slice(0, sep);
+	const tool = rest.slice(sep + 2);
+	return `mcp_${server}_${tool}`;
+}
+
+/**
  * Convert VS Code tool definitions to OpenAI function tool definitions.
+ * MCP tool names (starting with `mcp_`) are automatically converted to standard format.
  * @param options Request options containing tools and toolMode.
  */
 export function convertToolsToOpenAI(options?: vscode.ProvideLanguageModelChatResponseOptions): {
@@ -110,7 +165,7 @@ export function convertToolsToOpenAI(options?: vscode.ProvideLanguageModelChatRe
 	const toolDefs: OpenAIFunctionToolDef[] = tools
 		.filter((t) => t && typeof t === "object")
 		.map((t) => {
-			const name = t.name;
+			const name = convertMcpToolNameToStandard(t.name);
 			const description = typeof t.description === "string" ? t.description : "";
 			const params = t.inputSchema ?? { type: "object", properties: {} };
 			return {
@@ -129,7 +184,7 @@ export function convertToolsToOpenAI(options?: vscode.ProvideLanguageModelChatRe
 			console.error("[OAI Compatible Model Provider] ToolMode.Required but multiple tools:", tools.length);
 			throw new Error("LanguageModelChatToolMode.Required is not supported with more than one tool");
 		}
-		tool_choice = { type: "function", function: { name: tools[0].name } };
+		tool_choice = { type: "function", function: { name: convertMcpToolNameToStandard(tools[0].name) } };
 	}
 
 	return { tools: toolDefs, tool_choice };

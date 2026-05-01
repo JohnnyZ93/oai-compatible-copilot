@@ -18,6 +18,8 @@ import {
 	isToolResultPart,
 	collectToolResultText,
 	convertToolsToOpenAI,
+	convertMcpToolNameToStandard,
+	convertMcpToolNameToVSCode,
 	mapRole,
 	tryParseJSONObject,
 } from "../utils";
@@ -515,7 +517,7 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 				} else if (part instanceof vscode.LanguageModelToolCallPart) {
 					const callId = part.callId || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 					const args = part.input && typeof part.input === "object" ? (part.input as Record<string, unknown>) : {};
-					toolCalls.push({ callId, name: part.name, args });
+					toolCalls.push({ callId, name: convertMcpToolNameToStandard(part.name), args });
 				} else if (isToolResultPart(part)) {
 					const callId = (part as { callId?: string }).callId ?? "";
 					const outputText = collectToolResultText(part as { content?: ReadonlyArray<unknown> });
@@ -954,7 +956,7 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 								progress.report(new vscode.LanguageModelTextPart(" "));
 								this._emittedBeginToolCallsHint = true;
 							}
-							progress.report(new vscode.LanguageModelToolCallPart(id, name, argsObj));
+							progress.report(new vscode.LanguageModelToolCallPart(id, convertMcpToolNameToVSCode(name), argsObj));
 						}
 					}
 

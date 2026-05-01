@@ -24,6 +24,7 @@ import {
 	isToolResultPart,
 	collectToolResultText,
 	convertToolsToOpenAI,
+	convertMcpToolNameToStandard,
 	mapRole,
 } from "../utils";
 
@@ -67,7 +68,7 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 					} catch {
 						args = "{}";
 					}
-					toolCalls.push({ id, type: "function", function: { name: part.name, arguments: args } });
+					toolCalls.push({ id, type: "function", function: { name: convertMcpToolNameToStandard(part.name), arguments: args } });
 				} else if (isToolResultPart(part)) {
 					const callId = (part as { callId?: string }).callId ?? "";
 					const content = collectToolResultText(part as { content?: ReadonlyArray<unknown> });
