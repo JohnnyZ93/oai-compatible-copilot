@@ -94,6 +94,12 @@ export interface HFModelItem {
 	 * If not specified, falls back to global `oaicopilot.delay` configuration.
 	 */
 	delay?: number;
+
+	/**
+	 * Price per million tokens (input + output combined).
+	 * If specified, used to calculate and display cost in the status bar.
+	 */
+	pricePerMillion?: number;
 }
 
 /**
