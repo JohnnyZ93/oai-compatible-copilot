@@ -49,6 +49,7 @@ export async function prepareLanguageModelChatInformation(
 					tooltip: detail,
 					family: m.family ?? EXTENSION_LABEL,
 					version: "1.0.0",
+					isUserSelectable: true,
 					maxInputTokens: maxInput,
 					maxOutputTokens: maxOutput,
 					capabilities: {
@@ -96,6 +97,7 @@ export async function prepareLanguageModelChatInformation(
 					tooltip: detail,
 					family: m.family ?? EXTENSION_LABEL,
 					version: "1.0.0",
+					isUserSelectable: true,
 					maxInputTokens: maxInput,
 					maxOutputTokens: maxOutput,
 					capabilities: {
@@ -117,6 +119,7 @@ export async function prepareLanguageModelChatInformation(
 					tooltip: EXTENSION_LABEL,
 					family: m.family ?? EXTENSION_LABEL,
 					version: "1.0.0",
+					isUserSelectable: true,
 					maxInputTokens: maxInput,
 					maxOutputTokens: maxOutput,
 					capabilities: {
