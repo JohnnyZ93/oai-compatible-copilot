@@ -11,6 +11,7 @@ import { logger } from "./logger";
 const DEFAULT_CONTEXT_LENGTH = 128000;
 const DEFAULT_MAX_TOKENS = 4096;
 const EXTENSION_LABEL = "OAICopilot";
+const MODEL_CATEGORY = { label: "OAI Compatible", order: 500 };
 
 /**
  * Get the list of available language models contributed by this provider
@@ -49,6 +50,8 @@ export async function prepareLanguageModelChatInformation(
 					tooltip: detail,
 					family: m.family ?? EXTENSION_LABEL,
 					version: "1.0.0",
+					isUserSelectable: true,
+					category: MODEL_CATEGORY,
 					maxInputTokens: maxInput,
 					maxOutputTokens: maxOutput,
 					capabilities: {
@@ -96,6 +99,8 @@ export async function prepareLanguageModelChatInformation(
 					tooltip: detail,
 					family: m.family ?? EXTENSION_LABEL,
 					version: "1.0.0",
+					isUserSelectable: true,
+					category: MODEL_CATEGORY,
 					maxInputTokens: maxInput,
 					maxOutputTokens: maxOutput,
 					capabilities: {
@@ -117,6 +122,8 @@ export async function prepareLanguageModelChatInformation(
 					tooltip: EXTENSION_LABEL,
 					family: m.family ?? EXTENSION_LABEL,
 					version: "1.0.0",
+					isUserSelectable: true,
+					category: MODEL_CATEGORY,
 					maxInputTokens: maxInput,
 					maxOutputTokens: maxOutput,
 					capabilities: {
