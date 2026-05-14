@@ -41,6 +41,12 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 	// Thinking content state management
 	protected _currentThinkingId: string | null = null;
 
+	/** Signature for the current thinking block (used by Anthropic). */
+	protected _currentThinkingSignature: string | null = null;
+
+	/** Full accumulated thinking content for the current block (for signature caching). */
+	protected _thinkingContentAccumulator = "";
+
 	/** Buffer for accumulating thinking content before emitting. */
 	protected _thinkingBuffer = "";
 
@@ -215,8 +221,10 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 			console.error("[OAI Compatible Model Provider] Failed to end thinking sequence:", e);
 		}
 		this._currentThinkingId = null;
-		// Clear thinking buffer and timer since sequence ended
+		this._currentThinkingSignature = null;
+		// Clear thinking buffer, content accumulator, and timer since sequence ended
 		this._thinkingBuffer = "";
+		this._thinkingContentAccumulator = "";
 		if (this._thinkingFlushTimer) {
 			clearTimeout(this._thinkingFlushTimer);
 			this._thinkingFlushTimer = null;
@@ -242,8 +250,9 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 			this._currentThinkingId = this.generateThinkingId();
 		}
 
-		// Append to thinking buffer
+		// Append to thinking buffer and content accumulator
 		this._thinkingBuffer += text;
+		this._thinkingContentAccumulator += text;
 
 		// Schedule flush with 100ms delay
 		if (!this._thinkingFlushTimer) {
