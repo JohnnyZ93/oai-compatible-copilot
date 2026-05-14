@@ -153,6 +153,7 @@
 							<th>Temperature</th>
 							<th>TopP</th>
 							<th>Delay (ms)</th>
+							<th>Price/M</th>
 							<th>Actions</th>
 						</tr>
 					</thead>
@@ -268,6 +269,11 @@
 							<label for="modelDelay">Delay (ms)</label>
 							<div class="field-description">Model-specific delay in milliseconds between consecutive requests.</div>
 							<input id="modelDelay" type="number" class="model-input" placeholder="0" min="0" />
+						</div>
+						<div class="field">
+							<label for="modelPrice">Price/M</label>
+							<div class="field-description">Price per million tokens (input + output).</div>
+							<input id="modelPrice" type="number" class="model-input" placeholder="0" min="0" step="0.01" />
 						</div>
 					</div>
 					<!-- Advanced Settings Section -->

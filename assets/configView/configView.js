@@ -44,6 +44,7 @@ const modelApiModeInput = document.getElementById("modelApiMode");
 const modelTemperatureInput = document.getElementById("modelTemperature");
 const modelTopPInput = document.getElementById("modelTopP");
 const modelDelayInput = document.getElementById("modelDelay");
+const modelPriceInput = document.getElementById("modelPrice");
 const modelTopKInput = document.getElementById("modelTopK");
 const modelMinPInput = document.getElementById("modelMinP");
 const modelFrequencyPenaltyInput = document.getElementById("modelFrequencyPenalty");
@@ -455,7 +456,7 @@ function renderProviders() {
 function renderModels() {
 	const models = state.models.filter((m) => !m.id.startsWith("__provider__")).sort((a, b) => a.id.localeCompare(b.id));
 	if (!models.length) {
-		modelTableBody.innerHTML = '<tr><td colspan="11" class="no-data">No models</td></tr>';
+		modelTableBody.innerHTML = '<tr><td colspan="12" class="no-data">No models</td></tr>';
 		return;
 	}
 
@@ -473,6 +474,7 @@ function renderModels() {
 				<td>${model.temperature !== undefined && model.temperature !== null ? model.temperature : ""}</td>
 				<td>${model.top_p !== undefined && model.top_p !== null ? model.top_p : ""}</td>
 				<td>${model.delay || ""}</td>
+				<td>${model.pricePerMillion || ""}</td>
 				<td class="action-buttons">
 					<button class="update-model-btn" data-model-id="${model.id}${model.configId ? "::" + model.configId : ""}">Edit</button>
 					<button class="delete-model-btn danger" data-model-id="${model.id}${model.configId ? "::" + model.configId : ""}">Delete</button>
@@ -546,6 +548,7 @@ function resetModelForm() {
 	modelTemperatureInput.value = 0;
 	modelTopPInput.value = "";
 	modelDelayInput.value = "";
+	modelPriceInput.value = "";
 	modelTopKInput.value = "";
 	modelMinPInput.value = "";
 	modelFrequencyPenaltyInput.value = "";
@@ -594,6 +597,7 @@ function collectModelFormData() {
 		temperature: modelTemperatureInput.value !== "" ? parseFloat(modelTemperatureInput.value) : undefined,
 		top_p: modelTopPInput.value !== "" ? parseFloat(modelTopPInput.value) : undefined,
 		delay: modelDelayInput.value ? parseInt(modelDelayInput.value) : undefined,
+		pricePerMillion: modelPriceInput.value ? parseFloat(modelPriceInput.value) : undefined,
 		top_k: modelTopKInput.value ? parseInt(modelTopKInput.value) : undefined,
 		min_p: modelMinPInput.value !== "" ? parseFloat(modelMinPInput.value) : undefined,
 		frequency_penalty:
@@ -903,6 +907,7 @@ function populateModelForm(model) {
 	modelTemperatureInput.value = model.temperature !== undefined && model.temperature !== null ? model.temperature : "";
 	modelTopPInput.value = model.top_p !== undefined && model.top_p !== null ? model.top_p : "";
 	modelDelayInput.value = model.delay || "";
+	modelPriceInput.value = model.pricePerMillion || "";
 	modelTopKInput.value = model.top_k || "";
 	modelMinPInput.value = model.min_p || "";
 	modelFrequencyPenaltyInput.value = model.frequency_penalty || "";

@@ -51,14 +51,14 @@ export function createProgressBar(usedTokens: number, maxTokens: number): string
  * @param tools Optional tool definitions to count tokens for
  * @param model The language model information
  * @param statusBarItem The status bar item to update
- * @param modelConfig Configuration including reasoning settings
+ * @param modelConfig Configuration including reasoning settings and price
  */
 export async function updateContextStatusBar(
 	messages: readonly LanguageModelChatRequestMessage[],
 	tools: readonly LanguageModelChatTool[] | undefined,
 	model: LanguageModelChatInformation,
 	statusBarItem: vscode.StatusBarItem,
-	modelConfig: { includeReasoningInRequest: boolean }
+	modelConfig: { includeReasoningInRequest: boolean; pricePerMillion?: number }
 ): Promise<void> {
 	// Calculate tokens for all messages in parallel
 	const tokenCountPromises = messages.map((message) => countMessageTokens(message, modelConfig));
@@ -78,12 +78,21 @@ export async function updateContextStatusBar(
 
 	// Create visual progress bar with single progressive block
 	const progressBar = createProgressBar(totalTokenCount, maxTokens);
-	const displayText = `$(symbol-parameter) ${progressBar}`;
+
+	// Calculate price if pricePerMillion is set
+	let priceDisplay = "";
+	const pricePerMillion = modelConfig.pricePerMillion;
+	if (pricePerMillion && pricePerMillion > 0) {
+		const totalCost = (totalTokenCount / 1_000_000) * pricePerMillion;
+		priceDisplay = ` $${totalCost.toFixed(4)}`;
+	}
+
+	const displayText = `$(symbol-parameter) ${progressBar}${priceDisplay}`;
 	statusBarItem.text = displayText;
 	statusBarItem.tooltip = `Token Usage: ${formatTokenCount(totalTokenCount)} / ${formatTokenCount(maxTokens)}\n
-${progressBar}\n
+${progressBar}${priceDisplay}\n
   - Messages: ${formatTokenCount(messagesTokens)}  (${Math.min((messagesTokens / maxTokens) * 100, 100).toFixed(1)}%)
-  - Tools: ${formatTokenCount(toolTokens)}  (${Math.min((toolTokens / maxTokens) * 100, 100).toFixed(1)}%) \n
+  - Tools: ${formatTokenCount(toolTokens)}  (${Math.min((toolTokens / maxTokens) * 100, 100).toFixed(1)}%) ${pricePerMillion ? `\n  - Cost: $${((totalTokenCount / 1_000_000) * pricePerMillion).toFixed(4)}` : ""} \n
 Click to Open Configuration UI`;
 
 	// Add color coding based on token usage

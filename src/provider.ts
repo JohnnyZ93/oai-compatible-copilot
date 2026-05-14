@@ -144,6 +144,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			// Prepare model configuration
 			const modelConfig = {
 				includeReasoningInRequest: um?.include_reasoning_in_request ?? false,
+				pricePerMillion: um?.pricePerMillion,
 			};
 
 			// Update Token Usage
