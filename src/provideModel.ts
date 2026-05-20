@@ -6,6 +6,7 @@ import {
 	createReasoningEffortConfigurationSchema,
 	type ModelPickerChatInformation,
 	isReasoningEffortValue,
+	isOpenRouterReasoningEffortPickerEnabled,
 } from "./modelConfiguration";
 import { normalizeUserModels } from "./utils";
 import { VersionManager } from "./versionManager";
@@ -46,9 +47,15 @@ export async function prepareLanguageModelChatInformation(
 				const modelId = m.configId ? `${m.id}::${m.configId}` : m.id;
 				const modelName = m.displayName || (m.configId ? `${m.id}::${m.configId}` : `${m.id}`);
 				const detail = m.owned_by ? `${m.owned_by} (${EXTENSION_LABEL})` : EXTENSION_LABEL;
-				const reasoningEffort = isReasoningEffortValue(m.reasoning_effort) ? m.reasoning_effort : undefined;
 
-				return {
+				let reasoningEffort: string | undefined;
+				if (isReasoningEffortValue(m.reasoning_effort)) {
+					reasoningEffort = m.reasoning_effort;
+				} else if (isOpenRouterReasoningEffortPickerEnabled(m)) {
+					reasoningEffort = (m.reasoning as { effort?: string })?.effort;
+				}
+
+				const modelInfo: Record<string, unknown> = {
 					id: modelId,
 					name: modelName,
 					detail: detail,
@@ -58,14 +65,17 @@ export async function prepareLanguageModelChatInformation(
 					maxInputTokens: maxInput,
 					maxOutputTokens: maxOutput,
 					isUserSelectable: true,
-					...(reasoningEffort
-						? { configurationSchema: createReasoningEffortConfigurationSchema(reasoningEffort) }
-						: {}),
 					capabilities: {
 						toolCalling: true,
 						imageInput: m?.vision ?? false,
 					},
-				} satisfies ModelPickerChatInformation;
+				};
+
+				if (isReasoningEffortValue(reasoningEffort)) {
+					modelInfo.configurationSchema = createReasoningEffortConfigurationSchema(reasoningEffort as "minimal" | "low" | "medium" | "high" | "xhigh" | "max");
+				}
+
+				return modelInfo as unknown as ModelPickerChatInformation;
 			});
 	} else {
 		// Fallback: Fetch models from API

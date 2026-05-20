@@ -6,6 +6,7 @@ import {
 	createReasoningEffortConfigurationSchema,
 	getConfiguredReasoningEffort,
 	isReasoningEffortPickerEnabled,
+	isOpenRouterReasoningEffortPickerEnabled,
 	type ModelPickerChatInformation,
 	REASONING_EFFORT_CONFIGURATION_SCHEMA,
 } from "../modelConfiguration";
@@ -32,6 +33,14 @@ suite("modelConfiguration", () => {
 		assert.strictEqual(isReasoningEffortPickerEnabled({ id: "m", owned_by: "p", reasoning_effort: "" }), false);
 		assert.strictEqual(isReasoningEffortPickerEnabled({ id: "m", owned_by: "p", reasoning_effort: "custom" }), false);
 		assert.strictEqual(isReasoningEffortPickerEnabled({ id: "m", owned_by: "p", reasoning_effort: "high" }), true);
+	});
+
+	test("only enables the OpenRouter picker when the model has a reasoning effort default", () => {
+		assert.strictEqual(isOpenRouterReasoningEffortPickerEnabled({ id: "m", owned_by: "p" }), false);
+		assert.strictEqual(isOpenRouterReasoningEffortPickerEnabled({ id: "m", owned_by: "p", reasoning: {} }), false);
+		assert.strictEqual(isOpenRouterReasoningEffortPickerEnabled({ id: "m", owned_by: "p", reasoning: { effort: "" } }), false);
+		assert.strictEqual(isOpenRouterReasoningEffortPickerEnabled({ id: "m", owned_by: "p", reasoning: { effort: "custom" } }), false);
+		assert.strictEqual(isOpenRouterReasoningEffortPickerEnabled({ id: "m", owned_by: "p", reasoning: { effort: "high" } }), true);
 	});
 
 	test("defines reasoning effort choices for provider configuration", () => {
@@ -104,6 +113,32 @@ suite("modelConfiguration", () => {
 		}
 	});
 
+	test("registers OpenRouter model with reasoning effort metadata", async () => {
+		const config = vscode.workspace.getConfiguration();
+		const previousModels = config.get<unknown>("oaicopilot.models", []);
+		const cts = new vscode.CancellationTokenSource();
+		const model: HFModelItem = {
+			...deepSeekModel,
+			id: "openrouter-model",
+			displayName: undefined,
+			reasoning_effort: undefined,
+			reasoning: { effort: "low" }
+		};
+
+		try {
+			await config.update("oaicopilot.models", [model], vscode.ConfigurationTarget.Global);
+
+			const infos = await prepareLanguageModelChatInformation({ silent: true }, cts.token, {} as vscode.SecretStorage);
+			const info = infos.find((item) => item.id === "openrouter-model") as ModelPickerChatInformation | undefined;
+
+			assert.ok(info, "openrouter-model should be registered");
+			assert.deepStrictEqual(info.configurationSchema, createReasoningEffortConfigurationSchema("low"));
+		} finally {
+			cts.dispose();
+			await config.update("oaicopilot.models", previousModels, vscode.ConfigurationTarget.Global);
+		}
+	});
+
 	test("applies selected reasoning effort to OpenAI-compatible chat requests", () => {
 		const requestBody = new OpenaiApi("deepseek-v4-pro").prepareRequestBody(
 			{ model: "deepseek-v4-pro", messages: [], stream: true },
@@ -112,6 +147,16 @@ suite("modelConfiguration", () => {
 		);
 
 		assert.strictEqual(requestBody.reasoning_effort, "high");
+	});
+
+	test("applies selected reasoning effort to OpenRouter chat requests", () => {
+		const requestBody = new OpenaiApi("openrouter-model").prepareRequestBody(
+			{ model: "openrouter-model", messages: [], stream: true },
+			{ ...deepSeekModel, reasoning_effort: undefined, reasoning: { effort: "low" } },
+			{ modelConfiguration: { reasoningEffort: "max" } } as never
+		);
+
+		assert.deepStrictEqual(requestBody.reasoning, { effort: "max" });
 	});
 
 	test("falls back to the configured default reasoning effort when Copilot has no temporary override", () => {

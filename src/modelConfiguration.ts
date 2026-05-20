@@ -62,6 +62,13 @@ export function isReasoningEffortPickerEnabled(
 	return isReasoningEffortValue(model?.reasoning_effort);
 }
 
+export function isOpenRouterReasoningEffortPickerEnabled(
+	model: HFModelItem | undefined
+): boolean {
+	const reasoningConfig = model?.reasoning as { effort?: unknown } | undefined;
+	return isReasoningEffortValue(reasoningConfig?.effort);
+}
+
 export function getConfiguredReasoningEffort(
 	options: vscode.ProvideLanguageModelChatResponseOptions | undefined,
 	fallback: ReasoningEffortPickerValue = "medium"

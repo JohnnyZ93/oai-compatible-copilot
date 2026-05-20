@@ -8,7 +8,7 @@ import {
 } from "vscode";
 
 import type { HFModelItem, ReasoningConfig, TokenUsage } from "../types";
-import { getConfiguredReasoningEffort, isReasoningEffortPickerEnabled } from "../modelConfiguration";
+import { getConfiguredReasoningEffort, isReasoningEffortPickerEnabled, isOpenRouterReasoningEffortPickerEnabled, type ReasoningEffortPickerValue } from "../modelConfiguration";
 
 import type {
 	OpenAIChatMessage,
@@ -201,7 +201,12 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 			const reasoningConfig: ReasoningConfig = um.reasoning as ReasoningConfig;
 			if (reasoningConfig.enabled !== false) {
 				const reasoningObj: Record<string, unknown> = {};
-				const effort = reasoningConfig.effort;
+
+				let effort = reasoningConfig.effort;
+				if (isOpenRouterReasoningEffortPickerEnabled(um)) {
+					effort = getConfiguredReasoningEffort(options, effort as ReasoningEffortPickerValue);
+				}
+
 				const maxTokensReasoning = reasoningConfig.max_tokens || 2000; // Default 2000 as per docs
 				if (effort && effort !== "auto") {
 					reasoningObj.effort = effort;
