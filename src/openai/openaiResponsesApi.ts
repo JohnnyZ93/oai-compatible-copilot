@@ -117,8 +117,8 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 				}
 			}
 
-			const joinedText = textParts.join("").trim();
-			const joinedThinking = thinkingParts.join("").trim();
+			const joinedText = sanitizeText(textParts.join("").trim());
+			const joinedThinking = sanitizeText(thinkingParts.join("").trim());
 
 			// assistant message (optional)
 			if (role === "assistant") {
