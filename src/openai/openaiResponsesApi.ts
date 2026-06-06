@@ -14,10 +14,12 @@ import type { OpenAIToolCall } from "./openaiTypes";
 import {
 	isImageMimeType,
 	createDataUrl,
+	createDataUrlFromImageInfo,
 	isToolResultPart,
-	collectToolResultText,
+	collectToolResultContent,
 	convertToolsToOpenAIResponses,
 	mapRole,
+	type ToolResultImage,
 } from "../utils";
 
 import { CommonApi } from "../commonApi";
@@ -84,13 +86,14 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 		modelConfig: { includeReasoningInRequest: boolean }
 	): ResponsesInputItem[] {
 		const out: ResponsesInputItem[] = [];
+		const toolCallMetaById = new Map<string, { name: string; input: Record<string, unknown> }>();
 
 		for (const m of messages) {
 			const role = mapRole(m);
 			const textParts: string[] = [];
 			const imageParts: vscode.LanguageModelDataPart[] = [];
 			const toolCalls: OpenAIToolCall[] = [];
-			const toolResults: { callId: string; content: string }[] = [];
+			const toolResults: { callId: string; content: string; images: ToolResultImage[] }[] = [];
 			const thinkingParts: string[] = [];
 
 			for (const part of m.content ?? []) {
@@ -100,6 +103,7 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 					imageParts.push(part);
 				} else if (part instanceof vscode.LanguageModelToolCallPart) {
 					const id = part.callId || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+					toolCallMetaById.set(id, { name: part.name, input: (part.input as Record<string, unknown>) ?? {} });
 					let args = "{}";
 					try {
 						args = JSON.stringify(part.input ?? {});
@@ -109,8 +113,11 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 					toolCalls.push({ id, type: "function", function: { name: part.name, arguments: args } });
 				} else if (isToolResultPart(part)) {
 					const callId = (part as { callId?: string }).callId ?? "";
-					const content = collectToolResultText(part as { content?: ReadonlyArray<unknown> });
-					toolResults.push({ callId, content });
+					const collected = collectToolResultContent(
+						part as { content?: ReadonlyArray<unknown> },
+						toolCallMetaById.get(callId)
+					);
+					toolResults.push({ callId, content: collected.text, images: collected.images });
 				} else if (part instanceof vscode.LanguageModelThinkingPart && modelConfig.includeReasoningInRequest) {
 					const content = Array.isArray(part.value) ? part.value.join("") : part.value;
 					thinkingParts.push(content);
@@ -165,6 +172,27 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 					id: `fco_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
 					status: "completed",
 				});
+				if (tr.images.length > 0) {
+					const contentArray: ResponsesContentPart[] = [
+						{
+							type: "input_text",
+							text: "The previous tool result includes the following image(s). Use them as the actual visual content from the tool result.",
+						},
+					];
+					for (const image of tr.images) {
+						contentArray.push({
+							type: "input_image",
+							image_url: createDataUrlFromImageInfo(image),
+							detail: "auto",
+						});
+					}
+					out.push({
+						role: "user",
+						content: contentArray,
+						type: "message",
+						status: "completed",
+					});
+				}
 			}
 
 			// user message

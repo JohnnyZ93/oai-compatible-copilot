@@ -20,7 +20,7 @@ import type {
 	AnthropicStreamChunk,
 } from "./anthropicTypes";
 
-import { isImageMimeType, isToolResultPart, collectToolResultText, convertToolsToOpenAI, mapRole } from "../utils";
+import { isImageMimeType, isToolResultPart, collectToolResultContent, convertToolsToOpenAI, mapRole } from "../utils";
 
 import { CommonApi } from "../commonApi";
 import { logger } from "../logger";
@@ -75,6 +75,7 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 		modelConfig: { includeReasoningInRequest: boolean }
 	): AnthropicMessage[] {
 		const out: AnthropicMessage[] = [];
+		const toolCallMetaById = new Map<string, { name: string; input: Record<string, unknown> }>();
 
 		for (const m of messages) {
 			const role = mapRole(m);
@@ -107,6 +108,7 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 					collectedParts++;
 				} else if (part instanceof vscode.LanguageModelToolCallPart) {
 					const id = part.callId || `toolu_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+					toolCallMetaById.set(id, { name: part.name, input: (part.input as Record<string, unknown>) ?? {} });
 					toolCalls.push({
 						type: "tool_use",
 						id,
@@ -116,7 +118,24 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 					collectedParts++;
 				} else if (isToolResultPart(part)) {
 					const callId = (part as { callId?: string }).callId ?? "";
-					const content = collectToolResultText(part as { content?: ReadonlyArray<unknown> });
+					const collected = collectToolResultContent(
+						part as { content?: ReadonlyArray<unknown> },
+						toolCallMetaById.get(callId)
+					);
+					const content =
+						collected.images.length > 0
+							? [
+									...(collected.text ? [{ type: "text" as const, text: collected.text }] : []),
+									...collected.images.map((image) => ({
+										type: "image" as const,
+										source: {
+											type: "base64" as const,
+											media_type: image.mimeType,
+											data: Buffer.from(image.data).toString("base64"),
+										},
+									})),
+								]
+							: collected.text;
 					toolResults.push({
 						type: "tool_result",
 						tool_use_id: callId,
