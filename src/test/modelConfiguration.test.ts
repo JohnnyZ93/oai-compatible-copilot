@@ -72,6 +72,7 @@ suite("modelConfiguration", () => {
 			assert.strictEqual(info.name, "deepseek-v4-flash");
 			assert.strictEqual(info.detail, "deepseek (OAICopilot)");
 			assert.strictEqual(info.isUserSelectable, true);
+			assert.strictEqual(info.isBYOK, true);
 			assert.deepStrictEqual(info.configurationSchema, createReasoningEffortConfigurationSchema("medium"));
 		} finally {
 			cts.dispose();

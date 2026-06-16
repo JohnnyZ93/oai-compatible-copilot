@@ -51,6 +51,8 @@ declare module "vscode" {
 		readonly category?: { label: string; order: number };
 
 		readonly statusIcon?: ThemeIcon;
+
+		readonly isBYOK?: boolean;
 	}
 
 	export interface LanguageModelChatCapabilities {

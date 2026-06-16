@@ -58,6 +58,7 @@ export async function prepareLanguageModelChatInformation(
 					maxInputTokens: maxInput,
 					maxOutputTokens: maxOutput,
 					isUserSelectable: true,
+					isBYOK: true,
 					...(reasoningEffort
 						? { configurationSchema: createReasoningEffortConfigurationSchema(reasoningEffort) }
 						: {}),
@@ -109,6 +110,7 @@ export async function prepareLanguageModelChatInformation(
 					maxInputTokens: maxInput,
 					maxOutputTokens: maxOutput,
 					isUserSelectable: true,
+					isBYOK: true,
 					capabilities: {
 						toolCalling: true,
 						imageInput: vision,
@@ -131,6 +133,7 @@ export async function prepareLanguageModelChatInformation(
 					maxInputTokens: maxInput,
 					maxOutputTokens: maxOutput,
 					isUserSelectable: true,
+					isBYOK: true,
 					capabilities: {
 						toolCalling: true,
 						imageInput: true,
