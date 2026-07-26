@@ -1,18 +1,82 @@
 import * as vscode from "vscode";
 import { LanguageModelChatInformation, LanguageModelChatRequestMessage, LanguageModelChatTool } from "vscode";
 import { countMessageTokens, countToolTokens } from "./provideToken";
+import { TokenUsageTracker } from "./tokenUsage/tokenUsageTracker";
+import { I18N } from "./i18n";
 
-export function initStatusBar(context: vscode.ExtensionContext): vscode.StatusBarItem {
+/** 当前状态栏显示模式 */
+type StatusBarMode = "context" | "usage";
+
+let _statusBarMode: StatusBarMode = "context";
+let _tokenUsageTracker: TokenUsageTracker | undefined;
+let _statusBarItem: vscode.StatusBarItem | undefined;
+
+export function initStatusBar(context: vscode.ExtensionContext, tokenUsageTracker?: TokenUsageTracker): vscode.StatusBarItem {
+	_tokenUsageTracker = tokenUsageTracker;
+
 	// Create status bar item for token count display
 	const tokenCountStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
 	tokenCountStatusBarItem.name = "Token Count";
-	tokenCountStatusBarItem.text = "$(symbol-numeric) Ready";
-	tokenCountStatusBarItem.tooltip = "Current model token usage - Click to Open Configuration UI";
+	tokenCountStatusBarItem.text = `$(symbol-numeric) ${I18N.ready()}`;
+	tokenCountStatusBarItem.tooltip = I18N.tokenUsageShowDetails();
 	tokenCountStatusBarItem.command = "oaicopilot.openConfig";
 	context.subscriptions.push(tokenCountStatusBarItem);
 	// Show the status bar item initially
 	tokenCountStatusBarItem.show();
+
+	_statusBarItem = tokenCountStatusBarItem;
 	return tokenCountStatusBarItem;
+}
+
+/**
+ * 切换状态栏显示模式（上下文窗口 / Token 消耗统计）
+ */
+export function toggleStatusBarMode(): void {
+	if (!_statusBarItem) {
+		return;
+	}
+
+	if (_statusBarMode === "context") {
+		_statusBarMode = "usage";
+		updateUsageStatusBar();
+	} else {
+		_statusBarMode = "context";
+		_statusBarItem.text = `$(symbol-numeric) ${I18N.ready()}`;
+		_statusBarItem.tooltip = I18N.tokenUsageShowDetails();
+		_statusBarItem.command = "oaicopilot.openConfig";
+	}
+}
+
+/**
+ * 更新状态栏显示 Token 消耗统计
+ */
+export function updateUsageStatusBar(): void {
+	if (!_statusBarItem || !_tokenUsageTracker) {
+		return;
+	}
+
+	const todayTotal = _tokenUsageTracker.getTodayTotalTokens();
+	const allTimeTotal = _tokenUsageTracker.getAllTimeTotalTokens();
+	const todayStats = _tokenUsageTracker.getTodayStats();
+
+	// Build provider summary
+	const providerSummaries: string[] = [];
+	for (const [provider, stats] of todayStats) {
+		providerSummaries.push(`${provider}: ${formatTokenCount(stats.totalTokens)}`);
+	}
+
+	const todayStr = providerSummaries.length > 0 ? providerSummaries.join(" | ") : I18N.noData();
+
+	_statusBarItem.text = `$(graph) ${formatTokenCount(todayTotal)}`;
+	_statusBarItem.tooltip = [
+		`${I18N.tokenUsageToday()}: ${formatTokenCount(todayTotal)} (${todayStats.size} ${I18N.provider()})`,
+		`${I18N.tokenUsageAllTime()}: ${formatTokenCount(allTimeTotal)}`,
+		"",
+		todayStr,
+		"",
+		I18N.tokenUsageShowDetails(),
+	].join("\n");
+	_statusBarItem.command = "oaicopilot.showTokenUsage";
 }
 
 /**
@@ -78,13 +142,23 @@ export async function updateContextStatusBar(
 
 	// Create visual progress bar with single progressive block
 	const progressBar = createProgressBar(totalTokenCount, maxTokens);
-	const displayText = `$(symbol-parameter) ${progressBar}`;
+
+	// Append today's usage summary if tracker is available
+	let suffix = "";
+	if (_tokenUsageTracker) {
+		const todayTotal = _tokenUsageTracker.getTodayTotalTokens();
+		if (todayTotal > 0) {
+			suffix = ` | ${formatTokenCount(todayTotal)}`;
+		}
+	}
+
+	const displayText = `$(symbol-parameter) ${progressBar}${suffix}`;
 	statusBarItem.text = displayText;
-	statusBarItem.tooltip = `Token Usage: ${formatTokenCount(totalTokenCount)} / ${formatTokenCount(maxTokens)}\n
+	statusBarItem.tooltip = `${I18N.tokenUsageContext()}: ${formatTokenCount(totalTokenCount)} / ${formatTokenCount(maxTokens)}\n
 ${progressBar}\n
-  - Messages: ${formatTokenCount(messagesTokens)}  (${Math.min((messagesTokens / maxTokens) * 100, 100).toFixed(1)}%)
-  - Tools: ${formatTokenCount(toolTokens)}  (${Math.min((toolTokens / maxTokens) * 100, 100).toFixed(1)}%) \n
-Click to Open Configuration UI`;
+  - ${I18N.tokenUsageMessages()}: ${formatTokenCount(messagesTokens)}  (${Math.min((messagesTokens / maxTokens) * 100, 100).toFixed(1)}%)
+  - ${I18N.tokenUsageTools()}: ${formatTokenCount(toolTokens)}  (${Math.min((toolTokens / maxTokens) * 100, 100).toFixed(1)}%) \n
+${I18N.tokenUsageClickConfig()}`;
 
 	// Add color coding based on token usage
 	const usagePercentage = (totalTokenCount / maxTokens) * 100;

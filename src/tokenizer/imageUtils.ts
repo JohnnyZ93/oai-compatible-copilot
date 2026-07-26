@@ -1,6 +1,8 @@
+import { I18N } from "../i18n";
+
 export function getImageDimensions(base64: string) {
 	if (!base64.startsWith("data:image/")) {
-		throw new Error("Could not read image: invalid base64 image string");
+		throw new Error(I18N.invalidBase64Image());
 	}
 	const rawString = base64.split(",")[1];
 	switch (getMimeType(rawString)) {
@@ -14,7 +16,7 @@ export function getImageDimensions(base64: string) {
 		case "image/webp":
 			return getWebPDimensions(rawString);
 		default:
-			throw new Error("Unsupported image format");
+		throw new Error(I18N.unsupportedImageFormat());
 	}
 }
 
@@ -61,7 +63,7 @@ export function getJpegDimensions(base64: string) {
 		offset += 2 + segmentLength;
 	}
 
-	throw new Error("JPEG dimensions not found");
+	throw new Error(I18N.jpegDimensionsNotFound());
 }
 
 export function getWebPDimensions(base64String: string) {
@@ -72,7 +74,7 @@ export function getWebPDimensions(base64String: string) {
 	}
 
 	if (binaryString.slice(0, 4) !== "RIFF" || binaryString.slice(8, 12) !== "WEBP") {
-		throw new Error("Not a valid WebP image.");
+		throw new Error(I18N.invalidWebPImage());
 	}
 
 	const chunkHeader = binaryString.slice(12, 16);
@@ -90,7 +92,7 @@ export function getWebPDimensions(base64String: string) {
 		const height = ((binaryData[27] | (binaryData[28] << 8) | (binaryData[29] << 16)) & 0xffffff) + 1;
 		return { width, height };
 	} else {
-		throw new Error("Unsupported WebP format.");
+		throw new Error(I18N.unsupportedWebPFormat());
 	}
 }
 

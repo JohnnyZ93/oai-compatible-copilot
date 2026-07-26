@@ -1,447 +1,402 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="%LOCALE%">
 	<head>
 		<meta charset="UTF-8" />
 		<meta http-equiv="Content-Security-Policy" content="%CSP_SOURCE%" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>OAI Copilot Configuration</title>
+		<title data-i18n="title">OAI Copilot Configuration</title>
 		<link rel="stylesheet" href="%CSS_URI%" />
 	</head>
 	<body>
 		<section id="globalConfigSection">
 			<div class="section-header">
-				<h2>Global Configuration</h2>
+				<h2 data-i18n="globalConfig">Global Configuration</h2>
 				<div class="section-actions">
-					<button id="exportConfig" class="secondary">Export</button>
-					<button id="importConfig" class="secondary">Import</button>
-					<button id="refreshGlobalConfig" class="secondary">Refresh</button>
+					<button id="exportConfig" class="secondary" data-i18n="export">Export</button>
+					<button id="importConfig" class="secondary" data-i18n="import">Import</button>
+					<button id="refreshGlobalConfig" class="secondary" data-i18n="refresh">Refresh</button>
 				</div>
 			</div>
 			<div class="row">
 				<div class="field">
-					<label for="baseUrl">Global Base URL</label>
-					<div class="field-description">The base URL for the Openai Compatible Inference API.</div>
+					<label for="baseUrl" data-i18n="globalBaseUrl">Global Base URL</label>
+					<div class="field-description" data-i18n="globalBaseUrlDesc">The base URL for the Openai Compatible Inference API.</div>
 					<input id="baseUrl" type="text" placeholder="https://api.openai.com/v1" />
 				</div>
 				<div class="field">
-					<label for="apiKey">Global API Key</label>
-					<div class="field-description">The API Key for Authentication.</div>
+					<label for="apiKey" data-i18n="globalApiKey">Global API Key</label>
+					<div class="field-description" data-i18n="globalApiKeyDesc">The API Key for Authentication.</div>
 					<input id="apiKey" type="password" placeholder="sk-..." />
 				</div>
 				<div class="field">
-					<label for="delay">Delay (ms)</label>
-					<div class="field-description">Fixed delay in milliseconds between consecutive requests.</div>
+					<label for="delay" data-i18n="delayMs">Delay (ms)</label>
+					<div class="field-description" data-i18n="delayMsDesc">Fixed delay in milliseconds between consecutive requests.</div>
 					<input id="delay" type="number" min="0" placeholder="0" />
 				</div>
 				<div class="field">
-					<label for="readFileLines">Read File Lines</label>
-					<div class="field-description">
-						Number of lines to read when using `read_file` tool. Large lines may cost more tokens. Default is 0, let
-						model decide lines.
-					</div>
+					<label for="readFileLines" data-i18n="readFileLines">Read File Lines</label>
+					<div class="field-description" data-i18n="readFileLinesDesc">Number of lines to read when using read_file tool. Default is 0, let model decide lines.</div>
 					<input id="readFileLines" type="number" min="0" placeholder="0" />
+				</div>
+				<div class="field">
+					<label for="tokenUsageEnabled" data-i18n="tokenUsageEnabled">Enable Token Usage Tracking</label>
+					<div class="field-description" data-i18n="tokenUsageEnabledDesc">Track daily and cumulative token consumption per provider. Default is false.</div>
+					<input id="tokenUsageEnabled" type="checkbox" />
 				</div>
 			</div>
 			<div class="retry-config">
-				<h3>Retry Configuration</h3>
+				<h3 data-i18n="retryConfig">Retry Configuration</h3>
 				<div class="row">
 					<div class="field">
-						<label for="retryEnabled">Enable Retry</label>
-						<div class="field-description">Enable retry mechanism for api errors.</div>
+						<label for="retryEnabled" data-i18n="enableRetry">Enable Retry</label>
+						<div class="field-description" data-i18n="enableRetryDesc">Enable retry mechanism for api errors.</div>
 						<input id="retryEnabled" type="checkbox" />
 					</div>
 					<div class="field">
-						<label for="maxAttempts">Max Attempts</label>
-						<div class="field-description">Maximum number of retry attempts.</div>
+						<label for="maxAttempts" data-i18n="maxAttempts">Max Attempts</label>
+						<div class="field-description" data-i18n="maxAttemptsDesc">Maximum number of retry attempts.</div>
 						<input id="maxAttempts" type="number" min="1" placeholder="3" />
 					</div>
 					<div class="field">
-						<label for="intervalMs">Retry Interval (ms)</label>
-						<div class="field-description">Interval between retry attempts in milliseconds.</div>
+						<label for="intervalMs" data-i18n="retryInterval">Retry Interval (ms)</label>
+						<div class="field-description" data-i18n="retryIntervalDesc">Interval between retry attempts in milliseconds.</div>
 						<input id="intervalMs" type="number" min="1" placeholder="1000" />
 					</div>
 					<div class="field">
-						<label for="statusCodes">Retry Status Codes (comma separated)</label>
-						<div class="field-description">Additional HTTP status codes that will be merged.</div>
+						<label for="statusCodes" data-i18n="retryStatusCodes">Retry Status Codes (comma separated)</label>
+						<div class="field-description" data-i18n="retryStatusCodesDesc">Additional HTTP status codes that will be merged.</div>
 						<input id="statusCodes" type="text" placeholder="429,500,502,503,504" />
 					</div>
 				</div>
 			</div>
 			<div class="retry-config">
-				<h3>Git Commit Message</h3>
+				<h3 data-i18n="gitCommitMsg">Git Commit Message</h3>
 				<div class="row">
 					<div class="field">
-						<label for="commitModel">Git Commit Model</label>
-						<div class="field-description">Select the model to be used for Git commit message generation.</div>
+						<label for="commitModel" data-i18n="gitCommitModel">Git Commit Model</label>
+						<div class="field-description" data-i18n="gitCommitModelDesc">Select the model to be used for Git commit message generation.</div>
 						<select id="commitModel" class="model-input">
-							<option value="">None</option>
+							<option value="" data-i18n="none">None</option>
 						</select>
 					</div>
 					<div class="field">
-						<label for="commitLanguage">Commit Language</label>
-						<div class="field-description">Language for generated Git commit messages.</div>
+						<label for="commitLanguage" data-i18n="commitLanguage">Commit Language</label>
+						<div class="field-description" data-i18n="commitLanguageDesc">Language for generated Git commit messages.</div>
 						<select id="commitLanguage" class="model-input">
-							<option value="English">English</option>
-							<option value="French">French</option>
-							<option value="Italian">Italian</option>
-							<option value="German">German</option>
-							<option value="Spanish">Spanish</option>
-							<option value="Russian">Russian</option>
-							<option value="Chinese (Simplified)">Chinese (Simplified)</option>
-							<option value="Chinese (Traditional)">Chinese (Traditional)</option>
-							<option value="Japanese">Japanese</option>
-							<option value="Korean">Korean</option>
-							<option value="Czech">Czech</option>
-							<option value="Portuguese (Brazil)">Portuguese (Brazil)</option>
-							<option value="Turkish">Turkish</option>
-							<option value="Polish">Polish</option>
+							<option value="English" data-i18n="commitLangEnglish">English</option>
+							<option value="French" data-i18n="commitLangFrench">French</option>
+							<option value="Italian" data-i18n="commitLangItalian">Italian</option>
+							<option value="German" data-i18n="commitLangGerman">German</option>
+							<option value="Spanish" data-i18n="commitLangSpanish">Spanish</option>
+							<option value="Russian" data-i18n="commitLangRussian">Russian</option>
+							<option value="Chinese (Simplified)" data-i18n="commitLangChineseSimplified">简体中文</option>
+							<option value="Chinese (Traditional)" data-i18n="commitLangChineseTraditional">繁體中文</option>
+							<option value="Japanese" data-i18n="commitLangJapanese">Japanese</option>
+							<option value="Korean" data-i18n="commitLangKorean">Korean</option>
+							<option value="Czech" data-i18n="commitLangCzech">Czech</option>
+							<option value="Portuguese (Brazil)" data-i18n="commitLangPortugueseBrazil">Portuguese (Brazil)</option>
+							<option value="Turkish" data-i18n="commitLangTurkish">Turkish</option>
+							<option value="Polish" data-i18n="commitLangPolish">Polish</option>
 						</select>
 					</div>
 				</div>
 			</div>
 			<div class="block-gap">
-				<button id="saveBase">Save Global Configuration</button>
+				<button id="saveBase" data-i18n="saveGlobalConfig">Save Global Configuration</button>
 			</div>
 		</section>
 
 		<section id="providerManagementSection">
 			<div class="section-header">
-				<h2>Provider Management</h2>
+				<h2 data-i18n="providerMgmt">Provider Management</h2>
 				<div class="section-actions">
-					<button id="addProvider">Add Provider</button>
-					<button id="refreshProviders" class="secondary">Refresh</button>
+					<button id="addProvider" data-i18n="addProvider">Add Provider</button>
+					<button id="refreshProviders" class="secondary" data-i18n="refresh">Refresh</button>
 				</div>
 			</div>
 			<div class="table-container">
 				<table id="providerTable">
 					<thead>
 						<tr>
-							<th>Provider ID</th>
-							<th>Base URL</th>
-							<th>API Key</th>
-							<th>API Mode</th>
-							<th>Custom Headers (JSON)</th>
-							<th>Actions</th>
+							<th data-i18n="thProviderId">Provider ID</th>
+							<th data-i18n="thBaseUrl">Base URL</th>
+							<th data-i18n="thApiKey">API Key</th>
+							<th data-i18n="thApiMode">API Mode</th>
+							<th data-i18n="thCustomHeaders">Custom Headers (JSON)</th>
+							<th data-i18n="thActions">Actions</th>
 						</tr>
 					</thead>
-					<tbody id="providerTableBody">
-						<!-- Provider rows will be inserted here -->
-					</tbody>
+					<tbody id="providerTableBody"></tbody>
 				</table>
 			</div>
 		</section>
 
 		<section id="modelManagementSection">
 			<div class="section-header">
-				<h2>Model Management</h2>
+				<h2 data-i18n="modelMgmt">Model Management</h2>
 				<div class="section-actions">
-					<button id="addModel">Add Model</button>
-					<button id="refreshModels" class="secondary">Refresh</button>
+					<button id="addModel" data-i18n="addModel">Add Model</button>
+					<button id="refreshModels" class="secondary" data-i18n="refresh">Refresh</button>
 				</div>
 			</div>
 			<div class="table-container">
 				<table id="modelTable">
 					<thead>
 						<tr>
-							<th>Model ID</th>
-							<th>Provider ID</th>
-							<th>Display Name</th>
-							<th>Config ID</th>
-							<th>Context Length</th>
-							<th>Max Tokens</th>
-							<th>Supports Vision</th>
-							<th>Temperature</th>
-							<th>TopP</th>
-							<th>Delay (ms)</th>
-							<th>Actions</th>
+							<th data-i18n="thModelId">Model ID</th>
+							<th data-i18n="thProviderId">Provider ID</th>
+							<th data-i18n="thDisplayName">Display Name</th>
+							<th data-i18n="thConfigId">Config ID</th>
+							<th data-i18n="thContextLength">Context Length</th>
+							<th data-i18n="thMaxTokens">Max Tokens</th>
+							<th data-i18n="thSupportsVision">Supports Vision</th>
+							<th data-i18n="thTemperature">Temperature</th>
+							<th data-i18n="thTopP">TopP</th>
+							<th data-i18n="thDelayMs">Delay (ms)</th>
+							<th data-i18n="thActions">Actions</th>
 						</tr>
 					</thead>
-					<tbody id="modelTableBody">
-						<!-- Model rows will be inserted here -->
-					</tbody>
+					<tbody id="modelTableBody"></tbody>
 				</table>
 			</div>
-			<!-- Model Form Section -->
 			<div id="modelFormSection" style="display: none; margin-top: 20px">
-				<h3 id="modelFormTitle">Add New Model</h3>
+				<h3 id="modelFormTitle" data-i18n="addNewModel">Add New Model</h3>
 				<div class="form-container">
 					<div class="row">
 						<div class="field">
-							<label for="modelProvider">Provider ID *</label>
-							<div class="field-description">Model provider.</div>
+							<label for="modelProvider" data-i18n="modelProvider">Provider ID *</label>
+							<div class="field-description" data-i18n="modelProviderDesc">The provider that serves this model.</div>
 							<select id="modelProvider" class="model-input" required>
-								<option value="">Select Provider</option>
+								<option value="" data-i18n="selectProvider">Select Provider</option>
 							</select>
 						</div>
 						<div class="field">
-							<label for="modelVision">Supports Vision</label>
-							<div class="field-description">Model support vision.</div>
+							<label for="modelVision" data-i18n="modelVision">Supports Vision</label>
+							<div class="field-description" data-i18n="modelVisionDesc">Whether the model supports image input.</div>
 							<select id="modelVision" class="model-input">
-								<option value="">Default (False)</option>
-								<option value="true">True</option>
-								<option value="false">False</option>
+								<option value="" data-i18n="defaultFalse">Default (False)</option>
+								<option value="true" data-i18n="optTrue">True</option>
+								<option value="false" data-i18n="optFalse">False</option>
 							</select>
 						</div>
 						<div class="field">
-							<label for="modelApiMode">API Mode</label>
-							<div class="field-description">
-								'openai' for API (/chat/completions), 'openai-responses' for API (/responses), 'ollama' for API
-								(/api/chat), 'anthropic' for API (/v1/messages), 'gemini' for API
-								(/v1beta/models/{model}:streamGenerateContent?alt=sse).
-							</div>
+							<label for="modelApiMode" data-i18n="modelApiMode">API Mode</label>
+							<div class="field-description" data-i18n="modelApiModeDesc">API endpoint format for the provider.</div>
 							<select id="modelApiMode" class="model-input">
-								<option value="openai">OpenAI</option>
-								<option value="openai-responses">OpenAI Responses</option>
-								<option value="ollama">Ollama</option>
-								<option value="anthropic">Anthropic</option>
-								<option value="gemini">Gemini</option>
+								<option value="openai" data-i18n="apiModeOpenAI">OpenAI</option>
+								<option value="openai-responses" data-i18n="apiModeOpenAIResponses">OpenAI Responses</option>
+								<option value="ollama" data-i18n="apiModeOllama">Ollama</option>
+								<option value="anthropic" data-i18n="apiModeAnthropic">Anthropic</option>
+								<option value="gemini" data-i18n="apiModeGemini">Gemini</option>
 							</select>
 						</div>
 					</div>
 					<div class="row">
 						<div class="field">
-							<label for="modelIdInput">Model ID *</label>
-							<div class="field-description">Model ID (e.g., gpt-4, claude-3).</div>
+							<label for="modelIdInput" data-i18n="modelIdInput">Model ID *</label>
+							<div class="field-description" data-i18n="modelIdInputDesc">Model ID (e.g., gpt-4, claude-3).</div>
 							<div class="input-with-dropdown">
 								<input id="modelIdInput" type="text" class="model-input" placeholder="e.g., gpt-4, claude-3" required />
 								<div id="modelIdDropdown" class="model-input-dropdown">
-									<div class="dropdown-header">Select Model</div>
-									<div class="dropdown-content">
-										<!-- Model options will be inserted here -->
-									</div>
+									<div class="dropdown-header" data-i18n="selectModel">Select Model</div>
+									<div class="dropdown-content"></div>
 								</div>
 							</div>
 						</div>
 						<div class="field">
-							<label for="modelConfigId">Config ID</label>
-							<div class="field-description">
-								Configuration ID for this model. Allows defining the same model with different settings (e.g.
-								'glm-4.6::thinking', 'glm-4.6::no-thinking').
-							</div>
+							<label for="modelConfigId" data-i18n="modelConfigId">Config ID</label>
+							<div class="field-description" data-i18n="modelConfigIdDesc">Configuration ID for this model.</div>
 							<input id="modelConfigId" type="text" class="model-input" placeholder="e.g., thinking, no-thinking" />
 						</div>
 						<div class="field">
-							<label for="modelBaseUrl">Base URL</label>
-							<div class="field-description">Base URL for the model provider.</div>
+							<label for="modelBaseUrl" data-i18n="modelBaseUrl">Base URL</label>
+							<div class="field-description" data-i18n="modelBaseUrlDesc">Base URL for the model provider.</div>
 							<input id="modelBaseUrl" type="text" class="model-input" placeholder="https://api.openai.com/v1" />
 						</div>
 					</div>
 					<div class="row">
 						<div class="field">
-							<label for="modelContextLength">Context Length</label>
-							<div class="field-description">Maximum context length.</div>
+							<label for="modelContextLength" data-i18n="modelContextLength">Context Length</label>
+							<div class="field-description" data-i18n="modelContextLengthDesc">Maximum context length.</div>
 							<input id="modelContextLength" type="number" class="model-input" placeholder="128000" min="1" />
 						</div>
 						<div class="field">
-							<label for="modelMaxTokens">Max Tokens</label>
-							<div class="field-description">Maximum number of tokens to generate (range: [1, context_length)).</div>
+							<label for="modelMaxTokens" data-i18n="modelMaxTokens">Max Tokens</label>
+							<div class="field-description" data-i18n="modelMaxTokensDesc">Maximum number of tokens to generate.</div>
 							<input id="modelMaxTokens" type="number" class="model-input" placeholder="4096" min="1" />
 						</div>
 						<div class="field">
-							<label for="modelMaxCompletionTokens">Max Completion Tokens</label>
-							<div class="field-description">
-								Maximum output tokens (OpenAI new standard - takes precedence over Max Tokens if both are set).
-							</div>
+							<label for="modelMaxCompletionTokens" data-i18n="modelMaxCompletionTokens">Max Completion Tokens</label>
+							<div class="field-description" data-i18n="modelMaxCompletionTokensDesc">Maximum output tokens (OpenAI new standard).</div>
 							<input id="modelMaxCompletionTokens" type="number" class="model-input" placeholder="4096" min="1" />
 						</div>
 					</div>
 					<div class="row">
 						<div class="field">
-							<label for="modelTemperature">Temperature</label>
-							<div class="field-description">Sampling temperature (range: [0, 2]). Default is 0.</div>
-							<input
-								id="modelTemperature"
-								type="number"
-								class="model-input"
-								placeholder="0"
-								min="0"
-								max="2"
-								step="0.01"
-							/>
+							<label for="modelTemperature" data-i18n="modelTemperature">Temperature</label>
+							<div class="field-description" data-i18n="modelTemperatureDesc">Sampling temperature (range: [0, 2]). Default is 0.</div>
+							<input id="modelTemperature" type="number" class="model-input" placeholder="0" min="0" max="2" step="0.01" />
 						</div>
 						<div class="field">
-							<label for="modelTopP">Top P</label>
-							<div class="field-description">Top-p sampling value (range: (0, 1]).</div>
+							<label for="modelTopP" data-i18n="modelTopP">Top P</label>
+							<div class="field-description" data-i18n="modelTopPDesc">Top-p sampling value (range: (0, 1]).</div>
 							<input id="modelTopP" type="number" class="model-input" placeholder="1" min="0" max="1" step="0.01" />
 						</div>
 						<div class="field">
-							<label for="modelDelay">Delay (ms)</label>
-							<div class="field-description">Model-specific delay in milliseconds between consecutive requests.</div>
+							<label for="modelDelay" data-i18n="modelDelay">Delay (ms)</label>
+							<div class="field-description" data-i18n="modelDelayDesc">Model-specific delay in milliseconds between consecutive requests.</div>
 							<input id="modelDelay" type="number" class="model-input" placeholder="0" min="0" />
 						</div>
 					</div>
-					<!-- Advanced Settings Section -->
 					<div class="advanced-settings">
-						<button type="button" id="toggleAdvancedSettings" class="secondary">Show Advanced Settings</button>
+						<button type="button" id="toggleAdvancedSettings" class="secondary" data-i18n="showAdvanced">Show Advanced Settings</button>
 						<div id="advancedSettingsContent" style="display: none; margin-top: 15px">
 							<div class="row">
 								<div class="field">
-									<label for="modelDisplayName">Display Name</label>
-									<div class="field-description">
-										Display name for the model that will be shown in the Copilot interface.
-									</div>
+									<label for="modelDisplayName" data-i18n="formDisplayName">Display Name</label>
+									<div class="field-description" data-i18n="formDisplayNameDesc">Display name for the model.</div>
 									<input id="modelDisplayName" type="text" class="model-input" placeholder="e.g., GPT-4 Turbo" />
 								</div>
 								<div class="field">
-									<label for="modelFamily">Model Family</label>
-									<div class="field-description">
-										Model family (e.g., 'gpt-4', 'claude-3', 'gemini'). Enables model-specific optimizations and
-										behaviors.
-									</div>
+									<label for="modelFamily" data-i18n="modelFamily">Model Family</label>
+									<div class="field-description" data-i18n="modelFamilyDesc">Model family for specific optimizations.</div>
 									<input id="modelFamily" type="text" class="model-input" placeholder="e.g., gpt-4, claude-3" />
 								</div>
 								<div class="field">
-									<label for="modelTopK">Top K</label>
-									<div class="field-description">Top-k sampling value (range: [1, Infinity)).</div>
+									<label for="modelTopK" data-i18n="modelTopK">Top K</label>
+									<div class="field-description" data-i18n="modelTopKDesc">Top-k sampling value.</div>
 									<input id="modelTopK" type="number" class="model-input" min="1" />
 								</div>
 								<div class="field">
-									<label for="modelMinP">Min P</label>
-									<div class="field-description">Minimum probability threshold (range: [0, 1]).</div>
+									<label for="modelMinP" data-i18n="modelMinP">Min P</label>
+									<div class="field-description" data-i18n="modelMinPDesc">Minimum probability threshold (range: [0, 1]).</div>
 									<input id="modelMinP" type="number" class="model-input" min="0" max="1" step="0.01" />
 								</div>
 							</div>
 							<div class="row">
 								<div class="field">
-									<label for="modelThinkingBudget">Thinking Budget</label>
-									<div class="field-description">Maximum number of tokens for chain-of-thought output.</div>
+									<label for="modelThinkingBudget" data-i18n="modelThinkingBudget">Thinking Budget</label>
+									<div class="field-description" data-i18n="modelThinkingBudgetDesc">Maximum number of tokens for chain-of-thought output.</div>
 									<input id="modelThinkingBudget" type="number" class="model-input" min="128" />
 								</div>
 								<div class="field">
-									<label for="modelFrequencyPenalty">Frequency Penalty</label>
-									<div class="field-description">Frequency penalty (range: [-2, 2]).</div>
+									<label for="modelFrequencyPenalty" data-i18n="modelFreqPenalty">Frequency Penalty</label>
+									<div class="field-description" data-i18n="modelFreqPenaltyDesc">Frequency penalty (range: [-2, 2]).</div>
 									<input id="modelFrequencyPenalty" type="number" class="model-input" min="-2" max="2" step="0.01" />
 								</div>
 								<div class="field">
-									<label for="modelPresencePenalty">Presence Penalty</label>
-									<div class="field-description">Presence penalty (range: [-2, 2]).</div>
+									<label for="modelPresencePenalty" data-i18n="modelPresPenalty">Presence Penalty</label>
+									<div class="field-description" data-i18n="modelPresPenaltyDesc">Presence penalty (range: [-2, 2]).</div>
 									<input id="modelPresencePenalty" type="number" class="model-input" min="-2" max="2" step="0.01" />
 								</div>
 								<div class="field">
-									<label for="modelRepetitionPenalty">Repetition Penalty</label>
-									<div class="field-description">Repetition penalty (range: (0, 2]).</div>
+									<label for="modelRepetitionPenalty" data-i18n="modelRepPenalty">Repetition Penalty</label>
+									<div class="field-description" data-i18n="modelRepPenaltyDesc">Repetition penalty (range: (0, 2]).</div>
 									<input id="modelRepetitionPenalty" type="number" class="model-input" min="0" step="0.01" />
 								</div>
 							</div>
-							<!-- Thinking Configuration -->
 							<div class="row">
 								<div class="field">
-									<label for="modelIncludeReasoning">Include Reasoning</label>
-									<div class="field-description">Include reasoning_content in assistant messages sent to the API.</div>
+									<label for="modelIncludeReasoning" data-i18n="modelIncReasoning">Include Reasoning</label>
+									<div class="field-description" data-i18n="modelIncReasoningDesc">Include reasoning_content in assistant messages.</div>
 									<select id="modelIncludeReasoning" class="model-input">
-										<option value="">Default (False)</option>
-										<option value="true">True</option>
-										<option value="false">False</option>
+										<option value="" data-i18n="defaultFalse">Default (False)</option>
+										<option value="true" data-i18n="optTrue">True</option>
+										<option value="false" data-i18n="optFalse">False</option>
 									</select>
 								</div>
 								<div class="field">
-									<label for="modelThinkingType">Thinking Type</label>
-									<div class="field-description">Include "thinking.type" in request body.</div>
+									<label for="modelThinkingType" data-i18n="modelThinkType">Thinking Type</label>
+									<div class="field-description" data-i18n="modelThinkTypeDesc">Include "thinking.type" in request body.</div>
 									<select id="modelThinkingType" class="model-input">
-										<option value=""></option>
-										<option value="enabled">Enabled</option>
-										<option value="disabled">Disabled</option>
+										<option value="" data-i18n="optEmpty">Default</option>
+										<option value="enabled" data-i18n="enabled">Enabled</option>
+										<option value="disabled" data-i18n="disabled">Disabled</option>
 									</select>
 								</div>
 								<div class="field">
-									<label for="modelEnableThinking">Enable Thinking</label>
-									<div class="field-description">Include "enable_thinking" in request body.</div>
+									<label for="modelEnableThinking" data-i18n="modelEnableThink">Enable Thinking</label>
+									<div class="field-description" data-i18n="modelEnableThinkDesc">Include "enable_thinking" in request body.</div>
 									<select id="modelEnableThinking" class="model-input">
-										<option value=""></option>
-										<option value="true">True</option>
-										<option value="false">False</option>
+										<option value="" data-i18n="optEmpty">Default</option>
+										<option value="true" data-i18n="optTrue">True</option>
+										<option value="false" data-i18n="optFalse">False</option>
 									</select>
 								</div>
 								<div class="field">
-									<label for="modelReasoningEffort">Reasoning Effort (OpenAI)</label>
-									<div class="field-description">
-										Default OpenAI reasoning effort. Leave empty to hide the Copilot picker.
-									</div>
+									<label for="modelReasoningEffort" data-i18n="modelReasonEffort">Reasoning Effort (OpenAI)</label>
+									<div class="field-description" data-i18n="modelReasonEffortDesc">Default OpenAI reasoning effort. Leave empty to hide the Copilot picker.</div>
 									<select id="modelReasoningEffort" class="model-input">
-										<option value=""></option>
-										<option value="max">Max</option>
-										<option value="xhigh">XHigh</option>
-										<option value="high">High</option>
-										<option value="medium">Medium</option>
-										<option value="low">Low</option>
-										<option value="minimal">Minimal</option>
+										<option value="" data-i18n="optEmpty">Default</option>
+										<option value="max" data-i18n="reasoningEffortMax">Max</option>
+										<option value="xhigh" data-i18n="reasoningEffortXHigh">XHigh</option>
+										<option value="high" data-i18n="reasoningEffortHigh">High</option>
+										<option value="medium" data-i18n="reasoningEffortMedium">Medium</option>
+										<option value="low" data-i18n="reasoningEffortLow">Low</option>
+										<option value="minimal" data-i18n="reasoningEffortMinimal">Minimal</option>
 									</select>
 								</div>
 							</div>
-							<!-- Reasoning Configuration -->
 							<div class="retry-config">
-								<h3>Reasoning Configuration (OpenRouter)</h3>
+								<h3 data-i18n="reasoningConfig">Reasoning Configuration (OpenRouter)</h3>
 								<div class="row">
 									<div class="field">
-										<label for="modelReasoningEnabled">Reasoning Enabled</label>
-										<div class="field-description">Enable reasoning params in request body.</div>
+										<label for="modelReasoningEnabled" data-i18n="reasoningEnabled">Reasoning Enabled</label>
+										<div class="field-description" data-i18n="reasoningEnabledDesc">Enable reasoning params in request body.</div>
 										<select id="modelReasoningEnabled" class="model-input">
-											<option value=""></option>
-											<option value="true">True</option>
-											<option value="false">False</option>
+											<option value="" data-i18n="optEmpty">Default</option>
+											<option value="true" data-i18n="optTrue">True</option>
+											<option value="false" data-i18n="optFalse">False</option>
 										</select>
 									</div>
 									<div class="field">
-										<label for="modelReasoningEffortOR">Reasoning Effort</label>
-										<div class="field-description">Include "reasoning.effort" in request body.</div>
+										<label for="modelReasoningEffortOR" data-i18n="reasoningEffort">Reasoning Effort</label>
+										<div class="field-description" data-i18n="reasoningEffortDesc">Include "reasoning.effort" in request body.</div>
 										<select id="modelReasoningEffortOR" class="model-input">
-											<option value=""></option>
-											<option value="max">Max</option>
-											<option value="xhigh">XHigh</option>
-											<option value="high">High</option>
-											<option value="medium">Medium</option>
-											<option value="low">Low</option>
-											<option value="minimal">Minimal</option>
-											<option value="auto">Auto</option>
+											<option value="" data-i18n="optEmpty">Default</option>
+											<option value="max" data-i18n="reasoningEffortMax">Max</option>
+											<option value="xhigh" data-i18n="reasoningEffortXHigh">XHigh</option>
+											<option value="high" data-i18n="reasoningEffortHigh">High</option>
+											<option value="medium" data-i18n="reasoningEffortMedium">Medium</option>
+											<option value="low" data-i18n="reasoningEffortLow">Low</option>
+											<option value="minimal" data-i18n="reasoningEffortMinimal">Minimal</option>
+											<option value="auto" data-i18n="reasoningEffortAuto">Auto</option>
 										</select>
 									</div>
 									<div class="field">
-										<label for="modelReasoningExclude">Reasoning Exclude</label>
-										<div class="field-description">Include "reasoning.exclude" in request body.</div>
+										<label for="modelReasoningExclude" data-i18n="reasoningExclude">Reasoning Exclude</label>
+										<div class="field-description" data-i18n="reasoningExcludeDesc">Include "reasoning.exclude" in request body.</div>
 										<select id="modelReasoningExclude" class="model-input">
-											<option value=""></option>
-											<option value="true">True</option>
-											<option value="false">False</option>
+											<option value="" data-i18n="optEmpty">Default</option>
+											<option value="true" data-i18n="optTrue">True</option>
+											<option value="false" data-i18n="optFalse">False</option>
 										</select>
 									</div>
 									<div class="field">
-										<label for="modelReasoningMaxTokens">Reasoning Max Tokens</label>
-										<div class="field-description">Include "reasoning.max_tokens" in request body.</div>
+										<label for="modelReasoningMaxTokens" data-i18n="reasoningMaxTokens">Reasoning Max Tokens</label>
+										<div class="field-description" data-i18n="reasoningMaxTokensDesc">Include "reasoning.max_tokens" in request body.</div>
 										<input id="modelReasoningMaxTokens" type="number" class="model-input" min="1" />
 									</div>
 								</div>
 							</div>
-							<!-- Custom Headers and Extra Parameters -->
 							<div class="row">
 								<div class="field">
-									<label for="modelHeaders">Custom Headers (JSON)</label>
-									<div class="field-description">Custom HTTP headers to be sent with every request to this model.</div>
-									<textarea
-										id="modelHeaders"
-										class="model-input"
-										rows="3"
-										placeholder='{"X-API-Version": "v1", "X-Custom-Header": "value"}'
-									></textarea>
+									<label for="modelHeaders" data-i18n="formCustomHeaders">Custom Headers (JSON)</label>
+									<div class="field-description" data-i18n="formCustomHeadersDesc">Custom HTTP headers.</div>
+									<textarea id="modelHeaders" class="model-input" rows="3" placeholder='{"X-API-Version": "v1"}'></textarea>
 								</div>
 								<div class="field">
-									<label for="modelExtra">Extra Parameters (JSON)</label>
-									<div class="field-description">
-										Extra request body parameters to be sent with every request to this model.
-									</div>
-									<textarea
-										id="modelExtra"
-										class="model-input"
-										rows="3"
-										placeholder='{"key1": "value", "key2": "value"}'
-									></textarea>
+									<label for="modelExtra" data-i18n="formExtraParams">Extra Parameters (JSON)</label>
+									<div class="field-description" data-i18n="formExtraParamsDesc">Extra request body parameters.</div>
+									<textarea id="modelExtra" class="model-input" rows="3" placeholder='{"key1": "value"}'></textarea>
 								</div>
 							</div>
 						</div>
 					</div>
 					<div id="modelError" class="error-message" style="display: none"></div>
 					<div class="actions">
-						<button id="saveModel" class="primary">Save Model</button>
-						<button id="cancelModel" class="secondary">Cancel</button>
+						<button id="saveModel" class="primary" data-i18n="saveModel">Save Model</button>
+						<button id="cancelModel" class="secondary" data-i18n="cancel">Cancel</button>
 					</div>
 				</div>
 			</div>

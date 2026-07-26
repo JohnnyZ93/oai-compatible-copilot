@@ -1,0 +1,21 @@
+{
+	"displayName": "OAI Compatible Provider for Copilot",
+	"description": "将 OpenAI/Ollama/Anthropic/Gemini API 提供商集成到 GitHub Copilot Chat 的扩展",
+	"command.setApikey": "设置 OAI Compatible API 密钥",
+	"command.setProviderApikey": "设置 OAI Compatible 多提供商 API 密钥",
+	"command.openConfig": "打开配置面板",
+	"command.generateGitCommitMessage": "使用 OAICopilot 生成提交信息",
+	"command.abortGitCommitMessage": "使用 OAICopilot 生成提交信息 - 停止",
+	"command.showTokenUsage": "显示 Token 消耗统计",
+	"command.resetTokenUsage": "重置 Token 消耗统计",
+	"command.exportTokenUsage": "导出 Token 消耗数据",
+	"config.logLevel.description": "调试日志级别。日志以 JSON 行格式写入 ~/.copilot/oaicopilot/logs/。默认为 'off'（不记录）。",
+	"config.baseUrl.description": "OpenAI 兼容推理 API 的基础 URL。默认值为 Hugging Face。",
+	"config.models.description": "首选模型列表。如果提供，将直接使用这些模型而不是从 API 获取。",
+	"config.retry.description": "处理 API 错误（如 [429, 500, 502, 503, 504]）的重试配置。",
+	"config.delay.description": "连续请求之间的固定请求间隔（毫秒）。默认为 0（无请求间隔）。",
+	"config.commitLanguage.description": "生成的 Git 提交信息的语言。默认为英语。",
+	"config.commitMessagePrompt.description": "提交信息生成的自定义系统提示。如果未提供，则使用默认提示。",
+	"config.readFileLines.description": "使用 read_file 工具时读取的行数。大行可能消耗更多 Token。默认为 0，由模型决定行数。",
+	"config.tokenUsageEnabled.description": "启用按供应商的 Token 消耗统计。启用后，将追踪每个供应商的每日和累计 Token 消耗。默认为关闭。"
+}

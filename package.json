@@ -1,8 +1,8 @@
 {
 	"name": "oai-compatible-copilot",
 	"publisher": "johnny-zhao",
-	"displayName": "OAI Compatible Provider for Copilot",
-	"description": "An extension that integrates OpenAI/Ollama/Anthropic/Gemini API Providers into GitHub Copilot Chat",
+	"displayName": "%displayName%",
+	"description": "%description%",
 	"icon": "assets/logo.png",
 	"keywords": [
 		"ai",
@@ -59,29 +59,45 @@
 			{
 				"command": "oaicopilot.setApikey",
 				"category": "OAICopilot",
-				"title": "Set OAI Compatible Apikey"
+			"title": "%command.setApikey%"
 			},
 			{
 				"command": "oaicopilot.setProviderApikey",
 				"category": "OAICopilot",
-				"title": "Set OAI Compatible Multi-Provider Apikey"
+			"title": "%command.setProviderApikey%"
 			},
 			{
 				"command": "oaicopilot.openConfig",
 				"category": "OAICopilot",
-				"title": "Open Configuration UI"
+			"title": "%command.openConfig%"
 			},
 			{
 				"command": "oaicopilot.generateGitCommitMessage",
-				"title": "Generate Commit Message with OAICopilot",
+			"title": "%command.generateGitCommitMessage%",
 				"category": "OAICopilot",
 				"icon": "$(wand)"
 			},
 			{
 				"command": "oaicopilot.abortGitCommitMessage",
-				"title": "Generate Commit Message with OAICopilot - Stop",
+			"title": "%command.abortGitCommitMessage%",
 				"category": "OAICopilot",
 				"icon": "$(debug-stop)"
+			},
+			{
+				"command": "oaicopilot.showTokenUsage",
+				"category": "OAICopilot",
+				"title": "%command.showTokenUsage%",
+				"icon": "$(graph)"
+			},
+			{
+				"command": "oaicopilot.resetTokenUsage",
+				"category": "OAICopilot",
+				"title": "%command.resetTokenUsage%"
+			},
+			{
+				"command": "oaicopilot.exportTokenUsage",
+				"category": "OAICopilot",
+				"title": "%command.exportTokenUsage%"
 			}
 		],
 		"menus": {
@@ -105,11 +121,20 @@
 				{
 					"command": "oaicopilot.abortGitCommitMessage",
 					"when": "config.git.enabled && oaicopilot.isGeneratingCommit"
+				},
+				{
+					"command": "oaicopilot.showTokenUsage"
+				},
+				{
+					"command": "oaicopilot.resetTokenUsage"
+				},
+				{
+					"command": "oaicopilot.exportTokenUsage"
 				}
 			]
 		},
 		"configuration": {
-			"title": "OAI Compatible Copilot",
+			"title": "%displayName%",
 			"properties": {
 				"oaicopilot.logLevel": {
 				"type": "string",
@@ -121,12 +146,12 @@
 					"warn",
 					"error"
 				],
-				"description": "Debug log level. Logs are written to ~/.copilot/oaicopilot/logs/ as JSON lines. Default is 'off' (no logging)."
+				"description": "%config.logLevel.description%"
 			},
 			"oaicopilot.baseUrl": {
 					"type": "string",
 					"default": "https://router.huggingface.co/v1",
-					"description": "The base URL for the Openai Compatible Inference API. Default value is Hugging Face."
+					"description": "%config.baseUrl.description%"
 				},
 				"oaicopilot.models": {
 					"type": "array",
@@ -384,7 +409,7 @@
 							}
 						]
 					},
-					"description": "A list of preferred models to use. If provided, these models will be used directly instead of fetching from the API."
+					"description": "%config.models.description%"
 				},
 				"oaicopilot.retry": {
 					"type": "object",
@@ -420,13 +445,13 @@
 							"description": "Additional HTTP status codes that will be merged. Default is [429, 500, 502, 503, 504]."
 						}
 					},
-					"description": "Retry configuration for handling api errors like [429, 500, 502, 503, 504]."
+					"description": "%config.retry.description%"
 				},
 				"oaicopilot.delay": {
 					"type": "number",
 					"default": 0,
 					"minimum": 0,
-					"description": "Fixed delay in milliseconds between consecutive requests. Default is 0 (no delay)."
+					"description": "%config.delay.description%"
 				},
 				"oaicopilot.commitLanguage": {
 					"type": "string",
@@ -447,19 +472,24 @@
 						"Turkish",
 						"Polish"
 					],
-					"description": "Language for generated Git commit messages. Default is English."
+					"description": "%config.commitLanguage.description%"
 				},
 				"oaicopilot.commitMessagePrompt": {
 					"type": "string",
 					"default": "",
-					"description": "Custom system prompt for commit message generation. If not provided, uses the default prompt."
+					"description": "%config.commitMessagePrompt.description%"
 				},
 				"oaicopilot.readFileLines": {
 					"type": "number",
 					"default": 0,
 					"minimum": 0,
 					"maximum": 10000,
-					"description": "Number of lines to read when using `read_file` tool. Large lines may cost more tokens. Default is 0, let model decide lines."
+					"description": "%config.readFileLines.description%"
+				},
+				"oaicopilot.tokenUsageEnabled": {
+					"type": "boolean",
+					"default": false,
+					"description": "%config.tokenUsageEnabled.description%"
 				}
 			}
 		}

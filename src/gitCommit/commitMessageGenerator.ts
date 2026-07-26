@@ -8,6 +8,7 @@ import { OllamaApi } from "../ollama/ollamaApi";
 import { normalizeUserModels } from "../utils";
 import { logger } from "../logger";
 import type { HFModelItem } from "../types";
+import { I18N } from "../i18n";
 
 /**
  * Git commit message generator module
@@ -15,22 +16,22 @@ import type { HFModelItem } from "../types";
 
 let commitGenerationAbortController: AbortController | undefined;
 
-const DEFAULT_PROMPT = {
-	system:
-		"You are a helpful assistant that generates informative git commit messages based on git diffs output. Skip preamble and remove all backticks surrounding the commit message.\nBased on the provided git diff, generate a conventional format commit message.",
-	user: "Notes from developer (ignore if not relevant): {{USER_CURRENT_INPUT}}",
+const DEFAULT_PROMPT: { system: () => string; user: () => string } = {
+	system: () =>
+		I18N.defaultCommitSystemPrompt(),
+	user: () => I18N.defaultCommitUserPrompt(),
 };
 
 export async function generateCommitMsg(secrets: vscode.SecretStorage, scm?: vscode.SourceControl) {
 	try {
 		const gitExtension = vscode.extensions.getExtension("vscode.git")?.exports;
 		if (!gitExtension) {
-			throw new Error("Git extension not found");
+			throw new Error(I18N.gitExtensionNotFound());
 		}
 
 		const git = gitExtension.getAPI(1);
 		if (git.repositories.length === 0) {
-			throw new Error("No Git repositories available");
+			throw new Error(I18N.noGitRepos());
 		}
 
 		// If scm is provided, then the user specified one repository by clicking the "Source Control" menu button
@@ -38,7 +39,7 @@ export async function generateCommitMsg(secrets: vscode.SecretStorage, scm?: vsc
 			const repository = git.getRepository(scm.rootUri);
 
 			if (!repository) {
-				throw new Error("Repository not found for provided SCM");
+				throw new Error(I18N.repoNotFoundForScm());
 			}
 
 			await generateCommitMsgForRepository(secrets, repository);
@@ -48,7 +49,7 @@ export async function generateCommitMsg(secrets: vscode.SecretStorage, scm?: vsc
 		await orchestrateWorkspaceCommitMsgGeneration(secrets, git.repositories);
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : String(error);
-		vscode.window.showErrorMessage(`[Commit Generation Failed] ${errorMessage}`);
+		vscode.window.showErrorMessage(I18N.commitGenFailed(errorMessage));
 	}
 }
 
@@ -56,7 +57,7 @@ async function orchestrateWorkspaceCommitMsgGeneration(secrets: vscode.SecretSto
 	const reposWithChanges = await filterForReposWithChanges(repos);
 
 	if (reposWithChanges.length === 0) {
-		vscode.window.showInformationMessage(`No changes found in any workspace repositories.`);
+		vscode.window.showInformationMessage(I18N.noChangesFound());
 		return;
 	}
 
@@ -121,7 +122,7 @@ async function promptRepoSelection(repos: any[]) {
 	});
 
 	return await vscode.window.showQuickPick(repoItems, {
-		placeHolder: "Select repository for commit message generation",
+		placeHolder: I18N.selectRepository(),
 	});
 }
 
@@ -131,13 +132,14 @@ async function generateCommitMsgForRepository(secrets: vscode.SecretStorage, rep
 	const gitDiff = await getGitDiff(repoPath);
 
 	if (!gitDiff) {
-		throw new Error(`No changes in repository ${repoPath.split(path.sep).pop() || "repository"} for commit message`);
+		const repoName = repoPath.split(path.sep).pop() || "repository";
+		throw new Error(I18N.noChangesInRepo(repoName));
 	}
 
 	await vscode.window.withProgress(
 		{
 			location: vscode.ProgressLocation.SourceControl,
-			title: `Generating commit message for ${repoPath.split(path.sep).pop() || "repository"}...`,
+				title: I18N.generatingCommitMsg(repoPath.split(path.sep).pop() || "repository"),
 			cancellable: true,
 		},
 		() => performCommitMsgGeneration(secrets, gitDiff, inputBox)
@@ -154,8 +156,8 @@ async function performCommitMsgGeneration(secrets: vscode.SecretStorage, gitDiff
 		// Get custom prompts or use defaults
 		const customSystemPrompt = config.get<string>("oaicopilot.commitMessagePrompt", "");
 		const PROMPT = {
-			system: customSystemPrompt || DEFAULT_PROMPT.system,
-			user: DEFAULT_PROMPT.user,
+			system: customSystemPrompt || DEFAULT_PROMPT.system(),
+			user: DEFAULT_PROMPT.user(),
 		};
 
 		const prompts: string[] = [];
@@ -166,7 +168,7 @@ async function performCommitMsgGeneration(secrets: vscode.SecretStorage, gitDiff
 		}
 
 		const truncatedDiff =
-			gitDiff.length > 5000 ? gitDiff.substring(0, 5000) + "\n\n[Diff truncated due to size]" : gitDiff;
+			gitDiff.length > 5000 ? gitDiff.substring(0, 5000) + I18N.diffTruncated() : gitDiff;
 		prompts.push(truncatedDiff);
 		const prompt = prompts.join("\n\n");
 
@@ -177,9 +179,7 @@ async function performCommitMsgGeneration(secrets: vscode.SecretStorage, gitDiff
 		const commitModels = userModels.filter((model: HFModelItem) => model.useForCommitGeneration === true);
 
 		if (commitModels.length === 0) {
-			throw new Error(
-				"No models configured for commit message generation. Please set 'useForCommitGeneration' to true for at least one model in your configuration."
-			);
+			throw new Error(I18N.noCommitModels());
 		}
 
 		// Use the first model marked for commit generation
@@ -190,13 +190,13 @@ async function performCommitMsgGeneration(secrets: vscode.SecretStorage, gitDiff
 		// Get API key for the model's provider
 		const apiKey = await ensureApiKey(secrets, selectedModel.owned_by);
 		if (!apiKey) {
-			throw new Error("OAI Compatible API key not found");
+			throw new Error(I18N.apiKeyNotFound());
 		}
 
 		// Get base URL for the model
 		const baseUrl = selectedModel.baseUrl || config.get<string>("oaicopilot.baseUrl", "");
 		if (!baseUrl || !baseUrl.startsWith("http")) {
-			throw new Error(`Invalid base URL configuration.`);
+			throw new Error(I18N.invalidBaseUrl());
 		}
 
 		// Get commit language configuration
@@ -238,14 +238,14 @@ async function performCommitMsgGeneration(secrets: vscode.SecretStorage, gitDiff
 		inputBox.value = removeThinkTags(inputBox.value);
 
 		if (!inputBox.value) {
-			throw new Error("empty API response");
+			throw new Error(I18N.emptyApiResponse());
 		}
 
 		logger.info("commit.end", { modelId, durationMs: Date.now() - startTime });
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : String(error);
 		logger.error("commit.error", { modelId: modelId ?? "unknown", error: errorMessage });
-		vscode.window.showErrorMessage(`Failed to generate commit message: ${errorMessage}`);
+		vscode.window.showErrorMessage(I18N.commitGenFailed(errorMessage));
 	} finally {
 		vscode.commands.executeCommand("setContext", "oaicopilot.isGeneratingCommit", false);
 	}

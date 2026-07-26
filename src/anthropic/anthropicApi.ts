@@ -23,6 +23,7 @@ import type {
 import { isImageMimeType, isToolResultPart, collectToolResultText, convertToolsToOpenAI, mapRole } from "../utils";
 
 import { CommonApi } from "../commonApi";
+import { I18N } from "../i18n";
 import { logger } from "../logger";
 
 export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBody> {
@@ -72,7 +73,7 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 	 */
 	convertMessages(
 		messages: readonly LanguageModelChatRequestMessage[],
-		modelConfig: { includeReasoningInRequest: boolean }
+		_modelConfig: { includeReasoningInRequest: boolean }
 	): AnthropicMessage[] {
 		const out: AnthropicMessage[] = [];
 
@@ -166,10 +167,12 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 			}
 
 			// Add thinking content for assistant messages
-			if (role === "assistant" && modelConfig.includeReasoningInRequest) {
+			// Always pass back thinking content if present in message history.
+			// Reasoning models (e.g. DeepSeek) require previous thinking to be included.
+			if (role === "assistant" && joinedThinking) {
 				contentBlocks.push({
 					type: "thinking",
-					thinking: joinedThinking || "Next step.",
+					thinking: joinedThinking,
 				});
 			}
 
@@ -630,7 +633,7 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 		}
 
 		if (!response.body) {
-			throw new Error("No response body from Anthropic API");
+			throw new Error(I18N.noResponseBodyAnthropic());
 		}
 
 		// Process the response

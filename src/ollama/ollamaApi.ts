@@ -15,6 +15,7 @@ import { isToolResultPart, collectToolResultText, convertToolsToOpenAI, mapRole 
 
 import { CommonApi } from "../commonApi";
 import { logger } from "../logger";
+import { I18N } from "../i18n";
 
 export class OllamaApi extends CommonApi<OllamaMessage, OllamaRequestBody> {
 	constructor(modelId: string) {
@@ -325,7 +326,7 @@ export class OllamaApi extends CommonApi<OllamaMessage, OllamaRequestBody> {
 		}
 
 		if (!response.body) {
-			throw new Error("No response body from Ollama API");
+			throw new Error(I18N.noResponseBodyOllama());
 		}
 
 		// Process JSON lines streaming response

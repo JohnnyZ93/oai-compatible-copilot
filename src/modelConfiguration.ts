@@ -1,5 +1,6 @@
 import type * as vscode from "vscode";
 import type { HFModelItem } from "./types";
+import { I18N } from "./i18n";
 
 export type ReasoningEffortPickerValue = "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
@@ -16,16 +17,16 @@ export const REASONING_EFFORT_CONFIGURATION_SCHEMA = {
 	properties: {
 		reasoningEffort: {
 			type: "string",
-			title: "Reasoning Effort",
+			title: I18N.reasoningEffort(),
 			enum: REASONING_EFFORT_VALUES,
-			enumItemLabels: ["Minimal", "Low", "Medium", "High", "XHigh", "Max"],
+			enumItemLabels: [I18N.reasoningEffortMinimal(), I18N.reasoningEffortLow(), I18N.reasoningEffortMedium(), I18N.reasoningEffortHigh(), I18N.reasoningEffortXHigh(), I18N.reasoningEffortMax()],
 			enumDescriptions: [
-				"Smallest reasoning budget",
-				"Low reasoning budget",
-				"Balanced reasoning budget",
-				"High reasoning budget",
-				"Very high reasoning budget",
-				"Maximum reasoning budget",
+				I18N.reasoningEffortDescMinimal(),
+				I18N.reasoningEffortDescLow(),
+				I18N.reasoningEffortDescMedium(),
+				I18N.reasoningEffortDescHigh(),
+				I18N.reasoningEffortDescXHigh(),
+				I18N.reasoningEffortDescMax(),
 			],
 			default: "medium",
 			group: "navigation",

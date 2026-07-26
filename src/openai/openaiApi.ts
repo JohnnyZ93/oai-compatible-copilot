@@ -30,6 +30,7 @@ import {
 
 import { CommonApi } from "../commonApi";
 import { logger } from "../logger";
+import { I18N } from "../i18n";
 
 export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unknown>> {
 	constructor(modelId: string) {
@@ -92,8 +93,14 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 					assistantMessage.content = joinedText;
 				}
 
-				if (modelConfig.includeReasoningInRequest) {
-					assistantMessage.reasoning_content = joinedThinking || "Next step.";
+				// Always pass back reasoning_content if the message history contains thinking parts.
+				// DeepSeek (and other reasoning models) require the reasoning_content from previous
+				// assistant responses to be included in subsequent requests when thinking mode is active.
+				if (joinedThinking) {
+					assistantMessage.reasoning_content = joinedThinking;
+				} else if (modelConfig.includeReasoningInRequest && reasoningParts.length > 0) {
+					// Fallback only when explicitly configured and thinking parts existed but were empty
+					assistantMessage.reasoning_content = "Next step.";
 				}
 
 				if (toolCalls.length > 0) {
@@ -521,7 +528,7 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 		}
 
 		if (!response.body) {
-			throw new Error("No response body from OpenAI API");
+			throw new Error(I18N.noResponseBodyOai());
 		}
 
 		// Process the response

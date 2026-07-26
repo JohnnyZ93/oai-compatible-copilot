@@ -3,12 +3,14 @@ import type { HFApiMode, HFModelItem } from "../types";
 import { normalizeUserModels, parseModelId } from "../utils";
 import { fetchModels } from "../provideModel";
 import { VersionManager } from "../versionManager";
+import { I18N, t } from "../i18n";
 
 interface InitPayload {
 	baseUrl: string;
 	apiKey: string;
 	delay: number;
 	readFileLines: number;
+	tokenUsageEnabled: boolean;
 	retry: {
 		enabled?: boolean;
 		max_attempts?: number;
@@ -36,8 +38,9 @@ interface ExportConfig {
 	commitLanguage: string;
 	commitModel: string;
 	models: HFModelItem[];
-	providerKeys: Record<string, string>;
 	readFileLines: number;
+	tokenUsageEnabled: boolean;
+	providerKeys: Record<string, string>;
 }
 
 type IncomingMessage =
@@ -48,6 +51,7 @@ type IncomingMessage =
 			apiKey: string;
 			delay: number;
 			readFileLines: number;
+			tokenUsageEnabled: boolean;
 			retry: { enabled?: boolean; max_attempts?: number; interval_ms?: number; status_codes?: number[] };
 			commitModel: string;
 			commitLanguage: string;
@@ -100,12 +104,14 @@ export class ConfigViewPanel {
 
 		if (ConfigViewPanel.currentPanel) {
 			ConfigViewPanel.currentPanel.panel.reveal(column);
+			// Refresh data in case config was modified while panel was hidden
+			ConfigViewPanel.currentPanel.sendInit();
 			return;
 		}
 
 		const panel = vscode.window.createWebviewPanel(
 			"oaicopilot.config",
-			"OAICopilot Configuration",
+			t("OAICopilot Configuration", "OAICopilot 配置"),
 			column || vscode.ViewColumn.One,
 			{
 				enableScripts: true,
@@ -113,6 +119,11 @@ export class ConfigViewPanel {
 				localResourceRoots: [vscode.Uri.joinPath(extensionUri, "out"), vscode.Uri.joinPath(extensionUri, "assets")],
 			}
 		);
+
+		panel.iconPath = {
+			light: vscode.Uri.joinPath(extensionUri, "assets", "logo.png"),
+			dark: vscode.Uri.joinPath(extensionUri, "assets", "logo.png"),
+		};
 
 		ConfigViewPanel.currentPanel = new ConfigViewPanel(panel, extensionUri, secrets);
 	}
@@ -130,19 +141,17 @@ export class ConfigViewPanel {
 			async (message) => {
 				this.handleMessage(message).catch((err) => {
 					console.error("[oaicopilot] handleMessage failed", err);
-					vscode.window.showErrorMessage(
-						err instanceof Error
-							? err.message
-							: `Unexpected error while handling configuration message[${message.type}].`
-					);
+					const errorMessage = err instanceof Error ? err.message : String(err);
+					const messageType = message && typeof message === "object" ? (message as Record<string, unknown>).type : "unknown";
+					vscode.window.showErrorMessage(I18N.errorUnexpected(String(messageType), errorMessage));
 				});
 			},
 			null,
 			this.disposables
 		);
 
-		// Send initialization data
-		this.sendInit();
+		// Init data is sent in response to webview's requestInit message.
+		// This ensures the webview JS has loaded and registered its message listener.
 	}
 
 	private async update() {
@@ -174,6 +183,7 @@ export class ConfigViewPanel {
 					message.apiKey,
 					message.delay,
 					message.readFileLines,
+					message.tokenUsageEnabled,
 					message.retry,
 					message.commitModel,
 					message.commitLanguage
@@ -223,22 +233,23 @@ export class ConfigViewPanel {
 	}
 
 	private async handleConfirmRequest(id: string, message: string, action: string) {
-		let confirmed: boolean | string | undefined;
+		let confirmed = false;
 
 		if (action === "showInfo") {
-			// For informational messages, just show the message without confirmation
 			await vscode.window.showInformationMessage(message);
 			confirmed = true;
 		} else {
-			// For confirmation requests, show Yes/No dialog
-			confirmed = await vscode.window.showInformationMessage(message, { modal: true }, "Yes", "No");
+			const result = await vscode.window.showInformationMessage(
+				message, { modal: true }, I18N.yes(), I18N.no()
+			);
+			confirmed = result === I18N.yes();
 		}
 
 		// Send response back to webview
 		this.panel.webview.postMessage({
 			type: "confirmResponse",
 			id: id,
-			confirmed: action === "showInfo" ? true : confirmed === "Yes",
+			confirmed,
 		} as OutgoingMessage);
 	}
 
@@ -283,11 +294,13 @@ export class ConfigViewPanel {
 		const commitModel = foundModel ? `${foundModel.id}${foundModel.configId ? "::" + foundModel.configId : ""}` : "";
 		const commitLanguage = config.get<string>("oaicopilot.commitLanguage", "English");
 		const readFileLines = config.get<number>("oaicopilot.readFileLines", 0);
+		const tokenUsageEnabled = config.get<boolean>("oaicopilot.tokenUsageEnabled", false);
 		const payload: InitPayload = {
 			baseUrl,
 			apiKey,
 			delay,
 			readFileLines,
+			tokenUsageEnabled,
 			retry,
 			commitModel,
 			commitLanguage,
@@ -302,6 +315,7 @@ export class ConfigViewPanel {
 		rawApiKey: string,
 		delay: number,
 		readFileLines: number,
+		tokenUsageEnabled: boolean,
 		retry: { enabled?: boolean; max_attempts?: number; interval_ms?: number; status_codes?: number[] },
 		commitModel: string,
 		commitLanguage: string
@@ -312,6 +326,7 @@ export class ConfigViewPanel {
 		await config.update("oaicopilot.baseUrl", baseUrl, vscode.ConfigurationTarget.Global);
 		await config.update("oaicopilot.delay", delay, vscode.ConfigurationTarget.Global);
 		await config.update("oaicopilot.readFileLines", readFileLines, vscode.ConfigurationTarget.Global);
+		await config.update("oaicopilot.tokenUsageEnabled", tokenUsageEnabled, vscode.ConfigurationTarget.Global);
 		await config.update("oaicopilot.retry", retry, vscode.ConfigurationTarget.Global);
 		await config.update("oaicopilot.commitLanguage", commitLanguage, vscode.ConfigurationTarget.Global);
 		if (apiKey) {
@@ -335,9 +350,7 @@ export class ConfigViewPanel {
 			await config.update("oaicopilot.models", updatedModels, vscode.ConfigurationTarget.Global);
 		}
 
-		vscode.window.showInformationMessage(
-			"OAI Compatible base URL, Delay, Retry and API Key have been saved to global settings."
-		);
+		vscode.window.showInformationMessage(I18N.configSaved());
 		// Send refresh signal to frontend
 		await this.sendInit();
 	}
@@ -357,11 +370,13 @@ export class ConfigViewPanel {
 
 		const raw = await vscode.workspace.fs.readFile(templatePath);
 		let html = new TextDecoder("utf-8").decode(raw);
+		const locale = vscode.env.language?.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
 		html = html
 			.replaceAll("%CSP_SOURCE%", csp)
 			.replaceAll("%NONCE%", nonce)
 			.replace("%CSS_URI%", cssUri.toString())
-			.replace("%SCRIPT_URI%", jsUri.toString());
+			.replace("%SCRIPT_URI%", jsUri.toString())
+			.replace("%LOCALE%", locale);
 		return html;
 	}
 
@@ -378,7 +393,7 @@ export class ConfigViewPanel {
 	) {
 		const trimmedProvider = provider.trim();
 		if (!trimmedProvider) {
-			vscode.window.showErrorMessage("Provider ID is required.");
+			vscode.window.showErrorMessage(I18N.providerIdRequired());
 			return;
 		}
 		const normalizedProvider = trimmedProvider.toLowerCase();
@@ -408,8 +423,7 @@ export class ConfigViewPanel {
 		}
 
 		await config.update("oaicopilot.models", models, vscode.ConfigurationTarget.Global);
-		vscode.window.showInformationMessage(`Provider ${provider} has been added.`);
-		// Send refresh signal to frontend
+		vscode.window.showInformationMessage(I18N.providerAdded(provider));
 		await this.sendInit();
 	}
 
@@ -422,7 +436,7 @@ export class ConfigViewPanel {
 	) {
 		const trimmedProvider = provider.trim();
 		if (!trimmedProvider) {
-			vscode.window.showErrorMessage("Provider ID is required.");
+			vscode.window.showErrorMessage(I18N.providerIdRequired());
 			return;
 		}
 		const normalizedProvider = trimmedProvider.toLowerCase();
@@ -457,15 +471,14 @@ export class ConfigViewPanel {
 		});
 
 		await config.update("oaicopilot.models", updatedModels, vscode.ConfigurationTarget.Global);
-		vscode.window.showInformationMessage(`Provider ${provider} has been updated.`);
-		// Send refresh signal to frontend
+		vscode.window.showInformationMessage(I18N.providerUpdated(provider));
 		await this.sendInit();
 	}
 
 	private async deleteProvider(provider: string) {
 		const trimmedProvider = provider.trim();
 		if (!trimmedProvider) {
-			vscode.window.showErrorMessage("Provider ID is required.");
+			vscode.window.showErrorMessage(I18N.providerIdRequired());
 			return;
 		}
 		const normalizedProvider = trimmedProvider.toLowerCase();
@@ -481,8 +494,7 @@ export class ConfigViewPanel {
 		const filteredModels = models.filter((model) => model.owned_by !== trimmedProvider);
 
 		await config.update("oaicopilot.models", filteredModels, vscode.ConfigurationTarget.Global);
-		vscode.window.showInformationMessage(`Provider ${provider} and all its models have been deleted.`);
-		// Send refresh signal to frontend
+		vscode.window.showInformationMessage(I18N.providerDeleted(provider));
 		await this.sendInit();
 	}
 
@@ -496,14 +508,14 @@ export class ConfigViewPanel {
 				m.id === model.id && ((model.configId && m.configId === model.configId) || (!model.configId && !m.configId))
 		);
 		if (existingIndex !== -1) {
-			vscode.window.showErrorMessage(`Model ${model.id}${model.configId ? "::" + model.configId : ""} already exists.`);
+			vscode.window.showErrorMessage(I18N.modelExists(`${model.id}${model.configId ? "::" + model.configId : ""}`));
 			return;
 		}
 
 		models.push(model);
 		await config.update("oaicopilot.models", models, vscode.ConfigurationTarget.Global);
 		vscode.window.showInformationMessage(
-			`Model ${model.id}${model.configId ? "::" + model.configId : ""} has been added.`
+			I18N.modelAdded(`${model.id}${model.configId ? "::" + model.configId : ""}`)
 		);
 		// Send refresh signal to frontend
 		await this.sendInit();
@@ -531,9 +543,8 @@ export class ConfigViewPanel {
 
 		await config.update("oaicopilot.models", updatedModels, vscode.ConfigurationTarget.Global);
 		vscode.window.showInformationMessage(
-			`Model ${model.id}${model.configId ? "::" + model.configId : ""} has been updated.`
+			I18N.modelUpdated(`${model.id}${model.configId ? "::" + model.configId : ""}`)
 		);
-		// Send refresh signal to frontend
 		await this.sendInit();
 	}
 
@@ -551,7 +562,7 @@ export class ConfigViewPanel {
 		});
 
 		await config.update("oaicopilot.models", filteredModels, vscode.ConfigurationTarget.Global);
-		vscode.window.showInformationMessage(`Model ${modelId} has been deleted.`);
+		vscode.window.showInformationMessage(I18N.modelDeleted(modelId));
 		// Send refresh signal to frontend
 		await this.sendInit();
 	}
@@ -589,6 +600,8 @@ export class ConfigViewPanel {
 				}
 			}
 
+			const tokenUsageEnabled = config.get<boolean>("oaicopilot.tokenUsageEnabled", false);
+
 			const exportData: ExportConfig = {
 				version: VersionManager.getVersion(),
 				exportDate: new Date().toISOString(),
@@ -600,6 +613,7 @@ export class ConfigViewPanel {
 				commitModel,
 				models,
 				readFileLines,
+				tokenUsageEnabled,
 				providerKeys,
 			};
 
@@ -610,17 +624,17 @@ export class ConfigViewPanel {
 			});
 
 			if (!uri) {
-				vscode.window.showInformationMessage("Export configuration cancelled.");
+				vscode.window.showInformationMessage(I18N.configExportCancelled());
 				return;
 			}
 
 			const encoder = new TextEncoder();
 			await vscode.workspace.fs.writeFile(uri, encoder.encode(JSON.stringify(exportData, null, 2)));
 
-			vscode.window.showInformationMessage(`Configuration exported to ${uri.fsPath}`);
+			vscode.window.showInformationMessage(I18N.configExported(uri.fsPath));
 		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : "Unknown error";
-			vscode.window.showErrorMessage(`Failed to export configuration: ${errorMessage}`);
+			const errorMessage = error instanceof Error ? error.message : I18N.errorUnknown();
+			vscode.window.showErrorMessage(I18N.exportFailed(errorMessage));
 		}
 	}
 
@@ -635,7 +649,7 @@ export class ConfigViewPanel {
 			});
 
 			if (!uri || uri.length === 0) {
-				vscode.window.showInformationMessage("Import configuration cancelled.");
+				vscode.window.showInformationMessage(I18N.configImportCancelled());
 				return;
 			}
 
@@ -645,7 +659,7 @@ export class ConfigViewPanel {
 			const importData = JSON.parse(jsonContent) as ExportConfig;
 
 			if (!Array.isArray(importData.models)) {
-				throw new Error("Invalid configuration file: models must be an array");
+				throw new Error(I18N.invalidConfigFile());
 			}
 
 			const config = vscode.workspace.getConfiguration();
@@ -654,6 +668,7 @@ export class ConfigViewPanel {
 			await config.update("oaicopilot.delay", importData.delay, vscode.ConfigurationTarget.Global);
 			await config.update("oaicopilot.retry", importData.retry, vscode.ConfigurationTarget.Global);
 			await config.update("oaicopilot.readFileLines", importData.readFileLines, vscode.ConfigurationTarget.Global);
+			await config.update("oaicopilot.tokenUsageEnabled", importData.tokenUsageEnabled ?? false, vscode.ConfigurationTarget.Global);
 			await config.update("oaicopilot.commitLanguage", importData.commitLanguage, vscode.ConfigurationTarget.Global);
 
 			if (importData.apiKey) {
@@ -673,11 +688,11 @@ export class ConfigViewPanel {
 				}
 			}
 
-			vscode.window.showInformationMessage("Configuration imported successfully.");
+			vscode.window.showInformationMessage(I18N.configImported());
 			await this.sendInit();
 		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : "Unknown error";
-			vscode.window.showErrorMessage(`Failed to import configuration: ${errorMessage}`);
+			const errorMessage = error instanceof Error ? error.message : I18N.errorUnknown();
+			vscode.window.showErrorMessage(I18N.importFailed(errorMessage));
 		}
 	}
 }

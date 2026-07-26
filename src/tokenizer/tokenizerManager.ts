@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { TikTokenizer, createTokenizer, getRegexByEncoder, getSpecialTokensByEncoder } from "@microsoft/tiktokenizer";
+import { I18N } from "../i18n";
 
 const TOKENIZER_ENCODER = "o200k_base";
 const CACHE_MAX_ENTRIES = 5000;
@@ -80,7 +81,7 @@ export class TokenizerManager {
 		if (!this.tokenizerReady) {
 			this.tokenizerReady = (async () => {
 				if (!TokenizerManager.extensionPath) {
-					throw new Error("Extension path not initialized. Call TokenizerManager.setExtensionPath() first.");
+					throw new Error(I18N.extensionPathNotInitialized());
 				}
 				const basePath = vscode.Uri.file(TokenizerManager.extensionPath);
 				const tokenizerPath = vscode.Uri.joinPath(basePath, "assets", "model", `${TOKENIZER_ENCODER}.tiktoken`).fsPath;

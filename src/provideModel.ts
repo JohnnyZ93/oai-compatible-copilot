@@ -12,6 +12,7 @@ import { VersionManager } from "./versionManager";
 import { fetchGeminiModels } from "./gemini/geminiApi";
 import { fetchOllamaModels } from "./ollama/ollamaApi";
 import { logger } from "./logger";
+import { I18N, t } from "./i18n";
 
 const DEFAULT_CONTEXT_LENGTH = 128000;
 const DEFAULT_MAX_TOKENS = 4096;
@@ -75,14 +76,14 @@ export async function prepareLanguageModelChatInformation(
 			if (options.silent) {
 				return [];
 			} else {
-				throw new Error("OAI Compatible API key not found");
+				throw new Error(I18N.apiKeyNotFound());
 			}
 		}
 
 		const config = vscode.workspace.getConfiguration();
 		const BASE_URL = config.get<string>("oaicopilot.baseUrl", "");
 		if (!BASE_URL || !BASE_URL.startsWith("http")) {
-			throw new Error(`Invalid base URL configuration.`);
+			throw new Error(I18N.invalidBaseUrl());
 		}
 		const { models } = await fetchModels(BASE_URL, apiKey);
 
@@ -216,8 +217,8 @@ async function ensureApiKey(silent: boolean, secrets: vscode.SecretStorage): Pro
 
 	if (!apiKey && !silent) {
 		const entered = await vscode.window.showInputBox({
-			title: "OAI Compatible API Key",
-			prompt: "Enter your OAI Compatible API key",
+			title: t("OAI Compatible API Key", "OAI Compatible API 密钥"),
+			prompt: I18N.enterApiKey(),
 			ignoreFocusOut: true,
 			password: true,
 		});

@@ -1,0 +1,21 @@
+{
+	"displayName": "OAI Compatible Provider for Copilot",
+	"description": "An extension that integrates OpenAI/Ollama/Anthropic/Gemini API Providers into GitHub Copilot Chat",
+	"command.setApikey": "Set OAI Compatible Apikey",
+	"command.setProviderApikey": "Set OAI Compatible Multi-Provider Apikey",
+	"command.openConfig": "Open Configuration UI",
+	"command.generateGitCommitMessage": "Generate Commit Message with OAICopilot",
+	"command.abortGitCommitMessage": "Generate Commit Message with OAICopilot - Stop",
+	"command.showTokenUsage": "Show Token Usage Statistics",
+	"command.resetTokenUsage": "Reset Token Usage Statistics",
+	"command.exportTokenUsage": "Export Token Usage Data",
+	"config.logLevel.description": "Debug log level. Logs are written to ~/.copilot/oaicopilot/logs/ as JSON lines. Default is 'off' (no logging).",
+	"config.baseUrl.description": "The base URL for the Openai Compatible Inference API. Default value is Hugging Face.",
+	"config.models.description": "A list of preferred models to use. If provided, these models will be used directly instead of fetching from the API.",
+	"config.retry.description": "Retry configuration for handling api errors like [429, 500, 502, 503, 504].",
+	"config.delay.description": "Fixed delay in milliseconds between consecutive requests. Default is 0 (no delay).",
+	"config.commitLanguage.description": "Language for generated Git commit messages. Default is English.",
+	"config.commitMessagePrompt.description": "Custom system prompt for commit message generation. If not provided, uses the default prompt.",
+	"config.readFileLines.description": "Number of lines to read when using `read_file` tool. Large lines may cost more tokens. Default is 0, let model decide lines.",
+	"config.tokenUsageEnabled.description": "Enable token usage statistics per provider. When enabled, tracks daily and cumulative token consumption for each provider. Default is false."
+}

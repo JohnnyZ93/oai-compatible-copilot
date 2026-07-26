@@ -22,6 +22,7 @@ import {
 
 import { CommonApi } from "../commonApi";
 import { logger } from "../logger";
+import { I18N } from "../i18n";
 
 export interface ResponsesInputMessage {
 	role: "user" | "assistant" | "system";
@@ -111,7 +112,7 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 					const callId = (part as { callId?: string }).callId ?? "";
 					const content = collectToolResultText(part as { content?: ReadonlyArray<unknown> });
 					toolResults.push({ callId, content });
-				} else if (part instanceof vscode.LanguageModelThinkingPart && modelConfig.includeReasoningInRequest) {
+				} else if (part instanceof vscode.LanguageModelThinkingPart) {
 					const content = Array.isArray(part.value) ? part.value.join("") : part.value;
 					thinkingParts.push(content);
 				}
@@ -732,7 +733,7 @@ export class OpenaiResponsesApi extends CommonApi<ResponsesInputItem, Record<str
 		}
 
 		if (!response.body) {
-			throw new Error("No response body from OpenAI Responses API");
+			throw new Error(I18N.noResponseBodyResponses());
 		}
 
 		// Process SSE streaming response

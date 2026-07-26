@@ -12,6 +12,7 @@ import { HFModelItem, CustomDataPartMimeTypes, TokenUsage } from "./types";
 import { tryParseJSONObject } from "./utils";
 import { logger } from "./logger";
 import { VersionManager } from "./versionManager";
+import { I18N } from "./i18n";
 
 export abstract class CommonApi<TMessage, TRequestBody> {
 	/** Buffer for assembling streamed tool calls by index. */
@@ -59,6 +60,14 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 
 	constructor(modelId: string) {
 		this._modelId = modelId;
+	}
+
+	/**
+	 * Get the accumulated token usage from the last API response.
+	 * @returns Token usage data or null if not available.
+	 */
+	getUsage(): TokenUsage | null {
+		return this._usage;
 	}
 
 	/**
@@ -163,7 +172,7 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 						idx,
 						snippet: (buf.args || "").slice(0, 200),
 					});
-					throw new Error("Invalid JSON for tool call");
+					throw new Error(I18N.invalidJsonForToolCall());
 				}
 				// When not throwing (e.g. on [DONE]), drop silently to reduce noise
 				continue;

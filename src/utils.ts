@@ -3,6 +3,7 @@ import type { HFModelItem, RetryConfig } from "./types";
 import { OpenAIFunctionToolDef } from "./openai/openaiTypes";
 
 import { logger } from "./logger";
+import { I18N } from "./i18n";
 
 const RETRY_MAX_ATTEMPTS = 3;
 const RETRY_INTERVAL_MS = 1000;
@@ -127,7 +128,7 @@ export function convertToolsToOpenAI(options?: vscode.ProvideLanguageModelChatRe
 	if (options?.toolMode === vscode.LanguageModelChatToolMode.Required) {
 		if (tools.length !== 1) {
 			console.error("[OAI Compatible Model Provider] ToolMode.Required but multiple tools:", tools.length);
-			throw new Error("LanguageModelChatToolMode.Required is not supported with more than one tool");
+			throw new Error(I18N.toolModeRequiredUnsupported());
 		}
 		tool_choice = { type: "function", function: { name: tools[0].name } };
 	}

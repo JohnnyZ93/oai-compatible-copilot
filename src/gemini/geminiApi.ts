@@ -12,6 +12,7 @@ import type { OpenAIFunctionToolDef } from "../openai/openaiTypes";
 
 import { CommonApi } from "../commonApi";
 import { logger } from "../logger";
+import { I18N } from "../i18n";
 
 import {
 	isImageMimeType,
@@ -506,6 +507,7 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 			const imageParts: vscode.LanguageModelDataPart[] = [];
 			const toolCalls: Array<{ callId: string; name: string; args: Record<string, unknown> }> = [];
 			const toolResults: Array<{ callId: string; outputText: string }> = [];
+			const thinkingParts: string[] = [];
 
 			for (const part of m.content ?? []) {
 				if (part instanceof vscode.LanguageModelTextPart) {
@@ -520,10 +522,13 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 					const callId = (part as { callId?: string }).callId ?? "";
 					const outputText = collectToolResultText(part as { content?: ReadonlyArray<unknown> });
 					toolResults.push({ callId, outputText });
+				} else if (part instanceof vscode.LanguageModelThinkingPart) {
+					const content = Array.isArray(part.value) ? part.value.join("") : part.value;
+					thinkingParts.push(content);
 				}
 			}
 
-			return { text: textParts.join("").trim(), imageParts, toolCalls, toolResults };
+			return { text: textParts.join("").trim(), imageParts, toolCalls, toolResults, thinkingParts };
 		};
 
 		const toolResultToFunctionResponsePart = (
@@ -550,6 +555,7 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 			imageParts: vscode.LanguageModelDataPart[];
 			toolCalls: Array<unknown>;
 			toolResults: Array<unknown>;
+			thinkingParts: string[];
 		}): boolean => {
 			return Boolean(
 				extracted.toolResults.length > 0 &&
@@ -612,6 +618,9 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 
 			// assistant -> Gemini "model"
 			const parts: GeminiPart[] = [];
+			if (extracted.thinkingParts.length > 0) {
+				parts.push({ text: extracted.thinkingParts.join("\n") });
+			}
 			if (extracted.text) {
 				parts.push({ text: extracted.text });
 			}
@@ -1034,7 +1043,7 @@ export class GeminiApi extends CommonApi<GeminiChatMessage, GeminiGenerateConten
 		baseUrl: string,
 		apiKey: string
 	): AsyncGenerator<{ type: "text"; text: string }> {
-		throw new Error("Method not implemented.");
+		throw new Error(I18N.methodNotImplemented());
 	}
 }
 
