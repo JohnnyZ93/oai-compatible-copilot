@@ -23,6 +23,9 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 	/** Indices for which a tool call has been fully emitted. */
 	protected _completedToolCallIndices = new Set<number>();
 
+	/** Tool call IDs that were emitted during the current response. */
+	protected _emittedToolCallIds: string[] = [];
+
 	/** Track if we emitted any assistant text before seeing tool calls (SSE-like begin-tool-calls hint). */
 	protected _hasEmittedAssistantText = false;
 
@@ -56,6 +59,13 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 
 	/** Accumulated token usage from the API response. */
 	protected _usage: TokenUsage | null = null;
+
+	/**
+	 * Accumulated raw reasoning_content for the entire response.
+	 * Used to cache reasoning content so it can be replayed in subsequent requests
+	 * (required by MiMo and similar models that need reasoning_content preserved).
+	 */
+	protected _accumulatedReasoningContent = "";
 
 	constructor(modelId: string) {
 		this._modelId = modelId;
@@ -137,6 +147,7 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 		let parameters = canParse.value;
 		parameters = this.adjustReadFileParameters(buf.name, parameters);
 		progress.report(new LanguageModelToolCallPart(id, buf.name, parameters));
+		this._emittedToolCallIds.push(id);
 		this._toolCallBuffers.delete(index);
 		this._completedToolCallIndices.add(index);
 	}
@@ -173,6 +184,7 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 			let parameters = parsed.value;
 			parameters = this.adjustReadFileParameters(name, parameters);
 			progress.report(new LanguageModelToolCallPart(id, name, parameters));
+			this._emittedToolCallIds.push(id);
 			this._toolCallBuffers.delete(idx);
 			this._completedToolCallIndices.add(idx);
 		}
@@ -249,6 +261,9 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 		// Append to thinking buffer
 		this._thinkingBuffer += text;
 
+		// Also accumulate raw reasoning content for caching
+		this._accumulatedReasoningContent += text;
+
 		// Schedule flush with 100ms delay
 		if (!this._thinkingFlushTimer) {
 			this._thinkingFlushTimer = setTimeout(() => {
@@ -274,6 +289,24 @@ export abstract class CommonApi<TMessage, TRequestBody> {
 			this._thinkingBuffer = "";
 			progress.report(new LanguageModelThinkingPart(text, this._currentThinkingId));
 		}
+	}
+
+	/**
+	 * Get the accumulated raw reasoning_content for the entire response.
+	 * This is used to cache reasoning content so it can be replayed in subsequent requests.
+	 * @returns The accumulated reasoning content string.
+	 */
+	public getAccumulatedReasoningContent(): string {
+		return this._accumulatedReasoningContent;
+	}
+
+	/**
+	 * Get the tool call IDs that were emitted during the current response.
+	 * Used to build a cache key for reasoning_content storage.
+	 * @returns Array of emitted tool call IDs.
+	 */
+	public getEmittedToolCallIds(): string[] {
+		return [...this._emittedToolCallIds];
 	}
 
 	/**

@@ -40,11 +40,18 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 	 * Convert VS Code chat request messages into OpenAI-compatible message objects.
 	 * @param messages The VS Code chat messages to convert.
 	 * @param modelConfig model configuration that may affect message conversion.
+	 * @param reasoningContentCache Optional cache mapping tool-call-ID signatures to
+	 *   the original reasoning_content from a prior response. Used to replay
+	 *   reasoning_content for assistant messages that contain tool calls, as
+	 *   required by models like MiMo that return 400 when reasoning_content is
+	 *   missing from historical assistant messages with tool_calls.
 	 * @returns OpenAI-compatible messages array.
 	 */
 	convertMessages(
 		messages: readonly LanguageModelChatRequestMessage[],
-		modelConfig: { includeReasoningInRequest: boolean }
+		modelConfig: { includeReasoningInRequest: boolean },
+		reasoningContentCache?: Map<string, string>,
+		lastReasoningContent?: string
 	): OpenAIChatMessage[] {
 		const out: OpenAIChatMessage[] = [];
 		for (const m of messages) {
@@ -93,7 +100,27 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 				}
 
 				if (modelConfig.includeReasoningInRequest) {
-					assistantMessage.reasoning_content = joinedThinking || "Next step.";
+					// Try cache first: when VS Code doesn't preserve LanguageModelThinkingPart
+					// in conversation history, fall back to cached original reasoning_content.
+					let reasoningContent = joinedThinking;
+
+					if (!reasoningContent && reasoningContentCache && toolCalls.length > 0) {
+						// Generate cache key from sorted tool call IDs
+						const cacheKey = toolCalls
+							.map((tc) => tc.id)
+							.sort()
+							.join(",");
+						reasoningContent = reasoningContentCache.get(cacheKey) ?? "";
+					}
+
+					// Only use lastReasoningContent fallback for messages with tool_calls,
+					// as that's what MiMo requires. Messages without tool_calls can use
+					// the placeholder (they are typically final-answer turns).
+					if (!reasoningContent && lastReasoningContent && toolCalls.length > 0) {
+						reasoningContent = lastReasoningContent;
+					}
+
+					assistantMessage.reasoning_content = reasoningContent || "Next step.";
 				}
 
 				if (toolCalls.length > 0) {

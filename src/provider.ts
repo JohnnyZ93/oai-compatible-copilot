@@ -38,6 +38,21 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	private readonly _geminiToolCallMetaByCallId = new Map<string, GeminiToolCallMeta>();
 	private readonly _openaiResponsesPreviousResponseIdUnsupportedBaseUrls = new Set<string>();
 
+	/**
+	 * Cache for reasoning_content from prior API responses.
+	 * Maps a signature (sorted tool-call IDs) to the raw reasoning_content string.
+	 * Required by models like MiMo that return 400 when reasoning_content is
+	 * missing from historical assistant messages with tool_calls.
+	 */
+	private readonly _reasoningContentCache = new Map<string, string>();
+
+	/**
+	 * The reasoning_content from the most recent API response.
+	 * Used as a fallback when the per-ID cache is missed (e.g. after extension
+	 * restart where the Map is lost but VS Code conversation history remains).
+	 */
+	private _lastReasoningContent = "";
+
 	static readonly OPENAI_RESPONSES_STATEFUL_MARKER_MIME = "application/vnd.oaicopilot.stateful-marker";
 
 	/**
@@ -244,7 +259,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			} else if (apiMode === "anthropic") {
 				// Anthropic API mode
 				const anthropicApi = new AnthropicApi(model.id, um?.cache_control !== false);
-				const anthropicMessages = anthropicApi.convertMessages(messages, modelConfig);
+				const anthropicMessages = anthropicApi.convertMessages(messages, modelConfig, this._reasoningContentCache, this._lastReasoningContent);
 
 				// requestBody
 				let requestBody: AnthropicRequestBody = {
@@ -284,6 +299,23 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					throw new Error("No response body from Anthropic API");
 				}
 				await anthropicApi.processStreamingResponse(response.body, trackingProgress, token);
+
+				// Cache the reasoning_content from this response (same as OpenAI path).
+				if (modelConfig.includeReasoningInRequest) {
+					const reasoningContent = anthropicApi.getAccumulatedReasoningContent();
+					if (reasoningContent) {
+						this._lastReasoningContent = reasoningContent;
+					}
+					const emittedIds = anthropicApi.getEmittedToolCallIds();
+					if (reasoningContent && emittedIds.length > 0) {
+						const cacheKey = emittedIds.sort().join(",");
+						this._reasoningContentCache.set(cacheKey, reasoningContent);
+						logger.debug("reasoning.cache.store.anthropic", {
+							cacheKey,
+							reasoningLength: reasoningContent.length,
+						});
+					}
+				}
 			} else if (apiMode === "openai-responses") {
 				// OpenAI Responses API mode
 				const openaiResponsesApi = new OpenaiResponsesApi(model.id);
@@ -458,7 +490,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			} else {
 				// OpenAI compatible API mode (default)
 				const openaiApi = new OpenaiApi(model.id);
-				const openaiMessages = openaiApi.convertMessages(messages, modelConfig);
+				const openaiMessages = openaiApi.convertMessages(messages, modelConfig, this._reasoningContentCache, this._lastReasoningContent);
 
 				// requestBody
 				let requestBody: Record<string, unknown> = {
@@ -494,6 +526,24 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					throw new Error("No response body from OAI Compatible API");
 				}
 				await openaiApi.processStreamingResponse(response.body, trackingProgress, token);
+
+				// Cache the reasoning_content from this response so it can be replayed
+				// in subsequent requests (required by MiMo and similar models).
+				if (modelConfig.includeReasoningInRequest) {
+					const reasoningContent = openaiApi.getAccumulatedReasoningContent();
+					if (reasoningContent) {
+						this._lastReasoningContent = reasoningContent;
+					}
+					const emittedIds = openaiApi.getEmittedToolCallIds();
+					if (reasoningContent && emittedIds.length > 0) {
+						const cacheKey = emittedIds.sort().join(",");
+						this._reasoningContentCache.set(cacheKey, reasoningContent);
+						logger.debug("reasoning.cache.store", {
+							cacheKey,
+							reasoningLength: reasoningContent.length,
+						});
+					}
+				}
 			}
 		} catch (err) {
 			console.error("[OAI Compatible Model Provider] Chat request failed", {

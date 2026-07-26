@@ -72,7 +72,9 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 	 */
 	convertMessages(
 		messages: readonly LanguageModelChatRequestMessage[],
-		modelConfig: { includeReasoningInRequest: boolean }
+		modelConfig: { includeReasoningInRequest: boolean },
+		reasoningContentCache?: Map<string, string>,
+		lastReasoningContent?: string
 	): AnthropicMessage[] {
 		const out: AnthropicMessage[] = [];
 
@@ -167,9 +169,23 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 
 			// Add thinking content for assistant messages
 			if (role === "assistant" && modelConfig.includeReasoningInRequest) {
+				let thinkingContent = joinedThinking;
+
+				if (!thinkingContent && reasoningContentCache && toolCalls.length > 0) {
+					const cacheKey = toolCalls
+						.map((tc) => tc.id)
+						.sort()
+						.join(",");
+					thinkingContent = reasoningContentCache.get(cacheKey) ?? "";
+				}
+
+				if (!thinkingContent && lastReasoningContent && toolCalls.length > 0) {
+					thinkingContent = lastReasoningContent;
+				}
+
 				contentBlocks.push({
 					type: "thinking",
-					thinking: joinedThinking || "Next step.",
+					thinking: thinkingContent || "Next step.",
 				});
 			}
 
