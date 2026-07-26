@@ -214,7 +214,221 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 			}
 		}
 
+		// Anthropic requires each `tool_use` to be answered by exactly one `tool_result`. The host
+		// (Copilot) can emit multiple `LanguageModelToolResultPart`s sharing the same `callId` — either
+		// inside a single message or spread across replayed history messages — which produces duplicate
+		// `tool_result` blocks with the same `tool_use_id`. Sending those triggers the API 400:
+		// "each tool_use must have a single result. Found multiple tool_result blocks with id: ...".
+		// Deduplicate globally, keeping the first occurrence and dropping later duplicates.
+		this.dedupeToolResults(out);
+
+		// The host (Copilot) emits ONE `user` message per `tool_result`, so an assistant turn with N
+		// parallel `tool_use` blocks is followed by N separate consecutive `user` messages. The
+		// official Anthropic API tolerates that, but some OpenAI-compatible / Bedrock proxy gateways
+		// re-pack consecutive same-role messages before forwarding, and their merge logic can
+		// duplicate a `tool_result` — reproducing the 400 "each tool_use must have a single result"
+		// even though our outgoing body is already valid. Pre-merge consecutive same-role messages
+		// into a single message with concatenated content blocks so the gateway has nothing to merge.
+		this.mergeConsecutiveSameRoleMessages(out);
+
 		return out;
+	}
+
+	/**
+	 * Merge consecutive messages that share the same `role` into a single message whose `content` is
+	 * the concatenation of the originals' content blocks. This yields the canonical Anthropic shape
+	 * (one `assistant` message with all its `tool_use` blocks, immediately followed by one `user`
+	 * message with all the matching `tool_result` blocks) and prevents proxy gateways from
+	 * re-packing — and accidentally duplicating — `tool_result` blocks.
+	 *
+	 * Runs after {@link dedupeToolResults}, so the merged result is still guaranteed to hold at most
+	 * one `tool_result` per `tool_use_id`.
+	 *
+	 * @param messages The converted Anthropic messages to merge in place.
+	 */
+	private mergeConsecutiveSameRoleMessages(messages: AnthropicMessage[]): void {
+		let merged = 0;
+		for (let i = messages.length - 1; i > 0; i--) {
+			const cur = messages[i];
+			const prev = messages[i - 1];
+			if (cur.role !== prev.role) {
+				continue;
+			}
+			if (!Array.isArray(prev.content) || !Array.isArray(cur.content)) {
+				// Normalize any string content to a text block so we can always concatenate arrays.
+				const prevBlocks: AnthropicContentBlock[] = Array.isArray(prev.content)
+					? prev.content
+					: [{ type: "text", text: String(prev.content ?? "") }];
+				const curBlocks: AnthropicContentBlock[] = Array.isArray(cur.content)
+					? cur.content
+					: [{ type: "text", text: String(cur.content ?? "") }];
+				prev.content = [...prevBlocks, ...curBlocks];
+			} else {
+				prev.content = [...prev.content, ...cur.content];
+			}
+			messages.splice(i, 1);
+			merged++;
+		}
+
+		if (merged > 0) {
+			logger.warn("anthropic.messages.merged-consecutive-same-role", {
+				modelId: this._modelId,
+				mergedCount: merged,
+			});
+		}
+	}
+
+	/**
+	 * Remove duplicate `tool_result` blocks that share the same `tool_use_id`.
+	 *
+	 * Anthropic rejects requests where a single `tool_use` is answered by more than one
+	 * `tool_result`. The first occurrence (in document order) is kept; any subsequent block with an
+	 * already-seen `tool_use_id` is stripped from its message. Messages left with no content blocks
+	 * after stripping are removed entirely so we never send an empty `content` array.
+	 *
+	 * @param messages The converted Anthropic messages to sanitize in place.
+	 */
+	private dedupeToolResults(messages: AnthropicMessage[]): void {
+		// Pass 1 — deduplicate `tool_use` blocks. Anthropic keys tool calls by `id`; if the same id
+		// appears on more than one `tool_use` block, a single `tool_result` answering that id is
+		// considered to answer *multiple* tool calls, which triggers the very "each tool_use must
+		// have a single result" 400 we are guarding against. Keep the first `tool_use` per id.
+		const seenToolUse = new Set<string>();
+		// Pass 1 also records which tool_use ids actually survive, so we can drop orphan results.
+		let toolUseDuplicatesRemoved = 0;
+
+		for (let i = 0; i < messages.length; i++) {
+			const msg = messages[i];
+			if (!Array.isArray(msg.content)) {
+				continue;
+			}
+			const filtered = msg.content.filter((block) => {
+				if (block.type !== "tool_use") {
+					return true;
+				}
+				const id = (block as AnthropicToolUseBlock).id;
+				if (seenToolUse.has(id)) {
+					toolUseDuplicatesRemoved++;
+					return false;
+				}
+				seenToolUse.add(id);
+				return true;
+			});
+			if (filtered.length !== msg.content.length) {
+				msg.content = filtered.length === 0 ? [] : filtered;
+			}
+		}
+
+		// Pass 2 — deduplicate `tool_result` blocks. Keep exactly one result per `tool_use_id`
+		// (first occurrence in document order). Later duplicates — whether inside the same message
+		// or spread across replayed history messages — are dropped.
+		const seenResult = new Set<string>();
+		let resultDuplicatesRemoved = 0;
+
+		for (let i = 0; i < messages.length; i++) {
+			const msg = messages[i];
+			if (!Array.isArray(msg.content)) {
+				continue;
+			}
+
+			const filtered = msg.content.filter((block) => {
+				if (block.type !== "tool_result") {
+					return true;
+				}
+				const id = (block as AnthropicToolResultBlock).tool_use_id;
+				if (seenResult.has(id)) {
+					resultDuplicatesRemoved++;
+					return false;
+				}
+				seenResult.add(id);
+				return true;
+			});
+
+			if (filtered.length !== msg.content.length) {
+				if (filtered.length === 0) {
+					messages.splice(i, 1);
+					i--;
+				} else {
+					msg.content = filtered;
+				}
+			}
+		}
+
+		if (toolUseDuplicatesRemoved > 0 || resultDuplicatesRemoved > 0) {
+			logger.warn("anthropic.tool-blocks.deduped", {
+				modelId: this._modelId,
+				toolUseDuplicatesRemoved,
+				resultDuplicatesRemoved,
+			});
+		}
+
+		// Verification net — if, after both passes, any `tool_use_id` still carries more than one
+		// `tool_result` (should be impossible), force-log the offending structure at error level so
+		// it surfaces even when the log level is stricter than `warn`, then hard-strip the extras.
+		this.assertNoDuplicateToolResults(messages);
+	}
+
+	/**
+	 * Post-dedup verification. Counts `tool_result` blocks per `tool_use_id` across the whole
+	 * request. If any id still appears more than once (which would reproduce the Anthropic 400),
+	 * logs a detailed, non-sensitive summary at error level and forcibly removes the surplus so the
+	 * outgoing request is always valid.
+	 */
+	private assertNoDuplicateToolResults(messages: AnthropicMessage[]): void {
+		const counts = new Map<string, number>();
+		for (const msg of messages) {
+			if (!Array.isArray(msg.content)) {
+				continue;
+			}
+			for (const block of msg.content) {
+				if (block.type === "tool_result") {
+					const id = (block as AnthropicToolResultBlock).tool_use_id;
+					counts.set(id, (counts.get(id) ?? 0) + 1);
+				}
+			}
+		}
+
+		const offenders = [...counts.entries()].filter(([, n]) => n > 1);
+		if (offenders.length === 0) {
+			return;
+		}
+
+		logger.error("anthropic.tool-results.duplicate-after-dedup", {
+			modelId: this._modelId,
+			offenders: offenders.map(([id, n]) => ({ tool_use_id: id, count: n })),
+			messageShape: messages.map((m) => ({
+				role: m.role,
+				blockTypes: Array.isArray(m.content) ? m.content.map((b) => b.type) : "string",
+			})),
+		});
+
+		// Hard strip: keep the first result per id, drop the rest, no matter what.
+		const kept = new Set<string>();
+		for (let i = 0; i < messages.length; i++) {
+			const msg = messages[i];
+			if (!Array.isArray(msg.content)) {
+				continue;
+			}
+			const filtered = msg.content.filter((block) => {
+				if (block.type !== "tool_result") {
+					return true;
+				}
+				const id = (block as AnthropicToolResultBlock).tool_use_id;
+				if (kept.has(id)) {
+					return false;
+				}
+				kept.add(id);
+				return true;
+			});
+			if (filtered.length !== msg.content.length) {
+				if (filtered.length === 0) {
+					messages.splice(i, 1);
+					i--;
+				} else {
+					msg.content = filtered;
+				}
+			}
+		}
 	}
 
 	prepareRequestBody(
@@ -291,6 +505,15 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 			// Add all extra parameters directly to the request body
 			for (const [key, value] of Object.entries(um.extra)) {
 				if (value !== undefined) {
+					// Never let `extra` overwrite the converted `messages`: those have already been
+					// normalized and de-duplicated by convertMessages. Overwriting them here would
+					// bypass that sanitization and can re-introduce duplicate `tool_result` blocks.
+					if (key === "messages") {
+						logger.warn("anthropic.extra.messages-ignored", {
+							modelId: this._modelId,
+						});
+						continue;
+					}
 					if (key === "tools" && Array.isArray(value) && rb.tools) {
 						rb.tools = [...rb.tools, ...value];
 					} else {
@@ -311,6 +534,16 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 			this.enforceCacheControlBudget(rb);
 		}
 
+		// Final safety net: guarantee no duplicate `tool_result` blocks survive in the request body
+		// that is actually sent to Anthropic. Duplicates can be introduced by any path between message
+		// conversion and here (e.g. `extra`, or edge cases in the host-provided message structure).
+		// Anthropic rejects a request when a single `tool_use` is answered by more than one
+		// `tool_result` ("each tool_use must have a single result"), so we dedupe once more right
+		// before returning.
+		this.dedupeToolResults(rb.messages);
+		// Also collapse consecutive same-role messages one final time, so the body actually sent to
+		// the (possibly re-packing) proxy gateway is already in canonical merged shape.
+		this.mergeConsecutiveSameRoleMessages(rb.messages);
 		return rb;
 	}
 
