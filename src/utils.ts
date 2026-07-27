@@ -231,7 +231,7 @@ export function collectToolResultText(pr: { content?: ReadonlyArray<unknown> }):
 			}
 		}
 	}
-	return text;
+	return sanitizeText(text);
 }
 
 /**
@@ -337,4 +337,13 @@ export async function executeWithRetry<T>(fn: () => Promise<T>, retryConfig: Ret
 		lastError: lastError ? { name: lastError.name, message: lastError.message } : String(lastError),
 	});
 	throw lastError || new Error("Retry failed");
+}
+
+/**
+ * Remove lone surrogate characters from text to prevent JSON serialization errors.
+ * Valid surrogate pairs (used for emoji and other characters above U+FFFF) are preserved.
+ * Only unpaired surrogates that would cause JSON.parse/stringify to fail are removed.
+ */
+export function sanitizeText(text: string): string {
+	return text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|[\uDC00-\uDFFF]/g, "");
 }

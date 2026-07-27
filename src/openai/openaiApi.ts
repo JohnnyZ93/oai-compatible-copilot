@@ -26,6 +26,7 @@ import {
 	collectToolResultText,
 	convertToolsToOpenAI,
 	mapRole,
+	sanitizeText,
 } from "../utils";
 
 import { CommonApi } from "../commonApi";
@@ -79,8 +80,8 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 				}
 			}
 
-			const joinedText = textParts.join("").trim();
-			const joinedThinking = reasoningParts.join("").trim();
+			const joinedText = sanitizeText(textParts.join("").trim());
+			const joinedThinking = sanitizeText(reasoningParts.join("").trim());
 
 			// process assistant message
 			if (role === "assistant") {
@@ -107,7 +108,7 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
 
 			// process tool result messages
 			for (const tr of toolResults) {
-				out.push({ role: "tool", tool_call_id: tr.callId, content: tr.content || "" });
+				out.push({ role: "tool", tool_call_id: tr.callId, content: sanitizeText(tr.content || "") });
 			}
 
 			// process user messages

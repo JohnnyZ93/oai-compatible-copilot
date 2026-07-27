@@ -20,7 +20,7 @@ import type {
 	AnthropicStreamChunk,
 } from "./anthropicTypes";
 
-import { isImageMimeType, isToolResultPart, collectToolResultText, convertToolsToOpenAI, mapRole } from "../utils";
+import { isImageMimeType, isToolResultPart, collectToolResultText, convertToolsToOpenAI, mapRole, sanitizeText } from "../utils";
 
 import { CommonApi } from "../commonApi";
 import { logger } from "../logger";
@@ -130,8 +130,8 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 				}
 			}
 
-			const joinedText = textParts.join("").trim();
-			const joinedThinking = thinkingParts.join("").trim();
+			const joinedText = sanitizeText(textParts.join("").trim());
+			const joinedThinking = sanitizeText(thinkingParts.join("").trim());
 
 			// Handle system messages separately (Anthropic uses top-level system field)
 			if (role === "system") {
