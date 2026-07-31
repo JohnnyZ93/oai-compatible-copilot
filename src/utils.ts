@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import * as fs from "fs";
+import * as path from "path";
 import type { HFModelItem, RetryConfig } from "./types";
 import { OpenAIFunctionToolDef } from "./openai/openaiTypes";
 
@@ -196,6 +198,104 @@ export function createDataUrl(dataPart: vscode.LanguageModelDataPart): string {
 	return `data:${dataPart.mimeType};base64,${base64Data}`;
 }
 
+export interface ToolResultImage {
+	mimeType: string;
+	data: Uint8Array;
+	sourcePath?: string;
+}
+
+export interface ToolCallMetadata {
+	name?: string;
+	input?: Record<string, unknown>;
+}
+
+export interface ToolResultContent {
+	text: string;
+	images: ToolResultImage[];
+}
+
+export function createDataUrlFromImageInfo(image: ToolResultImage): string {
+	const base64Data = Buffer.from(image.data).toString("base64");
+	return `data:${image.mimeType};base64,${base64Data}`;
+}
+
+function guessImageMimeType(filePath: string): string {
+	const ext = path.extname(filePath).toLowerCase();
+	if (ext === ".jpg" || ext === ".jpeg") {
+		return "image/jpeg";
+	}
+	if (ext === ".png") {
+		return "image/png";
+	}
+	if (ext === ".gif") {
+		return "image/gif";
+	}
+	if (ext === ".webp") {
+		return "image/webp";
+	}
+	return "application/octet-stream";
+}
+
+function isImageToolCall(toolCallMeta?: ToolCallMetadata): boolean {
+	const input = toolCallMeta?.input;
+	if (input && (typeof input.imagePath === "string" || typeof input.image_path === "string")) {
+		return true;
+	}
+	const name = toolCallMeta?.name?.toLowerCase() ?? "";
+	return name.includes("image");
+}
+
+function extractCandidateImagePaths(toolCallMeta?: ToolCallMetadata): string[] {
+	if (!isImageToolCall(toolCallMeta)) {
+		return [];
+	}
+	const input = toolCallMeta?.input;
+	if (!input) {
+		return [];
+	}
+	const candidates: string[] = [];
+	for (const key of ["filePath", "file_path", "path", "imagePath", "image_path", "uri"]) {
+		const value = input[key];
+		if (typeof value === "string" && value.trim()) {
+			candidates.push(value.trim());
+		}
+	}
+	return candidates;
+}
+
+function readImageInfoFromPath(candidate: string): ToolResultImage | undefined {
+	try {
+		let filePath = candidate;
+		if (filePath.startsWith("file://")) {
+			filePath = vscode.Uri.parse(filePath).fsPath;
+		}
+		const mimeType = guessImageMimeType(filePath);
+		if (!isImageMimeType(mimeType) || !fs.existsSync(filePath)) {
+			return undefined;
+		}
+		return { mimeType, data: fs.readFileSync(filePath), sourcePath: filePath };
+	} catch {
+		return undefined;
+	}
+}
+
+function stringifyToolResultPartContent(c: unknown): string {
+	if (c instanceof vscode.LanguageModelTextPart) {
+		return c.value;
+	}
+	if (typeof c === "string") {
+		return c;
+	}
+	if (c instanceof vscode.LanguageModelDataPart && (c.mimeType === "cache_control" || isImageMimeType(c.mimeType))) {
+		return "";
+	}
+	try {
+		return JSON.stringify(c);
+	} catch {
+		return "";
+	}
+}
+
 /**
  * Type guard for LanguageModelToolResultPart-like values.
  * @param value Unknown value to test.
@@ -217,21 +317,45 @@ export function isToolResultPart(value: unknown): value is { callId: string; con
 export function collectToolResultText(pr: { content?: ReadonlyArray<unknown> }): string {
 	let text = "";
 	for (const c of pr.content ?? []) {
-		if (c instanceof vscode.LanguageModelTextPart) {
-			text += c.value;
-		} else if (typeof c === "string") {
-			text += c;
-		} else if (c instanceof vscode.LanguageModelDataPart && c.mimeType === "cache_control") {
-			/* ignore */
+		text += stringifyToolResultPartContent(c);
+	}
+	return text;
+}
+
+/**
+ * Collect text and image attachments from a tool result.
+ *
+ * Some VS Code image tools return only a `vscode-chat-response-resource://...` marker in the
+ * textual tool result. That URI is internal to VS Code and cannot be dereferenced by remote API
+ * providers. When the original image tool call included a local path, read that supported image
+ * file and attach it as real bytes so provider adapters can emit standard multimodal payloads.
+ */
+export function collectToolResultContent(
+	pr: { content?: ReadonlyArray<unknown> },
+	toolCallMeta?: ToolCallMetadata
+): ToolResultContent {
+	let text = "";
+	const images: ToolResultImage[] = [];
+
+	for (const c of pr.content ?? []) {
+		if (c instanceof vscode.LanguageModelDataPart && isImageMimeType(c.mimeType)) {
+			images.push({ mimeType: c.mimeType, data: c.data });
 		} else {
-			try {
-				text += JSON.stringify(c);
-			} catch {
-				/* ignore */
+			text += stringifyToolResultPartContent(c);
+		}
+	}
+
+	if (images.length === 0) {
+		for (const candidate of extractCandidateImagePaths(toolCallMeta)) {
+			const image = readImageInfoFromPath(candidate);
+			if (image) {
+				images.push(image);
+				break;
 			}
 		}
 	}
-	return text;
+
+	return { text, images };
 }
 
 /**

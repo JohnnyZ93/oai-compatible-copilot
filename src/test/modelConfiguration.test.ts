@@ -1,6 +1,10 @@
 import * as assert from "assert";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import * as vscode from "vscode";
 import { AnthropicApi } from "../anthropic/anthropicApi";
+import type { AnthropicContentBlock, AnthropicImageBlock, AnthropicToolResultBlock } from "../anthropic/anthropicTypes";
 import { GeminiApi } from "../gemini/geminiApi";
 import {
 	createReasoningEffortConfigurationSchema,
@@ -159,5 +163,70 @@ suite("modelConfiguration", () => {
 		assert.strictEqual(ollamaBody.think, undefined);
 		assert.strictEqual(geminiBody.reasoning_effort, undefined);
 		assert.strictEqual(geminiBody.thinkingConfig, undefined);
+	});
+
+	test("forwards local images referenced by image tool result call inputs", () => {
+		const imagePath = path.join(os.tmpdir(), `oaicopilot-tool-result-${Date.now()}.png`);
+		const pngBytes = Buffer.from(
+			"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+			"base64"
+		);
+
+		try {
+			fs.writeFileSync(imagePath, pngBytes);
+
+			const callId = "call_image_1";
+			const messages = [
+				{
+					role: vscode.LanguageModelChatMessageRole.Assistant,
+					content: [new vscode.LanguageModelToolCallPart(callId, "view_image", { filePath: imagePath })],
+				},
+				{
+					role: vscode.LanguageModelChatMessageRole.User,
+					content: [
+						{
+							callId,
+							content: [
+								new vscode.LanguageModelTextPart(
+									"[Image was previously shown to you. Image URI: vscode-chat-response-resource://example]"
+								),
+							],
+						},
+					],
+				},
+			] as unknown as readonly vscode.LanguageModelChatRequestMessage[];
+
+			const modelConfig = { includeReasoningInRequest: false };
+			const anthropicMessages = new AnthropicApi("claude").convertMessages(messages, modelConfig);
+			const openaiMessages = new OpenaiApi("gpt-4o").convertMessages(messages, modelConfig);
+			const responsesInput = new OpenaiResponsesApi("gpt-4o").convertMessages(messages, modelConfig);
+
+			assert.ok(Array.isArray(anthropicMessages[1].content));
+			const anthropicToolResult = anthropicMessages[1].content[0] as AnthropicToolResultBlock;
+			assert.strictEqual(anthropicToolResult.type, "tool_result");
+			assert.ok(Array.isArray(anthropicToolResult.content));
+			const anthropicImage = (anthropicToolResult.content as AnthropicContentBlock[]).find(
+				(part): part is AnthropicImageBlock => part.type === "image"
+			);
+			assert.strictEqual(anthropicImage?.source.media_type, "image/png");
+			assert.strictEqual(anthropicImage?.source.data, pngBytes.toString("base64"));
+
+			const openaiImageMessage = openaiMessages.find(
+				(message) => message.role === "user" && Array.isArray(message.content)
+			);
+			assert.ok(openaiImageMessage && Array.isArray(openaiImageMessage.content));
+			const openaiImage = openaiImageMessage.content.find((part) => part.type === "image_url");
+			assert.strictEqual(openaiImage?.image_url?.url, `data:image/png;base64,${pngBytes.toString("base64")}`);
+
+			const responsesImageMessage = responsesInput.find(
+				(item) =>
+					item.type === "message" && item.role === "user" && item.content.some((part) => part.type === "input_image")
+			);
+			assert.ok(responsesImageMessage && responsesImageMessage.type === "message");
+			const responsesImage = responsesImageMessage.content.find((part) => part.type === "input_image");
+			assert.strictEqual(responsesImage?.image_url, `data:image/png;base64,${pngBytes.toString("base64")}`);
+		} finally {
+			fs.rmSync(imagePath, { force: true });
+		}
 	});
 });
