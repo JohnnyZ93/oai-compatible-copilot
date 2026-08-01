@@ -31,6 +31,61 @@ export interface ParsedModelId {
 	configId?: string;
 }
 
+const INTERNAL_MODEL_ID_PREFIX = "__oaicopilot_internal__";
+
+function encodeInternalModelIdPart(value: string): string {
+	return Buffer.from(value, "utf8")
+		.toString("base64")
+		.replace(/\+/g, "-")
+		.replace(/\//g, "_")
+		.replace(/=+$/u, "");
+}
+
+function decodeInternalModelIdPart(value: string): string {
+	const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+	const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+	return Buffer.from(padded, "base64").toString("utf8");
+}
+
+function tryParseInternalModelId(modelId: string): ParsedModelId | undefined {
+	if (!modelId.startsWith(INTERNAL_MODEL_ID_PREFIX)) {
+		return undefined;
+	}
+
+	const encodedPayload = modelId.slice(INTERNAL_MODEL_ID_PREFIX.length);
+	if (!encodedPayload) {
+		return undefined;
+	}
+
+	const parts = encodedPayload.split("::");
+	const encodedBaseId = parts[0];
+	if (!encodedBaseId) {
+		return undefined;
+	}
+
+	try {
+		const baseId = decodeInternalModelIdPart(encodedBaseId);
+		const encodedConfigId = parts.length >= 2 ? parts.slice(1).join("::") : undefined;
+		const configId = encodedConfigId ? decodeInternalModelIdPart(encodedConfigId) : undefined;
+
+		return {
+			baseId,
+			...(configId ? { configId } : {}),
+		};
+	} catch {
+		return undefined;
+	}
+}
+
+export function buildInternalModelId(baseId: string, configId?: string): string {
+	const encodedBaseId = encodeInternalModelIdPart(baseId);
+	if (configId) {
+		return `${INTERNAL_MODEL_ID_PREFIX}${encodedBaseId}::${encodeInternalModelIdPart(configId)}`;
+	}
+
+	return `${INTERNAL_MODEL_ID_PREFIX}${encodedBaseId}`;
+}
+
 export function getModelProviderId(model: unknown): string {
 	if (!model || typeof model !== "object") {
 		return "";
@@ -65,6 +120,11 @@ export function normalizeUserModels(models: unknown): HFModelItem[] {
  * Format: "baseId::configId" or just "baseId"
  */
 export function parseModelId(modelId: string): ParsedModelId {
+	const parsedInternalModelId = tryParseInternalModelId(modelId);
+	if (parsedInternalModelId) {
+		return parsedInternalModelId;
+	}
+
 	const parts = modelId.split("::");
 	if (parts.length >= 2) {
 		return {

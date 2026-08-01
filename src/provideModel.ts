@@ -7,7 +7,7 @@ import {
 	type ModelPickerChatInformation,
 	isReasoningEffortValue,
 } from "./modelConfiguration";
-import { normalizeUserModels } from "./utils";
+import { buildInternalModelId, normalizeUserModels } from "./utils";
 import { VersionManager } from "./versionManager";
 import { fetchGeminiModels } from "./gemini/geminiApi";
 import { fetchOllamaModels } from "./ollama/ollamaApi";
@@ -42,8 +42,7 @@ export async function prepareLanguageModelChatInformation(
 				const maxOutput = m?.max_completion_tokens ?? m?.max_tokens ?? DEFAULT_MAX_TOKENS;
 				const maxInput = Math.max(1, contextLen - maxOutput);
 
-				// Use configId when present so each model configuration stays distinct.
-				const modelId = m.configId ? `${m.id}::${m.configId}` : m.id;
+				const modelId = buildInternalModelId(m.id, m.configId);
 				const modelName = m.displayName || (m.configId ? `${m.id}::${m.configId}` : `${m.id}`);
 				const detail = m.owned_by ? `${m.owned_by} (${EXTENSION_LABEL})` : EXTENSION_LABEL;
 				const reasoningEffort = isReasoningEffortValue(m.reasoning_effort) ? m.reasoning_effort : undefined;
@@ -101,7 +100,7 @@ export async function prepareLanguageModelChatInformation(
 				const maxInput = Math.max(1, contextLen - maxOutput);
 				const detail = p.provider ? `${p.provider} (${EXTENSION_LABEL})` : EXTENSION_LABEL;
 				entries.push({
-					id: `${m.id}:${p.provider}`,
+					id: buildInternalModelId(`${m.id}:${p.provider}`),
 					name: `${m.id}`,
 					detail: detail,
 					tooltip: detail,
@@ -124,7 +123,7 @@ export async function prepareLanguageModelChatInformation(
 				const maxOutput = DEFAULT_MAX_TOKENS;
 				const maxInput = Math.max(1, contextLen - maxOutput);
 				entries.push({
-					id: `${m.id}`,
+					id: buildInternalModelId(`${m.id}`),
 					name: `${m.id}`,
 					detail: EXTENSION_LABEL,
 					tooltip: EXTENSION_LABEL,

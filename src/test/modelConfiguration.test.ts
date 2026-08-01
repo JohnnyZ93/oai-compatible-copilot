@@ -14,6 +14,7 @@ import { OpenaiApi } from "../openai/openaiApi";
 import { OpenaiResponsesApi } from "../openai/openaiResponsesApi";
 import { prepareLanguageModelChatInformation } from "../provideModel";
 import type { HFModelItem } from "../types";
+import { buildInternalModelId, parseModelId } from "../utils";
 
 suite("modelConfiguration", () => {
 	const deepSeekModel: HFModelItem = {
@@ -66,7 +67,9 @@ suite("modelConfiguration", () => {
 			await config.update("oaicopilot.models", [model], vscode.ConfigurationTarget.Global);
 
 			const infos = await prepareLanguageModelChatInformation({ silent: true }, cts.token, {} as vscode.SecretStorage);
-			const info = infos.find((item) => item.id === "deepseek-v4-flash") as ModelPickerChatInformation | undefined;
+			const info = infos.find(
+				(item) => item.id === buildInternalModelId("deepseek-v4-flash")
+			) as ModelPickerChatInformation | undefined;
 
 			assert.ok(info, "deepseek-v4-flash should be registered");
 			assert.strictEqual(info.name, "deepseek-v4-flash");
@@ -95,7 +98,9 @@ suite("modelConfiguration", () => {
 			await config.update("oaicopilot.models", [model], vscode.ConfigurationTarget.Global);
 
 			const infos = await prepareLanguageModelChatInformation({ silent: true }, cts.token, {} as vscode.SecretStorage);
-			const info = infos.find((item) => item.id === "deepseek-v4-flash") as ModelPickerChatInformation | undefined;
+			const info = infos.find(
+				(item) => item.id === buildInternalModelId("deepseek-v4-flash")
+			) as ModelPickerChatInformation | undefined;
 
 			assert.ok(info, "deepseek-v4-flash should be registered");
 			assert.strictEqual(info.configurationSchema, undefined);
@@ -103,6 +108,44 @@ suite("modelConfiguration", () => {
 			cts.dispose();
 			await config.update("oaicopilot.models", previousModels, vscode.ConfigurationTarget.Global);
 		}
+	});
+
+	test("uses internal picker ids so built-in Copilot model ids do not collide", async () => {
+		const config = vscode.workspace.getConfiguration();
+		const previousModels = config.get<unknown>("oaicopilot.models", []);
+		const cts = new vscode.CancellationTokenSource();
+		const model: HFModelItem = {
+			id: "gpt-5.4",
+			owned_by: "external-provider",
+			baseUrl: "https://example.com/v1",
+			apiMode: "openai",
+		};
+
+		try {
+			await config.update("oaicopilot.models", [model], vscode.ConfigurationTarget.Global);
+
+			const infos = await prepareLanguageModelChatInformation({ silent: true }, cts.token, {} as vscode.SecretStorage);
+			const info = infos.find((item) => item.name === "gpt-5.4");
+
+			assert.ok(info, "gpt-5.4 should be registered");
+			assert.strictEqual(info?.id, buildInternalModelId("gpt-5.4"));
+			assert.notStrictEqual(info?.id, "gpt-5.4");
+			assert.deepStrictEqual(parseModelId(info?.id ?? ""), { baseId: "gpt-5.4" });
+		} finally {
+			cts.dispose();
+			await config.update("oaicopilot.models", previousModels, vscode.ConfigurationTarget.Global);
+		}
+	});
+
+	test("parses legacy and internal model ids", () => {
+		assert.deepStrictEqual(parseModelId("glm-4.6::thinking"), {
+			baseId: "glm-4.6",
+			configId: "thinking",
+		});
+		assert.deepStrictEqual(parseModelId(buildInternalModelId("gpt-5.4", "external")), {
+			baseId: "gpt-5.4",
+			configId: "external",
+		});
 	});
 
 	test("applies selected reasoning effort to OpenAI-compatible chat requests", () => {
