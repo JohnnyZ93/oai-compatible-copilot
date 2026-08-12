@@ -474,6 +474,7 @@ function renderModels() {
 				<td>${model.top_p !== undefined && model.top_p !== null ? model.top_p : ""}</td>
 				<td>${model.delay || ""}</td>
 				<td class="action-buttons">
+					<button class="clone-model-btn secondary" data-model-id="${model.id}${model.configId ? "::" + model.configId : ""}">Clone</button>
 					<button class="update-model-btn" data-model-id="${model.id}${model.configId ? "::" + model.configId : ""}">Edit</button>
 					<button class="delete-model-btn danger" data-model-id="${model.id}${model.configId ? "::" + model.configId : ""}">Delete</button>
 				</td>
@@ -484,6 +485,39 @@ function renderModels() {
 	modelTableBody.innerHTML = rows;
 
 	// Add event listeners for model rows
+	document.querySelectorAll(".clone-model-btn").forEach((btn) => {
+		btn.addEventListener("click", (event) => {
+			const modelId = event.target.getAttribute("data-model-id");
+			// Find the model in state
+			const parsedModelId = modelId.includes("::")
+				? { baseId: modelId.split("::")[0], configId: modelId.split("::")[1] }
+				: { baseId: modelId, configId: null };
+
+			const model = state.models.find(
+				(m) =>
+					m.id === parsedModelId.baseId &&
+					((parsedModelId.configId && m.configId === parsedModelId.configId) ||
+						(!parsedModelId.configId && !m.configId))
+			);
+
+			if (model) {
+				// Show the model form in clone mode
+				modelFormSection.style.display = "block";
+				modelFormTitle.textContent = `Clone Model: ${modelId}`;
+				populateModelForm(model);
+
+				// Remove editing attributes to ensure it's treated as a new model
+				modelIdInput.removeAttribute("data-editing");
+				modelIdInput.removeAttribute("data-original-id");
+				modelIdInput.removeAttribute("data-original-configId");
+
+				// Disable BaseURL and apiMode fields to match Add Model behavior
+				modelBaseUrlInput.disabled = true;
+				modelApiModeInput.disabled = true;
+			}
+		});
+	});
+
 	document.querySelectorAll(".update-model-btn").forEach((btn) => {
 		btn.addEventListener("click", (event) => {
 			const modelId = event.target.getAttribute("data-model-id");
