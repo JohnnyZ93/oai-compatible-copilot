@@ -9,7 +9,8 @@ import {
 	Progress,
 } from "vscode";
 
-import type { HFModelItem } from "./types";
+import type { HFModelItem, TokenUsage } from "./types";
+import { CustomDataPartMimeTypes } from "./types";
 
 import type { OllamaRequestBody } from "./ollama/ollamaTypes";
 
@@ -26,6 +27,7 @@ import { AnthropicRequestBody } from "./anthropic/anthropicTypes";
 import { GeminiApi, buildGeminiGenerateContentUrl, type GeminiToolCallMeta } from "./gemini/geminiApi";
 import type { GeminiGenerateContentRequest } from "./gemini/geminiTypes";
 import { CommonApi } from "./commonApi";
+import { startChatSpan } from "./otelTracer";
 import { logger } from "./logger";
 
 /**
@@ -96,6 +98,16 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	): Promise<void> {
 		const trackingProgress: Progress<LanguageModelResponsePart2> = {
 			report: (part) => {
+				// Collect for OTel tracing (cheap; consumers no-op when disabled)
+				try {
+					if (part instanceof vscode.LanguageModelTextPart) {
+						otelOutput += part.value;
+					} else if (part instanceof vscode.LanguageModelDataPart && part.mimeType === CustomDataPartMimeTypes.Usage) {
+						otelUsage = JSON.parse(new TextDecoder().decode(part.data)) as TokenUsage;
+					}
+				} catch {
+					/* tracing must never affect the chat stream */
+				}
 				try {
 					progress.report(part);
 				} catch (e) {
@@ -107,6 +119,11 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			},
 		};
 		const requestStartTime = Date.now();
+		// OTel tracing state: capture output text + reported usage via the progress
+		// reporter so every apiMode (ollama/anthropic/openai/gemini) is covered.
+		let otelSpan: ReturnType<typeof startChatSpan> | undefined;
+		let otelOutput = "";
+		let otelUsage: TokenUsage | null = null;
 		try {
 			// get model config from user settings
 			const config = vscode.workspace.getConfiguration();
@@ -140,6 +157,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				apiMode,
 				baseUrl,
 			});
+
+			// Start an OTel span for this chat request (no-op unless oaicopilot.otel.enabled)
+			otelSpan = startChatSpan(parsedModelId.baseId, apiMode, messages);
 
 			// Prepare model configuration
 			const modelConfig = {
@@ -507,8 +527,12 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				errorName: err instanceof Error ? err.name : String(err),
 				errorMessage: err instanceof Error ? err.message : String(err),
 			});
+			otelSpan?.setError(err);
 			throw err;
 		} finally {
+			otelSpan?.setUsage(otelUsage);
+			otelSpan?.setOutput(otelOutput);
+			otelSpan?.end();
 			const durationMs = Date.now() - requestStartTime;
 			logger.info("request.end", { modelId: model.id, durationMs });
 			// Update last request time after successful completion
