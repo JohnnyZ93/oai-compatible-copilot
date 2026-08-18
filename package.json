@@ -111,6 +111,26 @@
 		"configuration": {
 			"title": "OAI Compatible Copilot",
 			"properties": {
+				"oaicopilot.otel.enabled": {
+					"type": "boolean",
+					"default": false,
+					"description": "Export one OpenTelemetry span per chat request (GenAI semantic conventions) to an OTLP/HTTP JSON endpoint, e.g. Langfuse at http://<host>:3000/api/public/otel. Tracing failures never affect the chat request."
+				},
+				"oaicopilot.otel.endpoint": {
+					"type": "string",
+					"default": "",
+					"description": "OTLP/HTTP JSON base endpoint for tracing (spans are POSTed to <endpoint>/v1/traces). Example: http://localhost:3000/api/public/otel"
+				},
+				"oaicopilot.otel.headers": {
+					"type": "object",
+					"default": {},
+					"description": "Extra headers sent with OTLP export requests, e.g. { \"Authorization\": \"Basic <base64(publicKey:secretKey)>\", \"x-langfuse-ingestion-version\": \"4\" } for Langfuse."
+				},
+				"oaicopilot.otel.captureContent": {
+					"type": "boolean",
+					"default": false,
+					"description": "Opt-in: include full prompts and model responses in exported traces (gen_ai.content.prompt / gen_ai.content.completion events). Only enable if you are comfortable storing this content in your tracing backend."
+				},
 				"oaicopilot.logLevel": {
 				"type": "string",
 				"default": "off",
