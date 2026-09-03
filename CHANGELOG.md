@@ -1,5 +1,9 @@
 # Change Log
 
+## Unreleased
+
+- Feat: Add upstream load-balancer session affinity. A stable per-conversation session id is attached to every request via the `oaicopilot.sessionIdHeader` header (default `X-Session-ID`), reused across turns by persisting it in the conversation history. Set the setting to `none` or empty to disable.
+
 ## 0.4.2 (2026-05-19)
 
 - Feat(anthropic): Enable prompt caching. The system prompt and the last tool definition are now marked with `cache_control: { type: "ephemeral" }`, and in-message `cache_control` markers emitted by Copilot (`LanguageModelDataPart` with mimeType `"cache_control"`) are forwarded to Anthropic instead of being silently dropped. Add a per-model `cache_control` boolean (default `true`) to disable it for providers that reject the field.

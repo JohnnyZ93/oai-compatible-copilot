@@ -3,12 +3,14 @@ import type { HFApiMode, HFModelItem } from "../types";
 import { normalizeUserModels, parseModelId } from "../utils";
 import { fetchModels } from "../provideModel";
 import { VersionManager } from "../versionManager";
+import { DEFAULT_SESSION_ID_HEADER } from "../sessionId";
 
 interface InitPayload {
 	baseUrl: string;
 	apiKey: string;
 	delay: number;
 	readFileLines: number;
+	sessionIdHeader: string;
 	retry: {
 		enabled?: boolean;
 		max_attempts?: number;
@@ -27,6 +29,7 @@ interface ExportConfig {
 	baseUrl: string;
 	apiKey: string;
 	delay: number;
+	sessionIdHeader: string;
 	retry: {
 		enabled?: boolean;
 		max_attempts?: number;
@@ -48,6 +51,7 @@ type IncomingMessage =
 			apiKey: string;
 			delay: number;
 			readFileLines: number;
+			sessionIdHeader: string;
 			retry: { enabled?: boolean; max_attempts?: number; interval_ms?: number; status_codes?: number[] };
 			commitModel: string;
 			commitLanguage: string;
@@ -174,6 +178,7 @@ export class ConfigViewPanel {
 					message.apiKey,
 					message.delay,
 					message.readFileLines,
+					message.sessionIdHeader,
 					message.retry,
 					message.commitModel,
 					message.commitLanguage
@@ -268,6 +273,7 @@ export class ConfigViewPanel {
 		}
 
 		const delay = config.get<number>("oaicopilot.delay", 0);
+		const sessionIdHeader = config.get<string>("oaicopilot.sessionIdHeader", DEFAULT_SESSION_ID_HEADER);
 		const retry = config.get<{
 			enabled?: boolean;
 			max_attempts?: number;
@@ -287,6 +293,7 @@ export class ConfigViewPanel {
 			baseUrl,
 			apiKey,
 			delay,
+			sessionIdHeader,
 			readFileLines,
 			retry,
 			commitModel,
@@ -302,16 +309,19 @@ export class ConfigViewPanel {
 		rawApiKey: string,
 		delay: number,
 		readFileLines: number,
+		rawSessionIdHeader: string,
 		retry: { enabled?: boolean; max_attempts?: number; interval_ms?: number; status_codes?: number[] },
 		commitModel: string,
 		commitLanguage: string
 	) {
 		const baseUrl = rawBaseUrl.trim();
 		const apiKey = rawApiKey.trim();
+		const sessionIdHeader = rawSessionIdHeader.trim();
 		const config = vscode.workspace.getConfiguration();
 		await config.update("oaicopilot.baseUrl", baseUrl, vscode.ConfigurationTarget.Global);
 		await config.update("oaicopilot.delay", delay, vscode.ConfigurationTarget.Global);
 		await config.update("oaicopilot.readFileLines", readFileLines, vscode.ConfigurationTarget.Global);
+		await config.update("oaicopilot.sessionIdHeader", sessionIdHeader, vscode.ConfigurationTarget.Global);
 		await config.update("oaicopilot.retry", retry, vscode.ConfigurationTarget.Global);
 		await config.update("oaicopilot.commitLanguage", commitLanguage, vscode.ConfigurationTarget.Global);
 		if (apiKey) {
@@ -562,6 +572,7 @@ export class ConfigViewPanel {
 			const baseUrl = config.get<string>("oaicopilot.baseUrl", "https://api.openai.com/v1");
 			const apiKey = (await this.secrets.get("oaicopilot.apiKey")) ?? "";
 			const delay = config.get<number>("oaicopilot.delay", 0);
+			const sessionIdHeader = config.get<string>("oaicopilot.sessionIdHeader", DEFAULT_SESSION_ID_HEADER);
 			const retry = config.get<{
 				enabled?: boolean;
 				max_attempts?: number;
@@ -595,6 +606,7 @@ export class ConfigViewPanel {
 				baseUrl,
 				apiKey,
 				delay,
+				sessionIdHeader,
 				retry,
 				commitLanguage,
 				commitModel,
@@ -652,6 +664,11 @@ export class ConfigViewPanel {
 
 			await config.update("oaicopilot.baseUrl", importData.baseUrl, vscode.ConfigurationTarget.Global);
 			await config.update("oaicopilot.delay", importData.delay, vscode.ConfigurationTarget.Global);
+			await config.update(
+				"oaicopilot.sessionIdHeader",
+				importData.sessionIdHeader ?? DEFAULT_SESSION_ID_HEADER,
+				vscode.ConfigurationTarget.Global
+			);
 			await config.update("oaicopilot.retry", importData.retry, vscode.ConfigurationTarget.Global);
 			await config.update("oaicopilot.readFileLines", importData.readFileLines, vscode.ConfigurationTarget.Global);
 			await config.update("oaicopilot.commitLanguage", importData.commitLanguage, vscode.ConfigurationTarget.Global);

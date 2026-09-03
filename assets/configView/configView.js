@@ -3,6 +3,7 @@ const state = {
 	baseUrl: "",
 	apiKey: "",
 	delay: 0,
+	sessionIdHeader: "",
 	retry: { enabled: true, max_attempts: 3, interval_ms: 1000, status_codes: [429, 500, 502, 503, 504] },
 	commitModel: "",
 	models: [],
@@ -18,6 +19,7 @@ const baseUrlInput = document.getElementById("baseUrl");
 const apiKeyInput = document.getElementById("apiKey");
 const delayInput = document.getElementById("delay");
 const readFileLinesInput = document.getElementById("readFileLines");
+const sessionIdHeaderInput = document.getElementById("sessionIdHeader");
 const retryEnabledInput = document.getElementById("retryEnabled");
 const maxAttemptsInput = document.getElementById("maxAttempts");
 const intervalMsInput = document.getElementById("intervalMs");
@@ -95,6 +97,7 @@ document.getElementById("saveBase").addEventListener("click", () => {
 		apiKey: apiKeyInput.value,
 		delay: parseInt(delayInput.value) || 0,
 		readFileLines: parseInt(readFileLinesInput.value) || 0,
+		sessionIdHeader: sessionIdHeaderInput.value,
 		retry: retry,
 		commitModel: commitModelInput.value,
 		commitLanguage: commitLanguageInput.value,
@@ -272,12 +275,13 @@ window.addEventListener("message", (event) => {
 
 	switch (message.type) {
 		case "init":
-			const { baseUrl, apiKey, delay, readFileLines, retry, commitModel, models, providerKeys, commitLanguage } =
+			const { baseUrl, apiKey, delay, readFileLines, retry, commitModel, models, providerKeys, commitLanguage, sessionIdHeader } =
 				message.payload;
 			state.baseUrl = baseUrl;
 			state.apiKey = apiKey;
 			state.delay = delay || 0;
 			state.readFileLines = readFileLines || 0;
+			state.sessionIdHeader = sessionIdHeader || "";
 			state.retry = retry || {
 				enabled: true,
 				max_attempts: 3,
@@ -293,6 +297,7 @@ window.addEventListener("message", (event) => {
 			apiKeyInput.value = apiKey || "";
 			delayInput.value = state.delay;
 			readFileLinesInput.value = message.payload.readFileLines || 0;
+			sessionIdHeaderInput.value = state.sessionIdHeader;
 			retryEnabledInput.checked = state.retry.enabled !== false;
 			maxAttemptsInput.value = state.retry.max_attempts || 3;
 			intervalMsInput.value = state.retry.interval_ms || 1000;
