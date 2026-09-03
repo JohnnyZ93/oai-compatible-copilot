@@ -41,6 +41,15 @@
 					</div>
 					<input id="readFileLines" type="number" min="0" placeholder="0" />
 				</div>
+				<div class="field">
+					<label for="sessionIdHeader">Session ID Header</label>
+					<div class="field-description">
+						HTTP header for upstream load-balancer session affinity (default: X-Session-ID). A stable
+						per-conversation session id is attached to this header on every request. Set to 'none' or leave empty to
+						disable.
+					</div>
+					<input id="sessionIdHeader" type="text" placeholder="X-Session-ID" />
+				</div>
 			</div>
 			<div class="retry-config">
 				<h3>Retry Configuration</h3>

@@ -112,18 +112,18 @@
 			"title": "OAI Compatible Copilot",
 			"properties": {
 				"oaicopilot.logLevel": {
-				"type": "string",
-				"default": "off",
-				"enum": [
-					"off",
-					"debug",
-					"info",
-					"warn",
-					"error"
-				],
-				"description": "Debug log level. Logs are written to ~/.copilot/oaicopilot/logs/ as JSON lines. Default is 'off' (no logging)."
-			},
-			"oaicopilot.baseUrl": {
+					"type": "string",
+					"default": "off",
+					"enum": [
+						"off",
+						"debug",
+						"info",
+						"warn",
+						"error"
+					],
+					"description": "Debug log level. Logs are written to ~/.copilot/oaicopilot/logs/ as JSON lines. Default is 'off' (no logging)."
+				},
+				"oaicopilot.baseUrl": {
 					"type": "string",
 					"default": "https://router.huggingface.co/v1",
 					"description": "The base URL for the Openai Compatible Inference API. Default value is Hugging Face."
@@ -428,6 +428,11 @@
 					"minimum": 0,
 					"description": "Fixed delay in milliseconds between consecutive requests. Default is 0 (no delay)."
 				},
+				"oaicopilot.sessionIdHeader": {
+					"type": "string",
+					"default": "X-Session-ID",
+					"description": "HTTP header used for upstream load-balancer session affinity. The extension attaches a stable per-conversation session id to this header on every request, so load balancers can route all turns of one conversation to the same backend. Set to 'none' or leave empty to disable."
+				},
 				"oaicopilot.commitLanguage": {
 					"type": "string",
 					"default": "English",
@@ -481,12 +486,12 @@
 	"devDependencies": {
 		"@eslint/js": "^9.13.0",
 		"@stylistic/eslint-plugin": "^2.9.0",
-		"@types/node": "^22",
 		"@types/mocha": "^10.0.6",
-		"@vscode/dts": "^0.4.1",
+		"@types/node": "^22",
 		"@types/vscode": "^1.104.0",
+		"@vscode/dts": "^0.4.1",
 		"@vscode/test-cli": "^0.0.11",
-		"@vscode/test-electron": "^2.5.2",
+		"@vscode/test-electron": "^3.1.0",
 		"eslint": "^9.13.0",
 		"prettier": "^3.1.0",
 		"typescript": "^5.9.2",

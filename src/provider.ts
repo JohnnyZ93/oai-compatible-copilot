@@ -27,6 +27,12 @@ import { GeminiApi, buildGeminiGenerateContentUrl, type GeminiToolCallMeta } fro
 import type { GeminiGenerateContentRequest } from "./gemini/geminiTypes";
 import { CommonApi } from "./commonApi";
 import { logger } from "./logger";
+import {
+	createSessionIdPart,
+	DEFAULT_SESSION_ID_HEADER,
+	isSessionIdHeaderEnabled,
+	resolveSessionId,
+} from "./sessionId";
 
 /**
  * VS Code Chat provider backed by Hugging Face Inference Providers.
@@ -34,6 +40,9 @@ import { logger } from "./logger";
 export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	/** Track last request completion time for delay calculation. */
 	private _lastRequestTime: number | null = null;
+
+	/** In-process session id cache keyed by the conversation anchor (first <userRequest>-tagged user message). */
+	private readonly _sessionIdsByAnchor = new Map<string, string>();
 
 	private readonly _geminiToolCallMetaByCallId = new Map<string, GeminiToolCallMeta>();
 	private readonly _openaiResponsesPreviousResponseIdUnsupportedBaseUrls = new Set<string>();
@@ -195,6 +204,23 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 			// prepare headers with custom headers if specified
 			const requestHeaders = CommonApi.prepareHeaders(modelApiKey, apiMode, um?.headers);
+
+			// Session affinity: attach a stable routing key for upstream load balancers.
+			// Reuse the session id persisted in previous turns so all requests within one
+			// conversation reach the same backend, or mint a fresh one for a new conversation.
+			// The header name is configurable; 'none' or an empty value disables the feature.
+			const sessionIdHeaderName = (
+				config.get<string>("oaicopilot.sessionIdHeader", DEFAULT_SESSION_ID_HEADER) ?? DEFAULT_SESSION_ID_HEADER
+			).trim();
+			let sessionId: string | undefined;
+			if (isSessionIdHeaderEnabled(sessionIdHeaderName)) {
+				const workspaceName = (vscode.workspace.workspaceFolders ?? [])
+					.map((f) => f.name)
+					.join("+");
+				sessionId = resolveSessionId(messages, this._sessionIdsByAnchor, workspaceName);
+				requestHeaders[sessionIdHeaderName] = sessionId;
+				logger.debug("request.session", { header: sessionIdHeaderName, sessionId, workspaceName });
+			}
 			logger.debug("request.headers", {
 				headers: logger.sanitizeHeaders(requestHeaders as Record<string, string>),
 			});
@@ -494,6 +520,12 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					throw new Error("No response body from OAI Compatible API");
 				}
 				await openaiApi.processStreamingResponse(response.body, trackingProgress, token);
+			}
+
+			// Persist the session id used for this request so future turns within the same
+			// conversation reuse it (emitted as a data part that VS Code carries in history).
+			if (sessionId) {
+				trackingProgress.report(createSessionIdPart(sessionId));
 			}
 		} catch (err) {
 			console.error("[OAI Compatible Model Provider] Chat request failed", {
