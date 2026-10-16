@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import type { HFApiMode, HFModelItem } from "../types";
 import { normalizeUserModels, parseModelId } from "../utils";
 import { fetchModels } from "../provideModel";
+import { enrichModelMetadata } from "../modelMetadata";
 import { VersionManager } from "../versionManager";
 
 interface InitPayload {
@@ -76,6 +77,15 @@ type IncomingMessage =
 			headers?: Record<string, string>;
 	  }
 	| { type: "deleteProvider"; provider: string }
+	| {
+			type: "syncProviderModels";
+			provider: string;
+			baseUrl?: string;
+			apiKey?: string;
+			apiMode?: string;
+			headers?: Record<string, string>;
+	  }
+	| { type: "addModels"; models: HFModelItem[]; updateExisting?: boolean }
 	| { type: "addModel"; model: HFModelItem }
 	| { type: "updateModel"; model: HFModelItem; originalModelId?: string; originalConfigId?: string }
 	| { type: "deleteModel"; modelId: string }
@@ -87,6 +97,95 @@ type OutgoingMessage =
 	| { type: "init"; payload: InitPayload }
 	| { type: "modelsFetched"; models: HFModelItem[] }
 	| { type: "confirmResponse"; id: string; confirmed: boolean };
+
+/** Convert an unknown value into a positive integer, otherwise undefined. */
+function toPositiveInt(value: unknown): number | undefined {
+	const n = typeof value === "string" ? Number(value) : value;
+	return typeof n === "number" && Number.isFinite(n) && n > 0 ? Math.floor(n) : undefined;
+}
+
+type FetchedModelMeta = Partial<
+	Pick<HFModelItem, "displayName" | "context_length" | "max_completion_tokens" | "vision" | "supportsTools">
+>;
+
+/** Read a boolean-ish value from an unknown field. */
+function toBoolean(value: unknown): boolean | undefined {
+	if (typeof value === "boolean") {
+		return value;
+	}
+	if (typeof value === "string") {
+		const v = value.trim().toLowerCase();
+		if (v === "true" || v === "yes" || v === "1") {
+			return true;
+		}
+		if (v === "false" || v === "no" || v === "0") {
+			return false;
+		}
+	}
+	return undefined;
+}
+
+/**
+ * Extract parameter metadata (context length, output limit, vision, tool calling, display name)
+ * from a provider model listing entry. Supports OpenAI-compatible / OpenRouter-style entries
+ * and Gemini-style fields.
+ */
+function extractFetchedMeta(raw: HFModelItem): FetchedModelMeta {
+	const r = raw as unknown as Record<string, unknown>;
+	const topProvider = (r.top_provider && typeof r.top_provider === "object" ? r.top_provider : {}) as Record<
+		string,
+		unknown
+	>;
+	const architecture = (r.architecture && typeof r.architecture === "object" ? r.architecture : {}) as Record<
+		string,
+		unknown
+	>;
+	const modalities = Array.isArray(architecture.input_modalities) ? architecture.input_modalities : [];
+	// OpenRouter reports a combined modality string like "text+image->text"
+	const modality = typeof architecture.modality === "string" ? architecture.modality : "";
+	const name = [r.displayName, r.name].find((v): v is string => typeof v === "string" && v.trim() !== "");
+	const contextLength =
+		toPositiveInt(r.context_length) ??
+		toPositiveInt(r.context_window) ??
+		toPositiveInt(r.inputTokenLimit) ??
+		toPositiveInt(topProvider.context_length);
+	const maxOutput =
+		toPositiveInt(r.max_completion_tokens) ??
+		toPositiveInt(r.outputTokenLimit) ??
+		toPositiveInt(topProvider.max_completion_tokens);
+
+	// Vision: explicit flags win, otherwise fall back to modality declarations
+	const visionFlag =
+		toBoolean(r.vision) ??
+		toBoolean(r.supports_vision) ??
+		toBoolean(topProvider.supports_vision) ??
+		(modalities.includes("image") ? true : undefined) ??
+		(modality.includes("image") ? true : undefined);
+
+	// Tool calling: explicit flags win, otherwise fall back to modality declarations
+	const toolsFlag =
+		toBoolean(r.supports_tools) ??
+		toBoolean(topProvider.supports_tools) ??
+		(modality.includes("->text") ? true : undefined);
+
+	const meta: FetchedModelMeta = {};
+	if (name) {
+		meta.displayName = name.trim();
+	}
+	if (contextLength) {
+		meta.context_length = contextLength;
+	}
+	if (maxOutput) {
+		meta.max_completion_tokens = maxOutput;
+	}
+	if (visionFlag !== undefined) {
+		meta.vision = visionFlag;
+	}
+	if (toolsFlag !== undefined) {
+		meta.supportsTools = toolsFlag;
+	}
+	return meta;
+}
 
 export class ConfigViewPanel {
 	public static currentPanel: ConfigViewPanel | undefined;
@@ -182,7 +281,11 @@ export class ConfigViewPanel {
 			case "fetchModels": {
 				try {
 					const { models } = await fetchModels(message.baseUrl, message.apiKey, message.apiMode, message.headers);
-					this.panel.webview.postMessage({ type: "modelsFetched", models });
+					const enriched = await Promise.all(models.map((m: HFModelItem) => enrichModelMetadata(m)));
+					this.panel.webview.postMessage({
+						type: "modelsFetched",
+						models: enriched.map((m) => ({ id: m.id, ...extractFetchedMeta(m) })),
+					});
 				} catch (err) {
 					console.error("[oaicopilot] fetchModels failed", err);
 					const errorMessage = err instanceof Error ? err.message : String(err);
@@ -195,6 +298,18 @@ export class ConfigViewPanel {
 				break;
 			case "updateProvider":
 				await this.updateProvider(message.provider, message.baseUrl, message.apiKey, message.apiMode, message.headers);
+				break;
+			case "syncProviderModels":
+				await this.syncProviderModels(
+					message.provider,
+					message.baseUrl,
+					message.apiKey,
+					message.apiMode,
+					message.headers
+				);
+				break;
+			case "addModels":
+				await this.addModels(message.models, message.updateExisting === true);
 				break;
 			case "deleteProvider":
 				await this.deleteProvider(message.provider);
@@ -328,7 +443,8 @@ export class ConfigViewPanel {
 				if (fullModelId === commitModel) {
 					return { ...model, useForCommitGeneration: true };
 				} else {
-					const { useForCommitGeneration: _useForCommitGeneration, ...rest } = model;
+					const rest = { ...model };
+					delete rest.useForCommitGeneration;
 					return rest;
 				}
 			});
@@ -445,7 +561,8 @@ export class ConfigViewPanel {
 
 		const updatedModels = models.map((model) => {
 			if (model.owned_by === trimmedProvider) {
-				const { headers: _, ...rest } = model;
+				const rest = { ...model };
+				delete rest.headers;
 				return {
 					...rest,
 					baseUrl: baseUrl || model.baseUrl,
@@ -483,6 +600,96 @@ export class ConfigViewPanel {
 		await config.update("oaicopilot.models", filteredModels, vscode.ConfigurationTarget.Global);
 		vscode.window.showInformationMessage(`Provider ${provider} and all its models have been deleted.`);
 		// Send refresh signal to frontend
+		await this.sendInit();
+	}
+
+	/**
+	 * Fetch the remote model list for a provider and push the result to the webview,
+	 * where the user picks which models to import.
+	 */
+	private async syncProviderModels(
+		provider: string,
+		baseUrl?: string,
+		apiKey?: string,
+		apiMode?: string,
+		headers?: Record<string, string>
+	) {
+		const trimmedProvider = provider.trim();
+		const config = vscode.workspace.getConfiguration();
+		const models = normalizeUserModels(config.get<unknown>("oaicopilot.models", []));
+		const existing = models.find((m) => m.owned_by === trimmedProvider && !m.id.startsWith("__provider__"));
+		const effectiveBaseUrl = baseUrl || existing?.baseUrl || config.get<string>("oaicopilot.baseUrl", "");
+		const effectiveMode = (apiMode || existing?.apiMode || "openai") as string;
+		const effectiveKey =
+			apiKey ||
+			(await this.secrets.get(`oaicopilot.apiKey.${trimmedProvider.toLowerCase()}`)) ||
+			(await this.secrets.get("oaicopilot.apiKey")) ||
+			"";
+
+		if (!effectiveBaseUrl) {
+			this.panel.webview.postMessage({ type: "syncResult", provider: trimmedProvider, error: "Base URL is required." });
+			return;
+		}
+
+		try {
+			const { models: remote } = await fetchModels(
+				effectiveBaseUrl,
+				effectiveKey,
+				effectiveMode,
+				headers ?? existing?.headers
+			);
+			// Enrich with curated metadata (tool calling / vision / token limits) from models.dev,
+			// falling back to whatever the provider itself reported.
+			const items = await Promise.all(
+				remote
+					.filter((m) => m.id && !m.id.startsWith("__provider__"))
+					.map(async (m) => {
+						const enriched = await enrichModelMetadata(m);
+						return { id: enriched.id, ...extractFetchedMeta(enriched) };
+					})
+			);
+			this.panel.webview.postMessage({
+				type: "syncResult",
+				provider: trimmedProvider,
+				models: items,
+			});
+		} catch (err) {
+			console.error("[oaicopilot] syncProviderModels failed", err);
+			const errorMessage = err instanceof Error ? err.message : String(err);
+			this.panel.webview.postMessage({ type: "syncResult", provider: trimmedProvider, error: errorMessage });
+		}
+	}
+
+	/**
+	 * Batch-add (or update existing) models in one configuration write.
+	 */
+	private async addModels(newModels: HFModelItem[], updateExisting: boolean) {
+		const config = vscode.workspace.getConfiguration();
+		const models = normalizeUserModels(config.get<unknown>("oaicopilot.models", []));
+		let added = 0;
+		let updated = 0;
+
+		for (const model of newModels) {
+			if (!model?.id || !model.owned_by) {
+				continue;
+			}
+			const index = models.findIndex(
+				(m) =>
+					m.id === model.id &&
+					m.owned_by === model.owned_by &&
+					((model.configId && m.configId === model.configId) || (!model.configId && !m.configId))
+			);
+			if (index === -1) {
+				models.push(model);
+				added++;
+			} else if (updateExisting) {
+				models[index] = { ...models[index], ...model };
+				updated++;
+			}
+		}
+
+		await config.update("oaicopilot.models", models, vscode.ConfigurationTarget.Global);
+		vscode.window.showInformationMessage(`Models synced: ${added} added, ${updated} updated.`);
 		await this.sendInit();
 	}
 

@@ -8,6 +8,10 @@ const state = {
 	models: [],
 	providerKeys: {},
 	providerInfo: {},
+	// Models fetched from the provider during a sync operation
+	syncModels: [],
+	syncProvider: "",
+	modelSearchTerm: "",
 };
 
 // Store the action to be performed after confirmation
@@ -40,6 +44,7 @@ const modelFamilyInput = document.getElementById("modelFamily");
 const modelContextLengthInput = document.getElementById("modelContextLength");
 const modelMaxTokensInput = document.getElementById("modelMaxTokens");
 const modelVisionInput = document.getElementById("modelVision");
+const modelSupportsToolsInput = document.getElementById("modelSupportsTools");
 const modelApiModeInput = document.getElementById("modelApiMode");
 const modelTemperatureInput = document.getElementById("modelTemperature");
 const modelTopPInput = document.getElementById("modelTopP");
@@ -67,6 +72,24 @@ const toggleAdvancedSettingsBtn = document.getElementById("toggleAdvancedSetting
 const commitModelInput = document.getElementById("commitModel");
 const commitLanguageInput = document.getElementById("commitLanguage");
 const advancedSettingsContent = document.getElementById("advancedSettingsContent");
+
+// Model search elements
+const modelSearchInput = document.getElementById("modelSearch");
+const modelCountElement = document.getElementById("modelCount");
+
+// Sync dialog elements
+const syncDialog = document.getElementById("syncDialog");
+const syncDialogTitle = document.getElementById("syncDialogTitle");
+const syncDialogClose = document.getElementById("syncDialogClose");
+const syncSearchInput = document.getElementById("syncSearch");
+const syncSelectAllBtn = document.getElementById("syncSelectAll");
+const syncSelectNoneBtn = document.getElementById("syncSelectNone");
+const syncSelectNewBtn = document.getElementById("syncSelectNew");
+const syncStatus = document.getElementById("syncStatus");
+const syncList = document.getElementById("syncList");
+const syncUpdateExistingInput = document.getElementById("syncUpdateExisting");
+const syncCancelBtn = document.getElementById("syncCancel");
+const syncConfirmBtn = document.getElementById("syncConfirm");
 
 // Error message element
 const modelErrorElement = document.getElementById("modelError");
@@ -124,6 +147,14 @@ document.getElementById("refreshGlobalConfig").addEventListener("click", handleR
 document.getElementById("refreshProviders").addEventListener("click", handleRefresh);
 document.getElementById("refreshModels").addEventListener("click", handleRefresh);
 
+// Model search event listener
+if (modelSearchInput) {
+	modelSearchInput.addEventListener("input", () => {
+		state.modelSearchTerm = modelSearchInput.value || "";
+		renderModels();
+	});
+}
+
 // Add Provider button event listener
 document.getElementById("addProvider").addEventListener("click", () => {
 	// Add new provider row to the table
@@ -142,7 +173,8 @@ document.getElementById("addProvider").addEventListener("click", () => {
 			</select>
 		</td>
 		<td><textarea class="provider-input" data-field="headers" rows="2" placeholder='{"X-API-Version": "v1"}' style="width: 100%; font-family: monospace; font-size: 12px;"></textarea></td>
-		<td>
+		<td class="action-buttons">
+			<button class="save-sync-provider-btn">Save &amp; Sync</button>
 			<button class="save-provider-btn secondary">Save</button>
 			<button class="cancel-provider-btn secondary">Cancel</button>
 		</td>
@@ -151,9 +183,10 @@ document.getElementById("addProvider").addEventListener("click", () => {
 
 	// Add event listeners for the new row
 	const saveBtn = newRow.querySelector(".save-provider-btn");
+	const saveSyncBtn = newRow.querySelector(".save-sync-provider-btn");
 	const cancelBtn = newRow.querySelector(".cancel-provider-btn");
 
-	saveBtn.addEventListener("click", () => {
+	const readProviderRow = () => {
 		const inputs = newRow.querySelectorAll(".provider-input");
 		const providerData = {};
 		inputs.forEach((input) => {
@@ -169,6 +202,11 @@ document.getElementById("addProvider").addEventListener("click", () => {
 				// ignore invalid JSON
 			}
 		}
+		return { providerData, headers };
+	};
+
+	saveBtn.addEventListener("click", () => {
+		const { providerData, headers } = readProviderRow();
 
 		vscode.postMessage({
 			type: "addProvider",
@@ -180,6 +218,26 @@ document.getElementById("addProvider").addEventListener("click", () => {
 		});
 
 		newRow.remove();
+	});
+
+	saveSyncBtn.addEventListener("click", () => {
+		const { providerData, headers } = readProviderRow();
+		if (!providerData.provider || !providerData.provider.trim()) {
+			alert("Provider ID is required.");
+			return;
+		}
+
+		vscode.postMessage({
+			type: "addProvider",
+			provider: providerData.provider,
+			baseUrl: providerData.baseUrl || undefined,
+			apiKey: providerData.apiKey || undefined,
+			apiMode: providerData.apiMode || undefined,
+			headers: headers,
+		});
+
+		newRow.remove();
+		requestSyncModels(providerData.provider.trim(), providerData.baseUrl, providerData.apiKey, providerData.apiMode, headers);
 	});
 
 	cancelBtn.addEventListener("click", () => {
@@ -311,6 +369,9 @@ window.addEventListener("message", (event) => {
 			// Handle the response from fetchModels
 			populateModelIdDropdown(message.models);
 			break;
+		case "syncResult":
+			handleSyncResult(message);
+			break;
 		case "modelsFetchError":
 			// Handle error from fetchModels
 			dropdownHeader.textContent = "Error fetching models";
@@ -370,6 +431,7 @@ function renderProviders() {
 				</td>
 				<td><textarea class="provider-input" data-field="headers" rows="2" placeholder='{"X-API-Version": "v1"}' style="width: 100%; font-family: monospace; font-size: 12px;">${headersJson}</textarea></td>
 				<td class="action-buttons">
+					<button class="sync-provider-btn" data-provider="${provider}">Sync Models</button>
 					<button class="update-provider-btn" data-provider="${provider}">Save</button>
 					<button class="delete-provider-btn danger" data-provider="${provider}">Delete</button>
 				</td>
@@ -401,6 +463,30 @@ function renderProviders() {
 	modelProviderInput.innerHTML = '<option value="">Select Provider</option>' + providerOptions;
 
 	// Add event listeners for provider rows
+	document.querySelectorAll(".sync-provider-btn").forEach((btn) => {
+		btn.addEventListener("click", (event) => {
+			const provider = event.currentTarget.getAttribute("data-provider");
+			const row = event.target.closest("tr");
+			const inputs = row.querySelectorAll(".provider-input");
+			const providerData = {};
+			inputs.forEach((input) => {
+				const field = input.getAttribute("data-field");
+				providerData[field] = input.value;
+			});
+
+			let headers = undefined;
+			if (providerData.headers && providerData.headers.trim()) {
+				try {
+					headers = JSON.parse(providerData.headers);
+				} catch (e) {
+					// ignore invalid JSON
+				}
+			}
+
+			requestSyncModels(provider, providerData.baseUrl, providerData.apiKey, providerData.apiMode, headers);
+		});
+	});
+
 	document.querySelectorAll(".update-provider-btn").forEach((btn) => {
 		btn.addEventListener("click", (event) => {
 			const provider = event.target.getAttribute("data-provider");
@@ -453,29 +539,58 @@ function renderProviders() {
 }
 
 function renderModels() {
-	const models = state.models.filter((m) => !m.id.startsWith("__provider__")).sort((a, b) => a.id.localeCompare(b.id));
+	const allModels = state.models.filter((m) => !m.id.startsWith("__provider__"));
+	const term = state.modelSearchTerm.trim().toLowerCase();
+	const models = term
+		? allModels.filter((m) => {
+				const haystack = [m.id, m.owned_by, m.displayName, m.configId, m.family]
+					.filter(Boolean)
+					.join(" ")
+					.toLowerCase();
+				return haystack.includes(term);
+			})
+		: allModels.slice().sort((a, b) => a.id.localeCompare(b.id));
+
+	if (modelCountElement) {
+		modelCountElement.textContent = term
+			? `${models.length} of ${allModels.length} models`
+			: `${allModels.length} model(s)`;
+	}
+
 	if (!models.length) {
-		modelTableBody.innerHTML = '<tr><td colspan="11" class="no-data">No models</td></tr>';
+		modelTableBody.innerHTML =
+			'<tr><td colspan="11" class="no-data">No models match the current filter.</td></tr>';
 		return;
 	}
 
 	const rows = models
 		.map((model) => {
+			const fullId = `${model.id}${model.configId ? "::" + model.configId : ""}`;
+			const badges = [];
+			if (model.vision) {
+				badges.push('<span class="model-badge vision">Vision</span>');
+			}
+			if (model.supportsTools === false) {
+				badges.push('<span class="model-badge no-tools">No tools</span>');
+			}
+			if (model.apiMode && model.apiMode !== "openai") {
+				badges.push(`<span class="model-badge">${escapeHtml(model.apiMode)}</span>`);
+			}
 			return `
-			<tr data-model-id="${model.id}${model.configId ? "::" + model.configId : ""}">
-				<td>${model.id}</td>
-				<td>${model.owned_by}</td>
-				<td>${model.displayName || ""}</td>
-				<td>${model.configId || ""}</td>
+			<tr data-model-id="${fullId}">
+				<td>${escapeHtml(model.id)}</td>
+				<td>${escapeHtml(model.owned_by)}</td>
+				<td>${escapeHtml(model.displayName || "")}</td>
+				<td>${escapeHtml(model.configId || "")}</td>
 				<td>${model.context_length || ""}</td>
 				<td>${model.max_tokens || model.max_completion_tokens || ""}</td>
-				<td>${model.vision ? "True" : ""}</td>
+				<td>${badges.length ? `<div class="model-badges">${badges.join("")}</div>` : ""}</td>
 				<td>${model.temperature !== undefined && model.temperature !== null ? model.temperature : ""}</td>
 				<td>${model.top_p !== undefined && model.top_p !== null ? model.top_p : ""}</td>
 				<td>${model.delay || ""}</td>
 				<td class="action-buttons">
-					<button class="update-model-btn" data-model-id="${model.id}${model.configId ? "::" + model.configId : ""}">Edit</button>
-					<button class="delete-model-btn danger" data-model-id="${model.id}${model.configId ? "::" + model.configId : ""}">Delete</button>
+					<button class="update-model-btn" data-model-id="${fullId}">Edit</button>
+					<button class="delete-model-btn danger" data-model-id="${fullId}">Delete</button>
 				</td>
 			</tr>`;
 		})
@@ -528,6 +643,253 @@ function renderModels() {
 	});
 }
 
+/**
+ * Request the remote model list for a provider and open the sync dialog.
+ */
+function requestSyncModels(provider, baseUrl, apiKey, apiMode, headers) {
+	if (!provider) {
+		return;
+	}
+	state.syncProvider = provider;
+	state.syncModels = [];
+
+	syncDialogTitle.textContent = `Sync Models - ${provider}`;
+	syncSearchInput.value = "";
+	syncUpdateExistingInput.checked = false;
+	showSyncStatus("Fetching models from provider...", false);
+	renderSyncList();
+	syncDialog.style.display = "flex";
+
+	vscode.postMessage({
+		type: "syncProviderModels",
+		provider: provider,
+		baseUrl: baseUrl || undefined,
+		apiKey: apiKey || undefined,
+		apiMode: apiMode || undefined,
+		headers: headers,
+	});
+}
+
+function showSyncStatus(message, isError) {
+	if (!message) {
+		syncStatus.style.display = "none";
+		syncStatus.textContent = "";
+		return;
+	}
+	syncStatus.style.display = "block";
+	syncStatus.textContent = message;
+	syncStatus.classList.toggle("error", isError === true);
+}
+
+/** Whether a model id already exists in the current configuration. */
+function isExistingModel(id) {
+	return state.models.some((m) => m.id === id && !m.id.startsWith("__provider__"));
+}
+
+function formatSyncMeta(model) {
+	const parts = [];
+	if (model.context_length) {
+		parts.push(`Context: ${model.context_length.toLocaleString()}`);
+	}
+	if (model.max_completion_tokens) {
+		parts.push(`Max output: ${model.max_completion_tokens.toLocaleString()}`);
+	}
+	if (model.vision) {
+		parts.push("Vision");
+	}
+	if (model.supportsTools === false) {
+		parts.push("No tools");
+	}
+	return parts.join(" · ");
+}
+
+function renderSyncList() {
+	const term = syncSearchInput.value.trim().toLowerCase();
+	const models = state.syncModels.filter((m) => !term || m.id.toLowerCase().includes(term));
+
+	if (!models.length) {
+		syncList.innerHTML = state.syncModels.length
+			? '<div class="sync-empty">No models match the filter.</div>'
+			: '<div class="sync-empty">Loading models...</div>';
+		updateSyncConfirmLabel();
+		return;
+	}
+
+	syncList.innerHTML = models
+		.map((model) => {
+			const existing = isExistingModel(model.id);
+			const meta = formatSyncMeta(model);
+			const badges = [];
+			if (model.vision) {
+				badges.push('<span class="badge vision">Vision</span>');
+			}
+			if (model.supportsTools === false) {
+				badges.push('<span class="badge no-tools">No tools</span>');
+			}
+			const badgeHtml = badges.length ? badges.join("") : existing ? '<span class="badge">Existing</span>' : '<span class="badge new">New</span>';
+			return `
+			<label class="sync-option" data-model-id="${escapeHtml(model.id)}">
+				<input type="checkbox" class="sync-checkbox" value="${escapeHtml(model.id)}" ${existing ? "" : "checked"} />
+				<div class="sync-option-body">
+					<div class="sync-option-title">${escapeHtml(model.displayName || model.id)}${badgeHtml}</div>
+					<div class="sync-option-meta">${escapeHtml(model.id)}${meta ? " · " + escapeHtml(meta) : ""}</div>
+				</div>
+			</label>`;
+		})
+		.join("");
+
+	syncList.querySelectorAll(".sync-checkbox").forEach((cb) => {
+		cb.addEventListener("change", updateSyncConfirmLabel);
+	});
+
+	updateSyncConfirmLabel();
+}
+
+function updateSyncConfirmLabel() {
+	const checked = syncList.querySelectorAll(".sync-checkbox:checked").length;
+	syncConfirmBtn.textContent = checked > 0 ? `Add Selected (${checked})` : "Add Selected";
+	syncConfirmBtn.disabled = checked === 0;
+}
+
+/** Handle the backend response for a provider model sync request. */
+function handleSyncResult(message) {
+	if (message.error) {
+		showSyncStatus(`Failed to fetch models: ${message.error}`, true);
+		syncList.innerHTML = '<div class="sync-empty">No models available.</div>';
+		syncConfirmBtn.disabled = true;
+		return;
+	}
+
+	state.syncModels = Array.isArray(message.models) ? message.models : [];
+	state.syncProvider = message.provider || state.syncProvider;
+
+	if (!state.syncModels.length) {
+		showSyncStatus("The provider returned no models.", false);
+		syncList.innerHTML = '<div class="sync-empty">No models available.</div>';
+		syncConfirmBtn.disabled = true;
+		return;
+	}
+
+	const newCount = state.syncModels.filter((m) => !isExistingModel(m.id)).length;
+	showSyncStatus(
+		`Found ${state.syncModels.length} model(s): ${newCount} new, ${state.syncModels.length - newCount} already configured.`,
+		false
+	);
+	renderSyncList();
+}
+
+function escapeHtml(value) {
+	return String(value)
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#39;");
+}
+
+function closeSyncDialog() {
+	syncDialog.style.display = "none";
+	state.syncModels = [];
+	state.syncProvider = "";
+	showSyncStatus("", false);
+}
+
+/** Build the model entries to persist from the current dialog selection. */
+function collectSyncSelection() {
+	const checked = Array.from(syncList.querySelectorAll(".sync-checkbox:checked")).map((cb) => cb.value);
+	const providerInfo = state.providerInfo[state.syncProvider] || {};
+	const updateExisting = syncUpdateExistingInput.checked;
+
+	return state.syncModels
+		.filter((m) => checked.includes(m.id))
+		.map((m) => {
+			const existing = state.models.find((x) => x.id === m.id && !x.id.startsWith("__provider__"));
+			const base = existing && updateExisting ? existing : {};
+			const model = {
+				...base,
+				id: m.id,
+				owned_by: state.syncProvider,
+			};
+			// Only fill parameters that were actually reported by the provider
+			if (m.displayName) {
+				model.displayName = m.displayName;
+			}
+			if (m.context_length) {
+				model.context_length = m.context_length;
+			}
+			if (m.max_completion_tokens) {
+				model.max_completion_tokens = m.max_completion_tokens;
+			}
+			if (m.vision) {
+				model.vision = true;
+			}
+			// Persist the tool-calling capability so Copilot can gate agent mode correctly
+			if (m.supportsTools !== undefined) {
+				model.supportsTools = m.supportsTools;
+			}
+			// Inherit provider connection settings for new models
+			if (!existing) {
+				if (providerInfo.baseUrl) {
+					model.baseUrl = providerInfo.baseUrl;
+				}
+				if (providerInfo.apiMode) {
+					model.apiMode = providerInfo.apiMode;
+				}
+				if (providerInfo.headers) {
+					model.headers = providerInfo.headers;
+				}
+			}
+			return model;
+		});
+}
+
+// Sync dialog event listeners
+syncDialogClose.addEventListener("click", closeSyncDialog);
+syncCancelBtn.addEventListener("click", closeSyncDialog);
+syncDialog.addEventListener("click", (event) => {
+	if (event.target === syncDialog) {
+		closeSyncDialog();
+	}
+});
+
+syncSearchInput.addEventListener("input", renderSyncList);
+
+syncSelectAllBtn.addEventListener("click", () => {
+	syncList.querySelectorAll(".sync-checkbox").forEach((cb) => {
+		cb.checked = true;
+	});
+	updateSyncConfirmLabel();
+});
+
+syncSelectNoneBtn.addEventListener("click", () => {
+	syncList.querySelectorAll(".sync-checkbox").forEach((cb) => {
+		cb.checked = false;
+	});
+	updateSyncConfirmLabel();
+});
+
+syncSelectNewBtn.addEventListener("click", () => {
+	syncList.querySelectorAll(".sync-option").forEach((option) => {
+		const cb = option.querySelector(".sync-checkbox");
+		const isNew = !!option.querySelector(".badge.new");
+		cb.checked = isNew;
+	});
+	updateSyncConfirmLabel();
+});
+
+syncConfirmBtn.addEventListener("click", () => {
+	const selected = collectSyncSelection();
+	if (!selected.length) {
+		return;
+	}
+	vscode.postMessage({
+		type: "addModels",
+		models: selected,
+		updateExisting: syncUpdateExistingInput.checked,
+	});
+	closeSyncDialog();
+});
+
 // Reset model form
 function resetModelForm() {
 	// Clear any error message
@@ -542,6 +904,7 @@ function resetModelForm() {
 	modelContextLengthInput.value = 128000;
 	modelMaxTokensInput.value = 4096;
 	modelVisionInput.value = "";
+	modelSupportsToolsInput.value = "";
 	modelApiModeInput.value = "openai";
 	modelTemperatureInput.value = 0;
 	modelTopPInput.value = "";
@@ -590,6 +953,7 @@ function collectModelFormData() {
 		context_length: modelContextLengthInput.value ? parseInt(modelContextLengthInput.value) : undefined,
 		max_tokens: modelMaxTokensInput.value ? parseInt(modelMaxTokensInput.value) : undefined,
 		vision: modelVisionInput.value ? modelVisionInput.value === "true" : undefined,
+		supportsTools: modelSupportsToolsInput.value ? modelSupportsToolsInput.value === "true" : undefined,
 		apiMode: modelApiModeInput.value || undefined,
 		temperature: modelTemperatureInput.value !== "" ? parseFloat(modelTemperatureInput.value) : undefined,
 		top_p: modelTopPInput.value !== "" ? parseFloat(modelTopPInput.value) : undefined,
@@ -804,10 +1168,38 @@ function populateModelIdDropdown(models) {
 
 			// Add selection to clicked option
 			option.classList.add("selected");
+
+			// Auto-fill parameters reported by the provider
+			applyFetchedModelMeta(model);
 		});
 
 		dropdownContent.appendChild(option);
 	});
+}
+
+/**
+ * Fill model form fields with parameters reported by the provider listing.
+ * Only fields the provider actually reports are overwritten.
+ */
+function applyFetchedModelMeta(model) {
+	if (!model) {
+		return;
+	}
+	if (model.displayName) {
+		modelDisplayNameInput.value = model.displayName;
+	}
+	if (model.context_length) {
+		modelContextLengthInput.value = model.context_length;
+	}
+	if (model.max_completion_tokens) {
+		modelMaxCompletionTokensInput.value = model.max_completion_tokens;
+	}
+	if (model.vision) {
+		modelVisionInput.value = "true";
+	}
+	if (model.supportsTools !== undefined) {
+		modelSupportsToolsInput.value = String(model.supportsTools);
+	}
 }
 
 // Function to populate the commit model dropdown
@@ -899,6 +1291,7 @@ function populateModelForm(model) {
 	modelContextLengthInput.value = model.context_length || "";
 	modelMaxTokensInput.value = model.max_tokens || "";
 	modelVisionInput.value = model.vision !== undefined ? String(model.vision) : "";
+	modelSupportsToolsInput.value = model.supportsTools !== undefined ? String(model.supportsTools) : "";
 	modelApiModeInput.value = model.apiMode || "openai";
 	modelTemperatureInput.value = model.temperature !== undefined && model.temperature !== null ? model.temperature : "";
 	modelTopPInput.value = model.top_p !== undefined && model.top_p !== null ? model.top_p : "";

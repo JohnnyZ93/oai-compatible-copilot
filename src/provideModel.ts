@@ -47,6 +47,9 @@ export async function prepareLanguageModelChatInformation(
 				const modelName = m.displayName || (m.configId ? `${m.id}::${m.configId}` : `${m.id}`);
 				const detail = m.owned_by ? `${m.owned_by} (${EXTENSION_LABEL})` : EXTENSION_LABEL;
 				const reasoningEffort = isReasoningEffortValue(m.reasoning_effort) ? m.reasoning_effort : undefined;
+				// Tool calling defaults to true: most OpenAI-compatible endpoints support tools and
+				// only report the negative case. `supportsTools === false` explicitly disables it.
+				const toolCalling = m.supportsTools !== false;
 
 				return {
 					id: modelId,
@@ -63,7 +66,7 @@ export async function prepareLanguageModelChatInformation(
 						? { configurationSchema: createReasoningEffortConfigurationSchema(reasoningEffort) }
 						: {}),
 					capabilities: {
-						toolCalling: true,
+						toolCalling: toolCalling,
 						imageInput: m?.vision ?? false,
 					},
 				} satisfies ModelPickerChatInformation;
