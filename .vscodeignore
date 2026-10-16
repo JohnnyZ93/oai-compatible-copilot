@@ -16,3 +16,10 @@ eslint.config.mjs
 AGENTS.md
 CLAUDE.md
 .doc/**
+
+# ── Runtime dependencies (whitelist) ────────────────────────────────────────
+# The extension only needs @microsoft/tiktokenizer (and its native binding) at
+# runtime. Everything else in node_modules belongs to the packaging toolchain
+# (@vscode/vsce and its transitive deps) and must not ship.
+node_modules/**
+!node_modules/@microsoft/**

@@ -112,6 +112,10 @@
 					<button id="refreshProviders" class="secondary">Refresh</button>
 				</div>
 			</div>
+			<div class="hint-banner">
+				Tip: fill in <strong>Base URL</strong> and <strong>API Key</strong>, then use
+				<strong>Save &amp; Sync</strong> to import all models from the provider in one click.
+			</div>
 			<div class="table-container">
 				<table id="providerTable">
 					<thead>
@@ -138,6 +142,10 @@
 					<button id="addModel">Add Model</button>
 					<button id="refreshModels" class="secondary">Refresh</button>
 				</div>
+			</div>
+			<div class="model-toolbar">
+				<input id="modelSearch" type="text" placeholder="Search models by ID, provider or display name..." />
+				<span id="modelCount" class="muted"></span>
 			</div>
 			<div class="table-container">
 				<table id="modelTable">
@@ -178,6 +186,17 @@
 							<div class="field-description">Model support vision.</div>
 							<select id="modelVision" class="model-input">
 								<option value="">Default (False)</option>
+								<option value="true">True</option>
+								<option value="false">False</option>
+							</select>
+						</div>
+						<div class="field">
+							<label for="modelSupportsTools">Supports Tool Calling</label>
+							<div class="field-description">
+								Whether the model supports tool/function calling. Disable for models that only do plain chat.
+							</div>
+							<select id="modelSupportsTools" class="model-input">
+								<option value="">Default (True)</option>
 								<option value="true">True</option>
 								<option value="false">False</option>
 							</select>
@@ -446,6 +465,38 @@
 				</div>
 			</div>
 		</section>
+
+		<!-- Model Sync Dialog -->
+		<div id="syncDialog" class="modal-overlay" style="display: none">
+			<div class="modal">
+				<div class="modal-header">
+					<h3 id="syncDialogTitle">Sync Models</h3>
+					<button id="syncDialogClose" class="icon-button" title="Close">&times;</button>
+				</div>
+				<div class="modal-toolbar">
+					<input id="syncSearch" type="text" placeholder="Filter models..." />
+					<div class="modal-toolbar-actions">
+						<button id="syncSelectAll" class="secondary">Select All</button>
+						<button id="syncSelectNone" class="secondary">Select None</button>
+						<button id="syncSelectNew" class="secondary">Select New Only</button>
+					</div>
+				</div>
+				<div id="syncStatus" class="sync-status" style="display: none"></div>
+				<div id="syncList" class="sync-list">
+					<!-- Sync options will be inserted here -->
+				</div>
+				<div class="modal-footer">
+					<label class="sync-update-toggle">
+						<input type="checkbox" id="syncUpdateExisting" />
+						<span>Update existing models with fetched parameters</span>
+					</label>
+					<div class="modal-footer-actions">
+						<button id="syncCancel" class="secondary">Cancel</button>
+						<button id="syncConfirm" class="primary">Add Selected</button>
+					</div>
+				</div>
+			</div>
+		</div>
 
 		<script src="%SCRIPT_URI%" nonce="%NONCE%"></script>
 	</body>

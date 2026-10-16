@@ -29,6 +29,12 @@ export interface HFModelItem {
 	architecture?: HFArchitecture;
 	context_length?: number;
 	vision?: boolean;
+	/**
+	 * Whether the model supports tool/function calling.
+	 * Maps to the VS Code `capabilities.toolCalling` field. When undefined the
+	 * provider is assumed to support tools (the common case for OpenAI-compatible APIs).
+	 */
+	supportsTools?: boolean;
 	max_tokens?: number;
 	// OpenAI new standard parameter
 	max_completion_tokens?: number;
